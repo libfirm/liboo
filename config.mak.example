@@ -1,0 +1,3 @@
+FIRM_HOME        = ../libfirm
+LIBFIRM_CPPFLAGS = -I$(FIRM_HOME)/include
+LIBFIRM_LFLAGS   = -L$(FIRM_BUILD) -lfirm
