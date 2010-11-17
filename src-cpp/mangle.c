@@ -409,8 +409,9 @@ void mangle_add_name_substitution(const char *name, const char *mangled)
 	ste->name = duplicate_string(name);
 	ste->mangled = duplicate_string(mangled);
 	st_entry* obj = (st_entry*) cpset_insert(&st, ste);
+	/* noone should insert 2 substitutions for the same name */
 	if (obj != ste)
-		free_ste(ste);
+		panic("more than 1 substitution for name '%s'\n", name);
 }
 
 void mangle_deinit(void)
