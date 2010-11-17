@@ -1,0 +1,68 @@
+<project name="liboo" default="dist" basedir=".">
+	<description>firm object-orientation support library</description>
+
+	<property name="build" location="${basedir}/classes"/>
+	<property name="src" location="${basedir}/src"/>
+	<property name="lib" location="${basedir}/lib"/>
+	<property name="jar" value="liboo.jar"/>
+	<property name="jfirm.jar" value="jfirm.jar"/>
+	<property name="jfirm.location" value="${basedir}/../jFirm"/>
+	<property name="libfirm.location" value="${basedir}/../libfirm"/>
+	<property name="make.exe" value="make"/>
+	<property name="liboo.location" value="${x10.home}/liboo"/>
+
+	<path id="project.classpath">
+		<path refid="jfirm.classpath"/>
+	</path>
+
+	<path id="jfirm.classpath">
+		<pathelement location="${jfirm.location}/classes"/>
+		<pathelement location="${jfirm.location}/lib/jna.jar"/>
+	</path>
+
+	<target name="init">
+		<mkdir dir="${build}"/>
+		<available property="libfirm.exists" file="${basedir}/../libfirm"/>
+		<available property="config.mak.exists" file="${basedir}/config.mak"/>
+	</target>
+
+	<target name="c-build-init" if="libfirm.exists" unless="config.mak.exists">
+		<echo file="${basedir}/config.mak">
+			FIRM_HOME        = ../libfirm
+			LIBFIRM_CPPFLAGS = -I$(FIRM_HOME)/include
+			LIBFIRM_LFLAGS   = -L$(FIRM_HOME)/build/debug -lfirm
+		</echo>
+	</target>
+
+	<target name="clean">
+		<delete dir="${build}" failonerror="false"/>
+		<exec executable="${make.exe}" failonerror="false" dir="${basedir}">
+			<arg value="clean"/>
+		</exec>
+	</target>
+
+	<target name="c-build" depends="c-build-init">
+		<exec executable="${make.exe}" failonerror="true" dir="${basedir}"/>
+	</target>
+
+	<target name="build" depends="init">
+		<javac destdir="${build}" source="1.5" target="1.5" debug="on" includeantruntime="false">
+			<src path="${src}"/>
+			<classpath refid="project.classpath"/>
+		</javac>
+	</target>
+
+	<target name="jar" depends="build">
+		<jar jarfile="${build}/${jar}">
+			<fileset dir="${build}" excludes="${jar}"/>
+		</jar>
+	</target>
+
+	<target name="dist" depends="jar,c-build">
+		<mkdir dir="${lib}"/>
+		<copy todir="${lib}">
+			<fileset dir="${build}" includes="${jar}"/>
+		</copy>
+	</target>
+	
+</project>

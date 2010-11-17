@@ -18,18 +18,18 @@ Q ?= @
 
 all: $(GOAL)
 
+# Make sure our build-directories are created
+UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/adt)
+
 -include $(DEPS)
 
 $(GOAL): $(OBJECTS)
 	@echo '===> LD $@'
 	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS)
 
-$(BUILDDIR)/%.o: %.c $(BUILDDIR)
+$(BUILDDIR)/%.o: %.c
 	@echo '===> CC $<'
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
-
-$(BUILDDIR):
-	$(INSTALL) -d $(BUILDDIR)/src-cpp $(BUILDDIR)/src-cpp/adt
 
 librts.o: librts/librts.cc
 	@echo '===> Building $<'
