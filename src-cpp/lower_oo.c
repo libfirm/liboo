@@ -200,13 +200,10 @@ static void lower_type(type_or_ent tore, void *env)
 	int n_members = get_class_n_members(type);
 	for (int m = 0; m < n_members; ++m) {
 		ir_entity *entity = get_class_member(type, m);
-		fprintf(stderr, "Checking %s...", get_entity_name(entity));
 		/* don't mangle names of entities with explicitely set names */
 		if (entity_has_ld_ident(entity)) {
-			fprintf(stderr, "already mangled\n");
 			continue;
 		}
-		fprintf(stderr, "mangling\n");
 		ident *mangled_id = mangle_entity_name(entity);
 		set_entity_ld_ident(entity, mangled_id);
 	}
