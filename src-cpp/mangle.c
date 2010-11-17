@@ -390,17 +390,32 @@ ident *mangle_vtable_name(ir_type *clazz)
 	return result;
 }
 
+static void clear_primitive_type_link(type_or_ent tore, void *env)
+{
+	(void) env;
+	if (get_kind(tore.ent) == k_type) {
+		ir_type *type = tore.typ;
+		if (is_Primitive_type(type)) {
+			set_type_link(type, NULL);
+		}
+	}
+}
+
 void mangle_init(void)
 {
 	obstack_init(&obst);
 	memset(mangle_buffer, 0, 1024);
 	cpset_init(&st, string_hash, string_cmp);
+
+	/* just to be sure, clear all type links */
+	type_walk(clear_primitive_type_link, NULL, NULL);
 }
 
 void mangle_set_primitive_type_name(ir_type *type, const char *name)
 {
 	assert(is_Primitive_type(type));
-	set_type_link(type, (char*)name);
+	char *duplicate_name = obstack_copy(&obst, name, strlen(name)+1);
+	set_type_link(type, duplicate_name);
 }
 
 void mangle_add_name_substitution(const char *name, const char *mangled)
