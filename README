@@ -1,0 +1,1 @@
+This library provides support for compilation of object-oriented constructs in firm. Since firm mostly deals with low-level things you need an additional layer to produce things like vtable or name-mangling. This library provides them.
