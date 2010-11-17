@@ -10,9 +10,6 @@ static struct obstack obst;
 
 static const char* base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-static char *duplicate_string(const char *s);
-static char *duplicate_string_n(const char* s, size_t n);
-
 #define CT_SIZE 36 // theoretically, there could be substitution patterns with more than one digit.
 typedef struct {
 	char *name;
@@ -35,6 +32,20 @@ typedef struct {
  */
 static cte_entry ct[CT_SIZE];
 static int next_ct_entry;
+
+static char *duplicate_string_n(const char* s, size_t n)
+{
+	char *new_string = XMALLOCN(char, n+1);
+	memcpy(new_string, s, n);
+	new_string[n] = '\0';
+	return new_string;
+}
+
+static char *duplicate_string(const char *s)
+{
+	size_t len = strlen(s);
+	return duplicate_string_n(s, len);
+}
 
 static void flush_ct(void)
 {
@@ -69,13 +80,15 @@ static char mangle_buffer[MB_SIZE];
 
 // (entity name) substitution table
 typedef struct {
-	const char *name;
-	const char *mangled;
+	char *name;
+	char *mangled;
 } st_entry;
 
 static int string_cmp (const void *p1, const void *p2)
 {
-	return (strcmp(((st_entry*)p1)->name, ((st_entry*)p2)->name) == 0);
+	st_entry *entry1 = (st_entry*) p1;
+	st_entry *entry2 = (st_entry*) p2;
+	return strcmp(entry1->name, entry2->name) == 0;
 }
 
 static unsigned string_hash (const void *obj)
@@ -83,7 +96,7 @@ static unsigned string_hash (const void *obj)
 	unsigned hash = 0;
 	const char *s = ((st_entry*)obj)->name;
 	size_t len = strlen(s);
-	for (unsigned i = 0; i < len; i++) {
+	for (size_t i = 0; i < len; i++) {
 		hash = (31 * hash) + s[i];
 	}
 	return hash;
@@ -91,9 +104,11 @@ static unsigned string_hash (const void *obj)
 
 static void free_ste(st_entry *ste)
 {
-	if (! ste) return;
-	free((void*)ste->name);
-	free((void*)ste->mangled);
+	if (ste == NULL)
+		return;
+
+	free(ste->name);
+	free(ste->mangled);
 	free(ste);
 }
 
@@ -105,20 +120,6 @@ static void emit_substitution(int match, struct obstack *obst)
 	if (match > 0)
 		obstack_1grow(obst, base36[match-1]);
 	obstack_1grow(obst, '_');
-}
-
-static char *duplicate_string_n(const char* s, size_t n)
-{
-	char *new_string = malloc ((n+1) * sizeof(char));
-	for (unsigned i = 0; i < n; i++) new_string[i] = s[i];
-	new_string[n] = '\0';
-	return new_string;
-}
-
-static char *duplicate_string(const char *s)
-{
-	size_t len = strlen(s);
-	return duplicate_string_n(s, len);
 }
 
 static void mangle_type(ir_type *type, struct obstack *obst);
@@ -404,11 +405,12 @@ void mangle_set_primitive_type_name(ir_type *type, const char *name)
 
 void mangle_add_name_substitution(const char *name, const char *mangled)
 {
-	st_entry *ste = malloc(sizeof(st_entry));
+	st_entry *ste = XMALLOC(st_entry);
 	ste->name = duplicate_string(name);
 	ste->mangled = duplicate_string(mangled);
 	st_entry* obj = (st_entry*) cpset_insert(&st, ste);
-	if (obj != ste) free_ste(obj);
+	if (obj != ste)
+		free_ste(ste);
 }
 
 void mangle_deinit(void)
@@ -419,11 +421,10 @@ void mangle_deinit(void)
 	cpset_iterator_t iter;
 	cpset_iterator_init(&iter, &st);
 
-	st_entry *cur_ste = NULL;
-	do {
-		cur_ste = (st_entry*) cpset_iterator_next(&iter);
+	st_entry *cur_ste;
+	while ( (cur_ste = (st_entry*)cpset_iterator_next(&iter)) != NULL) {
 		free_ste(cur_ste);
-	} while (cur_ste != NULL);
+	}
 
 	cpset_destroy(&st);
 }
