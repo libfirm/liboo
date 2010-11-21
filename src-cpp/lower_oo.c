@@ -1,4 +1,4 @@
-#include "lower_oo.h"
+#include <liboo/lower_oo.h>
 
 #include <assert.h>
 #include <string.h>
@@ -9,7 +9,7 @@
 //#include "types.h"
 
 //#include "class_file.h"
-#include "mangle.h"
+#include <liboo/mangle.h>
 //#include "gcj_interface.h"
 
 static ir_entity *calloc_entity;

@@ -1,4 +1,4 @@
-#include "mangle.h"
+#include <liboo/mangle.h>
 
 #include <string.h>
 #include <assert.h>

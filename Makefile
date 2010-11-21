@@ -6,7 +6,7 @@ INSTALL ?= install
 
 BUILDDIR=build
 GOAL = $(BUILDDIR)/liboo.so
-CPPFLAGS = -I. $(LIBFIRM_CPPFLAGS)
+CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS)
 CXXFLAGS = -Wall -W -O0 -g3
 CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wunreachable-code -Wlogical-op -Werror -O0 -g3 -std=c99 -pedantic
 LFLAGS = $(LIBFIRM_LFLAGS)
