@@ -31,9 +31,5 @@ $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $<'
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
-librts.o: librts/librts.cc
-	@echo '===> Building $<'
-	$(Q)$(CXX) $(CXXFLAGS) -c -o $@ $<
-
 clean:
 	rm -rf $(OBJECTS) $(GOAL) $(DEPS)
