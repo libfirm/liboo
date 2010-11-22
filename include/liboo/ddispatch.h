@@ -19,10 +19,10 @@
 
 #include <libfirm/firm.h>
 
-typedef int  (*vtable_create_pred_t)      (ir_type* classtype);
+typedef int  (*vtable_create_pred_t)      (ir_type* klass);
 typedef int  (*vtable_include_pred_t)     (ir_entity* method);
 typedef int  (*vtable_is_abstract_pred_t) (ir_entity* method);
-typedef void (*vtable_init_slots_t)       (ir_type* classtype, ir_initializer_t *vtable_init, unsigned vtable_size);
+typedef void (*vtable_init_slots_t)       (ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size);
 
 typedef enum { bind_static, bind_dynamic, bind_interface, bind_builtin, bind_already_bound } ddispatch_binding;
 typedef ddispatch_binding (*call_decide_binding_t) (ir_node* call);
@@ -47,5 +47,6 @@ typedef struct {
 void ddispatch_init(ddispatch_params params);
 void ddispatch_setup_vtable(ir_type *klass);
 void ddispatch_lower_Call(ir_node* call);
+void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem);
 
 #endif

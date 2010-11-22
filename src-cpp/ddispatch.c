@@ -1,7 +1,6 @@
-
 #include <liboo/ddispatch.h>
-#include <liboo/mangle.h>
 
+#include <liboo/mangle.h>
 #include <assert.h>
 
 static ir_mode *mode_reference;
@@ -177,4 +176,25 @@ void ddispatch_lower_Call(ir_node* call)
 
 	set_Call_ptr(call, real_callee);
 	set_Call_mem(call, cur_mem);
+}
+
+void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem)
+{
+	assert(is_Class_type(klass));
+
+	ir_node   *cur_mem         = *mem;
+	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, ddp.call_vptr_entity);
+
+	ir_type   *global_type     = get_glob_type();
+	ir_entity *vtable_entity   = get_class_member_by_name(global_type, mangle_vtable_name(klass));
+
+	union symconst_symbol sym;
+	sym.entity_p = vtable_entity;
+	ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
+	ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddp.vtable_vptr_points_to_index * get_type_size_bytes(type_reference));
+	ir_node   *vptr_target     = new_r_Add(block, vtable_symconst, const_offset, mode_reference);
+	ir_node   *vptr_store      = new_r_Store(block, cur_mem, vptr, vptr_target, cons_none);
+	cur_mem                    = new_r_Proj(vptr_store, mode_M, pn_Store_M);
+
+	*mem = cur_mem;
 }
