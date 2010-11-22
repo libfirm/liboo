@@ -4,6 +4,7 @@
 
 #include <assert.h>
 
+static ir_mode *mode_reference;
 static ir_type *type_reference;
 
 static ddispatch_params ddp;
@@ -12,7 +13,8 @@ void ddispatch_init(ddispatch_params params)
 {
 	ddp = params;
 
-	type_reference = new_type_primitive(mode_P);
+	mode_reference = mode_reference;
+	type_reference = new_type_primitive(mode_reference);
 }
 
 void ddispatch_setup_vtable(ir_type *klass)
@@ -97,7 +99,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 				} else {
 					sym.entity_p = new_entity(get_glob_type(), ddp.vtable_abstract_method_ident, get_entity_type(member));
 				}
-				ir_node *symconst_node = new_r_SymConst(const_code, mode_P, sym, symconst_addr_ent);
+				ir_node *symconst_node = new_r_SymConst(const_code, mode_reference, sym, symconst_addr_ent);
 				ir_initializer_t *val = create_initializer_const(symconst_node);
 				set_initializer_compound_value (init, member_vtid+ddp.vtable_vptr_points_to_index, val);
 			}
@@ -144,24 +146,24 @@ void ddispatch_lower_Call(ir_node* call)
 	case bind_static: {
 		symconst_symbol callee_static;
 		callee_static.entity_p = method_entity;
-		real_callee = new_r_SymConst(irg, mode_P, callee_static, symconst_addr_ent);
+		real_callee = new_r_SymConst(irg, mode_reference, callee_static, symconst_addr_ent);
 		break;
 	}
 	case bind_dynamic: {
 		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, ddp.call_vptr_entity);
 
-		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_P, cons_none);
-		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_P, pn_Load_res);
+		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
+		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
 		cur_mem                = new_r_Proj(vtable_load, mode_M, pn_Load_M);
 
 		unsigned vtable_id     = get_entity_vtable_number(method_entity);
 		assert(vtable_id != IR_VTABLE_NUM_NOT_SET);
 
 		unsigned type_ref_size = get_type_size_bytes(type_reference);
-		ir_node *vtable_offset = new_r_Const_long(irg, mode_P, vtable_id * type_ref_size);
-		ir_node *funcptr_addr  = new_r_Add(block, vtable_addr, vtable_offset, mode_P);
-		ir_node *callee_load   = new_r_Load(block, cur_mem, funcptr_addr, mode_P, cons_none);
-		real_callee            = new_r_Proj(callee_load, mode_P, pn_Load_res);
+		ir_node *vtable_offset = new_r_Const_long(irg, mode_reference, vtable_id * type_ref_size);
+		ir_node *funcptr_addr  = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
+		ir_node *callee_load   = new_r_Load(block, cur_mem, funcptr_addr, mode_reference, cons_none);
+		real_callee            = new_r_Proj(callee_load, mode_reference, pn_Load_res);
 		cur_mem                = new_r_Proj(callee_load, mode_M, pn_Load_M);
 		break;
 	}
