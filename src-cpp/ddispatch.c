@@ -108,3 +108,71 @@ void ddispatch_setup_vtable(ir_type *klass)
 
 	set_entity_initializer(vtable, init);
 }
+
+void ddispatch_lower_Call(ir_node* call)
+{
+	assert(is_Call(call));
+
+	ddispatch_binding binding = (*ddp.call_decide_binding)(call);
+
+	if (binding == bind_already_bound)
+		return;
+
+	if (binding == bind_builtin) {
+		(*ddp.call_lower_builtin)(call);
+		return;
+	}
+
+	ir_node   *callee        = get_Call_ptr(call);
+	assert(is_Sel(callee));
+
+	ir_node   *objptr        = get_Sel_ptr(callee);
+	ir_entity *method_entity = get_Sel_entity(callee);
+	if (! is_method_entity(method_entity))
+		return;
+
+	ir_type   *classtype     = get_entity_owner(method_entity);
+	if (! is_Class_type(classtype))
+		return;
+
+	ir_graph  *irg           = get_irn_irg(call);
+	ir_node   *block         = get_nodes_block(call);
+	ir_node   *cur_mem       = get_Call_mem(call);
+	ir_node   *real_callee   = NULL;
+
+	switch (binding) {
+	case bind_static: {
+		symconst_symbol callee_static;
+		callee_static.entity_p = method_entity;
+		real_callee = new_r_SymConst(irg, mode_P, callee_static, symconst_addr_ent);
+		break;
+	}
+	case bind_dynamic: {
+		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, ddp.call_vptr_entity);
+
+		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_P, cons_none);
+		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_P, pn_Load_res);
+		cur_mem                = new_r_Proj(vtable_load, mode_M, pn_Load_M);
+
+		unsigned vtable_id     = get_entity_vtable_number(method_entity);
+		assert(vtable_id != IR_VTABLE_NUM_NOT_SET);
+
+		unsigned type_ref_size = get_type_size_bytes(type_reference);
+		ir_node *vtable_offset = new_r_Const_long(irg, mode_P, vtable_id * type_ref_size);
+		ir_node *funcptr_addr  = new_r_Add(block, vtable_addr, vtable_offset, mode_P);
+		ir_node *callee_load   = new_r_Load(block, cur_mem, funcptr_addr, mode_P, cons_none);
+		real_callee            = new_r_Proj(callee_load, mode_P, pn_Load_res);
+		cur_mem                = new_r_Proj(callee_load, mode_M, pn_Load_M);
+		break;
+	}
+	case bind_interface: {
+		real_callee = (*ddp.call_lookup_interface_method)(objptr, classtype, method_entity, irg, block, &cur_mem);
+		break;
+	}
+	default:
+		assert(0);
+	}
+
+	set_Call_ptr(call, real_callee);
+	set_Call_mem(call, cur_mem);
+}
