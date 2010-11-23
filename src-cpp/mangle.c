@@ -80,10 +80,6 @@ static void insert_ct(const char* name)
 	next_ct_entry++;
 }
 
-// mangle buffer
-#define MB_SIZE 1024
-static char mangle_buffer[MB_SIZE];
-
 // (entity name) substitution table
 typedef struct {
 	char *name;
@@ -153,15 +149,16 @@ static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, stru
 	size_t      slen        = strlen(string);
 	int         emitted_N   = 0;
 
-	int full_match          = find_in_ct(string);
-	int full_match_p        = -1;
+	int   full_match        = find_in_ct(string);
+	int   full_match_p      = -1;
+
+	char *request_buffer    = XMALLOCN(char, slen+2);
 
 	if (is_pointer) {
-		assert(slen+1 < MB_SIZE);
-		mangle_buffer[0] = 'P';
-		strcpy(mangle_buffer+1, string);
-		mangle_buffer[slen+1] = '\0';
-		full_match_p = find_in_ct(mangle_buffer);
+		request_buffer[0] = 'P';
+		strcpy(request_buffer+1, string);
+		request_buffer[slen+1] = '\0';
+		full_match_p = find_in_ct(request_buffer);
 	}
 
 	if (full_match_p >= 0) {
@@ -172,7 +169,7 @@ static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, stru
 
 	if (full_match >= 0) {
 		if (is_pointer) {
-			insert_ct(mangle_buffer); // we have the class entry -> use it and introduce the *class entry
+			insert_ct(request_buffer); // we have the class entry -> use it and introduce the *class entry
 			obstack_1grow(obst, 'P');
 		}
 		emit_substitution(full_match, obst);
@@ -197,16 +194,15 @@ static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, stru
 		const char *comp_begin   = p;
 		const char *comp_end     = p + l;
 		unsigned    comp_end_idx = (comp_end-string);
-		assert(comp_end_idx+1 < MB_SIZE);
-		strncpy(mangle_buffer, string, comp_end_idx);
-		mangle_buffer[comp_end_idx] = '\0';
+		strncpy(request_buffer, string, comp_end_idx);
+		request_buffer[comp_end_idx] = '\0';
 		p = comp_end;
 
-		int match = find_in_ct(mangle_buffer);
+		int match = find_in_ct(request_buffer);
 		if (match >= 0) {
 			last_match = match;
 		} else {
-			insert_ct(mangle_buffer);
+			insert_ct(request_buffer);
 
 			if (last_match >= 0) {
 				emit_substitution(last_match, obst);
@@ -219,14 +215,14 @@ static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, stru
 
 	if (is_pointer) {
 		// insert the *class entry AFTER the class entry (that has been created in the last loop iteration above)
-		assert(slen+1 < MB_SIZE);
-		mangle_buffer[0] = 'P';
-		strcpy(mangle_buffer+1, string);
-		mangle_buffer[slen+1] = '\0';
-		assert(find_in_ct(mangle_buffer) == -1);
-		insert_ct(mangle_buffer);
+		request_buffer[0] = 'P';
+		strcpy(request_buffer+1, string);
+		request_buffer[slen+1] = '\0';
+		assert(find_in_ct(request_buffer) == -1);
+		insert_ct(request_buffer);
 	}
 
+	free(request_buffer);
 	return emitted_N;
 }
 
@@ -412,7 +408,6 @@ static void clear_primitive_type_link(type_or_ent tore, void *env)
 void mangle_init(void)
 {
 	obstack_init(&obst);
-	memset(mangle_buffer, 0, 1024);
 	cpset_init(&st, string_hash, string_cmp);
 
 	/* just to be sure, clear all type links */
