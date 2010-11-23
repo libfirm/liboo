@@ -6,6 +6,12 @@
 #include "adt/cpset.h"
 #include "adt/error.h"
 
+#ifdef __APPLE__
+static const char *mangle_prefix = "_";
+#else
+static const char *mangle_prefix = "";
+#endif
+
 static struct obstack obst;
 
 static const char* base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -306,6 +312,7 @@ ident *mangle_entity_name(ir_entity *entity)
 	ir_type *owner = get_entity_owner(entity);
 	ir_type *type  = get_entity_type(entity);
 
+	obstack_grow(&obst, mangle_prefix, strlen(mangle_prefix));
 	obstack_grow(&obst, "_Z", 2);
 
 	mangle_qualified_class_name(owner, 0, &obst);
@@ -375,6 +382,7 @@ ident *mangle_vtable_name(ir_type *clazz)
 
 	flush_ct();
 
+	obstack_grow(&obst, mangle_prefix, strlen(mangle_prefix));
 	obstack_grow(&obst, "_ZTV", 4);
 
 	int emitted_N = mangle_qualified_class_name(clazz, 0, &obst);
