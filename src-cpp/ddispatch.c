@@ -10,9 +10,19 @@ static ddispatch_params ddp;
 
 void ddispatch_init(ddispatch_params params)
 {
+	assert (params.vtable_create_pred);
+	assert (params.vtable_include_pred);
+	assert (params.vtable_is_abstract_pred);
+	assert (params.vtable_init_slots);
+	assert (params.vtable_abstract_method_ident);
+	assert (params.vtable_index_of_first_method >= params.vtable_vptr_points_to_index);
+	assert (params.call_decide_binding);
+	assert (params.call_lookup_interface_method);
+	assert (params.call_lower_builtin);
+	assert (params.call_vptr_entity);
 	ddp = params;
 
-	mode_reference = mode_reference;
+	mode_reference = mode_P;
 	type_reference = new_type_primitive(mode_reference);
 }
 
@@ -29,7 +39,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	assert (get_class_member_by_name(global_type, vtable_name) == NULL);
 
 	ir_type *superclass = NULL;
-	unsigned vtable_size = ddp.vtable_index_of_first_method;
+	unsigned vtable_size = ddp.vtable_index_of_first_method-ddp.vtable_vptr_points_to_index;
 	int n_supertypes = get_class_n_supertypes(klass);
 	if (n_supertypes > 0) {
 		assert (n_supertypes == 1);
@@ -149,7 +159,7 @@ void ddispatch_lower_Call(ir_node* call)
 		break;
 	}
 	case bind_dynamic: {
-		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, ddp.call_vptr_entity);
+		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ddp.call_vptr_entity);
 
 		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
 		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
@@ -183,7 +193,7 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	assert(is_Class_type(klass));
 
 	ir_node   *cur_mem         = *mem;
-	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, ddp.call_vptr_entity);
+	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ddp.call_vptr_entity);
 
 	ir_type   *global_type     = get_glob_type();
 	ir_entity *vtable_entity   = get_class_member_by_name(global_type, mangle_vtable_name(klass));

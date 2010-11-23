@@ -30,18 +30,18 @@ typedef ir_node* (*call_lookup_interface_method_t) (ir_node *obptr, ir_type *ifa
 typedef void (*call_lower_builtin_t)        (ir_node* call);
 
 typedef struct {
-	vtable_create_pred_t      *vtable_create_pred;
-	vtable_include_pred_t     *vtable_include_pred;
-	vtable_is_abstract_pred_t *vtable_is_abstract_pred;
-	vtable_init_slots_t       *vtable_init_slots;
+	vtable_create_pred_t       vtable_create_pred;
+	vtable_include_pred_t      vtable_include_pred;
+	vtable_is_abstract_pred_t  vtable_is_abstract_pred;
+	vtable_init_slots_t        vtable_init_slots;
 	ident                     *vtable_abstract_method_ident;
 	unsigned                   vtable_vptr_points_to_index;
 	unsigned                   vtable_index_of_first_method;
 
-	call_decide_binding_t     *call_decide_binding;
-	call_lookup_interface_method_t *call_lookup_interface_method;
-	call_lower_builtin_t      *call_lower_builtin;
-	ir_entity                 *call_vptr_entity;
+	call_decide_binding_t      call_decide_binding;
+	call_lookup_interface_method_t call_lookup_interface_method;
+	call_lower_builtin_t       call_lower_builtin;
+	ir_entity                **call_vptr_entity;
 } ddispatch_params;
 
 void ddispatch_init(ddispatch_params params);

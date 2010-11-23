@@ -41,6 +41,10 @@ static void lower_type(type_or_ent tore, void *env)
 		return;
 	}
 
+	ir_type *global_type = get_glob_type();
+	if (type == global_type)
+		return;
+
 	/* mangle entity names */
 	int n_members = get_class_n_members(type);
 	for (int m = 0; m < n_members; ++m) {
@@ -52,10 +56,6 @@ static void lower_type(type_or_ent tore, void *env)
 		ident *mangled_id = mangle_entity_name(entity);
 		set_entity_ld_ident(entity, mangled_id);
 	}
-
-	ir_type *global_type = get_glob_type();
-	if (type == global_type)
-		return;
 
 	n_members = get_class_n_members(type);
 	for (int m = n_members-1; m >= 0; --m) {
