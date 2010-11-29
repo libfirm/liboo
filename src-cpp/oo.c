@@ -10,6 +10,12 @@ static void setup_vtable_proxy(ir_type *klass, void *env)
 	ddispatch_setup_vtable(klass);
 }
 
+static void construct_runtime_classinfo_proxy(ir_type *klass, void *env)
+{
+	(void) env;
+	ddispatch_construct_runtime_classinfo(klass);
+}
+
 static void lower_node(ir_node *node, void *env)
 {
 	(void) env;
@@ -70,10 +76,10 @@ static void lower_type(type_or_ent tore, void *env)
 	default_layout_compound_type(type);
 }
 
-void oo_init(ddispatch_params ddparams, dmemory_params dmparams)
+void oo_init(void)
 {
-	ddispatch_init(ddparams);
-	dmemory_init(dmparams);
+	ddispatch_init();
+	dmemory_init();
 	mangle_init();
 }
 
@@ -85,6 +91,7 @@ void oo_deinit(void)
 void lower_oo(void)
 {
 	class_walk_super2sub(setup_vtable_proxy, NULL, NULL);
+	class_walk_super2sub(construct_runtime_classinfo_proxy, NULL, NULL);
 
 	int n_irgs = get_irp_n_irgs();
 	for (int i = 0; i < n_irgs; ++i) {

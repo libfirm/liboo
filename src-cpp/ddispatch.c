@@ -1,36 +1,72 @@
 #include <liboo/ddispatch.h>
 
 #include <liboo/mangle.h>
+#include <liboo/dmemory.h>
+#include "adt/error.h"
 #include <assert.h>
 
 static ir_mode *mode_reference;
 static ir_type *type_reference;
 
-static ddispatch_params ddp;
+struct ddispatch_model_t {
+	unsigned                      vptr_points_to_index;
+	unsigned                      index_of_first_method;
+	init_vtable_slots_t           init_vtable_slots;
+	ident                        *abstract_method_ident;
+	construct_interface_lookup_t  construct_interface_lookup;
+	construct_runtime_classinfo_t construct_runtime_classinfo;
+} ddispatch_model;
 
-void ddispatch_init(ddispatch_params params)
+void __abstract_method(void);
+void __abstract_method(void)
 {
-	assert (params.vtable_create_pred);
-	assert (params.vtable_include_pred);
-	assert (params.vtable_is_abstract_pred);
-	assert (params.vtable_init_slots);
-	assert (params.vtable_abstract_method_ident);
-	assert (params.vtable_index_of_first_method >= params.vtable_vptr_points_to_index);
-	assert (params.call_decide_binding);
-	assert (params.call_lookup_interface_method);
-	assert (params.call_lower_builtin);
-	assert (params.call_vptr_entity);
-	ddp = params;
+	panic("Cannot invoke abstract method.");
+}
 
+static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size)
+{
+	(void) klass; (void) vtable_size;
+	ir_graph *ccode_irg = get_const_code_irg();
+	ir_node  *const_0   = new_r_Const_long(ccode_irg, mode_reference, 0);
+	ir_initializer_t *slot_init = create_initializer_const(const_0);
+
+	for (unsigned i = 0; i < ddispatch_model.index_of_first_method; i++) {
+		set_initializer_compound_value(vtable_init, i, slot_init);
+	}
+}
+
+static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface, ir_entity *method, ir_graph *irg, ir_node *block, ir_node **mem)
+{
+	(void) objptr; (void) iface; (void) method; (void) irg; (void) block; (void) mem;
+	panic("Invoking an interface method depends on runtime class information. Currently there's no default mechanism.");
+	return NULL;
+}
+
+static void default_construct_class_info(ir_type *klass)
+{
+	(void) klass;
+	panic("default_construct_class_info NYI");
+}
+
+void ddispatch_init(void)
+{
 	mode_reference = mode_P;
 	type_reference = new_type_primitive(mode_reference);
+
+	ddispatch_model.vptr_points_to_index        = 0;
+	ddispatch_model.index_of_first_method       = 0;
+	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
+	ddispatch_model.abstract_method_ident       = new_id_from_str("__abstract_method");
+	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
+	ddispatch_model.construct_runtime_classinfo = default_construct_class_info;
 }
 
 void ddispatch_setup_vtable(ir_type *klass)
 {
 	assert(is_Class_type(klass));
 
-	if (! (*ddp.vtable_create_pred)(klass))
+	oo_type_info *ti = get_class_info(klass);
+	if (! ti->needs_vtable)
 		return;
 
 	ident *vtable_name = mangle_vtable_name(klass);
@@ -39,7 +75,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	assert (get_class_member_by_name(global_type, vtable_name) == NULL);
 
 	ir_type *superclass = NULL;
-	unsigned vtable_size = ddp.vtable_index_of_first_method-ddp.vtable_vptr_points_to_index;
+	unsigned vtable_size = ddispatch_model.index_of_first_method-ddispatch_model.vptr_points_to_index;
 	int n_supertypes = get_class_n_supertypes(klass);
 	if (n_supertypes > 0) {
 		assert (n_supertypes == 1);
@@ -52,7 +88,8 @@ void ddispatch_setup_vtable(ir_type *klass)
 	for (int i = 0; i < get_class_n_members(klass); i++) {
 		ir_entity *member = get_class_member(klass, i);
 		if (is_method_entity(member)) {
-			if ((*ddp.vtable_include_pred)(member)) {
+			oo_entity_info *mi = get_entity_info(member);
+			if (mi->include_in_vtable) {
 				int n_overwrites = get_entity_n_overwrites(member);
 				if (n_overwrites > 0) { // this method already has a vtable id, copy it from the superclass' implementation
 					assert (n_overwrites == 1);
@@ -71,7 +108,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	// the vtable currently is an array of pointers
 	unsigned type_reference_size = get_type_size_bytes(type_reference);
 	ir_type *vtable_type = new_type_array(1, type_reference);
-	size_t vtable_ent_size = vtable_size + ddp.vtable_vptr_points_to_index;
+	size_t vtable_ent_size = vtable_size + ddispatch_model.vptr_points_to_index;
 	set_array_bounds_int(vtable_type, 0, 0, vtable_ent_size);
 	set_type_size_bytes(vtable_type, type_reference_size * vtable_ent_size);
 	set_type_state(vtable_type, layout_fixed);
@@ -89,7 +126,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 		ir_initializer_t *superclass_vtable_init = get_entity_initializer(superclass_vtable_entity);
 
 		// copy vtable initialization from superclass
-		for (unsigned i = ddp.vtable_vptr_points_to_index; i < superclass_vtable_size+ddp.vtable_vptr_points_to_index; i++) {
+		for (unsigned i = ddispatch_model.vptr_points_to_index;
+			          i < superclass_vtable_size+ddispatch_model.vptr_points_to_index;
+			          i++) {
 				ir_initializer_t *superclass_vtable_init_value = get_initializer_compound_value(superclass_vtable_init, i);
 				set_initializer_compound_value (init, i, superclass_vtable_init_value);
 		}
@@ -101,21 +140,21 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (is_method_entity(member)) {
 			unsigned member_vtid = get_entity_vtable_number(member);
 			if (member_vtid != IR_VTABLE_NUM_NOT_SET) {
-
+				oo_entity_info *mi = get_entity_info(member);
 				union symconst_symbol sym;
-				if (! (*ddp.vtable_is_abstract_pred)(member)) {
+				if (! mi->is_abstract) {
 					sym.entity_p = member;
 				} else {
-					sym.entity_p = new_entity(get_glob_type(), ddp.vtable_abstract_method_ident, get_entity_type(member));
+					sym.entity_p = new_entity(get_glob_type(), ddispatch_model.abstract_method_ident, get_entity_type(member));
 				}
 				ir_node *symconst_node = new_r_SymConst(const_code, mode_reference, sym, symconst_addr_ent);
 				ir_initializer_t *val = create_initializer_const(symconst_node);
-				set_initializer_compound_value (init, member_vtid+ddp.vtable_vptr_points_to_index, val);
+				set_initializer_compound_value (init, member_vtid+ddispatch_model.vptr_points_to_index, val);
 			}
 		}
 	}
 
-	(*ddp.vtable_init_slots)(klass, init, vtable_ent_size);
+	(*ddispatch_model.init_vtable_slots)(klass, init, vtable_ent_size);
 
 	set_entity_initializer(vtable, init);
 }
@@ -124,21 +163,17 @@ void ddispatch_lower_Call(ir_node* call)
 {
 	assert(is_Call(call));
 
-	ddispatch_binding binding = (*ddp.call_decide_binding)(call);
-
-	if (binding == bind_already_bound)
-		return;
-
-	if (binding == bind_builtin) {
-		(*ddp.call_lower_builtin)(call);
+	ir_node   *callee        = get_Call_ptr(call);
+	if (! is_Sel(callee)) {
+		if (is_SymConst_addr_ent(callee)
+		 && get_SymConst_entity(callee) == dmemory_get_arraylength_entity())
+			dmemory_lower_arraylength(call);
 		return;
 	}
 
-	ir_node   *callee        = get_Call_ptr(call);
-	assert(is_Sel(callee));
-
 	ir_node   *objptr        = get_Sel_ptr(callee);
 	ir_entity *method_entity = get_Sel_entity(callee);
+
 	if (! is_method_entity(method_entity))
 		return;
 
@@ -146,12 +181,18 @@ void ddispatch_lower_Call(ir_node* call)
 	if (! is_Class_type(classtype))
 		return;
 
+	oo_type_info   *ci       = get_class_info(classtype);
+	oo_entity_info *mi       = get_entity_info(method_entity);
+
+	if (mi->binding == bind_unknown)
+		return;
+
 	ir_graph  *irg           = get_irn_irg(call);
 	ir_node   *block         = get_nodes_block(call);
 	ir_node   *cur_mem       = get_Call_mem(call);
 	ir_node   *real_callee   = NULL;
 
-	switch (binding) {
+	switch (mi->binding) {
 	case bind_static: {
 		symconst_symbol callee_static;
 		callee_static.entity_p = method_entity;
@@ -159,7 +200,7 @@ void ddispatch_lower_Call(ir_node* call)
 		break;
 	}
 	case bind_dynamic: {
-		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ddp.call_vptr_entity);
+		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ci->vptr);
 
 		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
 		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
@@ -177,11 +218,11 @@ void ddispatch_lower_Call(ir_node* call)
 		break;
 	}
 	case bind_interface: {
-		real_callee = (*ddp.call_lookup_interface_method)(objptr, classtype, method_entity, irg, block, &cur_mem);
+		real_callee = (*ddispatch_model.construct_interface_lookup)(objptr, classtype, method_entity, irg, block, &cur_mem);
 		break;
 	}
 	default:
-		assert(0);
+		panic("Cannot lower call.");
 	}
 
 	set_Call_ptr(call, real_callee);
@@ -192,8 +233,9 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 {
 	assert(is_Class_type(klass));
 
+	oo_type_info *ci           = get_class_info(klass);
 	ir_node   *cur_mem         = *mem;
-	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ddp.call_vptr_entity);
+	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ci->vptr);
 
 	ir_type   *global_type     = get_glob_type();
 	ir_entity *vtable_entity   = get_class_member_by_name(global_type, mangle_vtable_name(klass));
@@ -201,10 +243,43 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	union symconst_symbol sym;
 	sym.entity_p = vtable_entity;
 	ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
-	ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddp.vtable_vptr_points_to_index * get_type_size_bytes(type_reference));
+	ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference));
 	ir_node   *vptr_target     = new_r_Add(block, vtable_symconst, const_offset, mode_reference);
 	ir_node   *vptr_store      = new_r_Store(block, cur_mem, vptr, vptr_target, cons_none);
 	cur_mem                    = new_r_Proj(vptr_store, mode_M, pn_Store_M);
 
 	*mem = cur_mem;
+}
+
+void ddispatch_construct_runtime_classinfo(ir_type *klass)
+{
+	(*ddispatch_model.construct_runtime_classinfo)(klass);
+}
+
+void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, init_vtable_slots_t func)
+{
+	assert (index_of_first_method >= vptr_points_to_index);
+	assert (func);
+
+	ddispatch_model.vptr_points_to_index  = vptr_points_to_index;
+	ddispatch_model.index_of_first_method = index_of_first_method;
+	ddispatch_model.init_vtable_slots     = func;
+}
+
+void ddispatch_set_interface_lookup_constructor(construct_interface_lookup_t func)
+{
+	assert (func);
+	ddispatch_model.construct_interface_lookup = func;
+}
+
+void ddispatch_set_abstract_method_ident(ident* ami)
+{
+	assert (ami);
+	ddispatch_model.abstract_method_ident = ami;
+}
+
+void ddispatch_set_runtime_classinfo_constructor(construct_runtime_classinfo_t func)
+{
+	assert (func);
+	ddispatch_model.construct_runtime_classinfo = func;
 }
