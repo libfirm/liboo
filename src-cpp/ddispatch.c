@@ -1,7 +1,6 @@
 #include <liboo/ddispatch.h>
 
-#include <liboo/mangle.h>
-#include <liboo/dmemory.h>
+#include <liboo/oo.h>
 #include "adt/error.h"
 #include <assert.h>
 
@@ -65,8 +64,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 {
 	assert(is_Class_type(klass));
 
-	oo_type_info *ti = get_class_info(klass);
-	if (! ti->needs_vtable)
+	if (! get_class_needs_vtable(klass))
 		return;
 
 	ident *vtable_name = mangle_vtable_name(klass);
@@ -88,8 +86,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	for (int i = 0; i < get_class_n_members(klass); i++) {
 		ir_entity *member = get_class_member(klass, i);
 		if (is_method_entity(member)) {
-			oo_entity_info *mi = get_entity_info(member);
-			if (mi->include_in_vtable) {
+			if (get_method_include_in_vtable(member)) {
 				int n_overwrites = get_entity_n_overwrites(member);
 				if (n_overwrites > 0) { // this method already has a vtable id, copy it from the superclass' implementation
 					assert (n_overwrites == 1);
@@ -140,9 +137,8 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (is_method_entity(member)) {
 			unsigned member_vtid = get_entity_vtable_number(member);
 			if (member_vtid != IR_VTABLE_NUM_NOT_SET) {
-				oo_entity_info *mi = get_entity_info(member);
 				union symconst_symbol sym;
-				if (! mi->is_abstract) {
+				if (! get_method_is_abstract(member)) {
 					sym.entity_p = member;
 				} else {
 					sym.entity_p = new_entity(get_glob_type(), ddispatch_model.abstract_method_ident, get_entity_type(member));
@@ -181,10 +177,8 @@ void ddispatch_lower_Call(ir_node* call)
 	if (! is_Class_type(classtype))
 		return;
 
-	oo_type_info   *ci       = get_class_info(classtype);
-	oo_entity_info *mi       = get_entity_info(method_entity);
-
-	if (mi->binding == bind_unknown)
+	ddispatch_binding binding = get_method_binding(method_entity);
+	if (binding == bind_unknown)
 		return;
 
 	ir_graph  *irg           = get_irn_irg(call);
@@ -192,7 +186,7 @@ void ddispatch_lower_Call(ir_node* call)
 	ir_node   *cur_mem       = get_Call_mem(call);
 	ir_node   *real_callee   = NULL;
 
-	switch (mi->binding) {
+	switch (binding) {
 	case bind_static: {
 		symconst_symbol callee_static;
 		callee_static.entity_p = method_entity;
@@ -200,7 +194,7 @@ void ddispatch_lower_Call(ir_node* call)
 		break;
 	}
 	case bind_dynamic: {
-		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ci->vptr);
+		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *get_class_vptr_entity_ptr(classtype));
 
 		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
 		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
@@ -233,9 +227,8 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 {
 	assert(is_Class_type(klass));
 
-	oo_type_info *ci           = get_class_info(klass);
 	ir_node   *cur_mem         = *mem;
-	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *ci->vptr);
+	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *get_class_vptr_entity_ptr(klass));
 
 	ir_type   *global_type     = get_glob_type();
 	ir_entity *vtable_entity   = get_class_member_by_name(global_type, mangle_vtable_name(klass));

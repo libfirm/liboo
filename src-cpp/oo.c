@@ -1,8 +1,144 @@
 #include <liboo/oo.h>
 
-#include <libfirm/firm.h>
 #include <assert.h>
+#include "adt/obst.h"
 #include "adt/error.h"
+
+typedef enum {
+	k_oo_BAD = k_ir_max+1,
+	k_oo_type_info,
+	k_oo_entity_info,
+} oo_info_kind;
+
+typedef struct {
+	oo_info_kind kind;
+	ir_entity **vptr;
+	int needs_vtable;
+	void *link;
+} oo_type_info;
+
+typedef struct {
+	oo_info_kind kind;
+	int include_in_vtable;
+	int is_abstract;
+	ddispatch_binding binding;
+	void *link;
+} oo_entity_info;
+
+static struct obstack oo_info_obst;
+
+static oo_type_info *get_type_info(ir_type *type)
+{
+	oo_type_info *ti = (oo_type_info*) get_type_link(type);
+	if (ti == NULL) {
+		ti = (oo_type_info*) obstack_alloc(&oo_info_obst, sizeof(oo_type_info));
+		ti->kind = k_oo_type_info;
+		set_type_link(type, ti);
+	} else {
+		assert (ti->kind == k_oo_type_info);
+	}
+	return ti;
+}
+
+static oo_entity_info *get_entity_info(ir_entity *entity)
+{
+	oo_entity_info *ei = (oo_entity_info*) get_entity_link(entity);
+	if (ei == NULL) {
+		ei = (oo_entity_info*) obstack_alloc(&oo_info_obst, sizeof(oo_entity_info));
+		ei->kind = k_oo_entity_info;
+		set_entity_link(entity, ei);
+	} else {
+		assert (ei->kind == k_oo_entity_info);
+	}
+	return ei;
+}
+
+int get_class_needs_vtable(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->needs_vtable;
+}
+void set_class_needs_vtable(ir_type *classtype, int needs_vtable)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->needs_vtable = needs_vtable;
+}
+
+ir_entity **get_class_vptr_entity_ptr(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->vptr;
+}
+void set_class_vptr_entity_ptr(ir_type *classtype, ir_entity **vptr)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->vptr = vptr;
+}
+
+void *get_oo_type_link(ir_type *type)
+{
+	oo_type_info *ti = get_type_info(type);
+	return ti->link;
+}
+void set_oo_type_link(ir_type *type, void* link)
+{
+	oo_type_info *ti = get_type_info(type);
+	ti->link = link;
+}
+
+int get_method_include_in_vtable(ir_entity *method)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	return ei->include_in_vtable;
+}
+void set_method_include_in_vtable(ir_entity *method, int include_in_vtable)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	ei->include_in_vtable = include_in_vtable;
+}
+
+int get_method_is_abstract(ir_entity *method)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	return ei->is_abstract;
+}
+void set_method_is_abstract(ir_entity *method, int is_abstract)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	ei->is_abstract = is_abstract;
+}
+
+ddispatch_binding get_method_binding(ir_entity *method)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	return ei->binding;
+}
+void set_method_binding(ir_entity *method, ddispatch_binding binding)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	ei->binding = binding;
+}
+
+void *get_oo_entity_link(ir_entity *entity)
+{
+	oo_entity_info *ei = get_entity_info(entity);
+	return ei->link;
+}
+void set_oo_entity_link(ir_entity *entity, void* link)
+{
+	oo_entity_info *ei = get_entity_info(entity);
+	ei->link = link;
+}
 
 static void setup_vtable_proxy(ir_type *klass, void *env)
 {
@@ -78,6 +214,7 @@ static void lower_type(type_or_ent tore, void *env)
 
 void oo_init(void)
 {
+	obstack_init(&oo_info_obst);
 	ddispatch_init();
 	dmemory_init();
 	mangle_init();
@@ -86,6 +223,7 @@ void oo_init(void)
 void oo_deinit(void)
 {
 	mangle_deinit();
+	obstack_free(&oo_info_obst, NULL);
 }
 
 void lower_oo(void)
