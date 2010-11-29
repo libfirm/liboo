@@ -146,10 +146,10 @@ static void setup_vtable_proxy(ir_type *klass, void *env)
 	ddispatch_setup_vtable(klass);
 }
 
-static void construct_runtime_classinfo_proxy(ir_type *klass, void *env)
+static void construct_runtime_typeinfo_proxy(ir_type *klass, void *env)
 {
 	(void) env;
-	ddispatch_construct_runtime_classinfo(klass);
+	rtti_construct_runtime_typeinfo(klass);
 }
 
 static void lower_node(ir_node *node, void *env)
@@ -218,6 +218,7 @@ void oo_init(void)
 	ddispatch_init();
 	dmemory_init();
 	mangle_init();
+	rtti_init();
 }
 
 void oo_deinit(void)
@@ -229,7 +230,7 @@ void oo_deinit(void)
 void lower_oo(void)
 {
 	class_walk_super2sub(setup_vtable_proxy, NULL, NULL);
-	class_walk_super2sub(construct_runtime_classinfo_proxy, NULL, NULL);
+	class_walk_super2sub(construct_runtime_typeinfo_proxy, NULL, NULL);
 
 	int n_irgs = get_irp_n_irgs();
 	for (int i = 0; i < n_irgs; ++i) {

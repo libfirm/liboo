@@ -13,7 +13,6 @@ struct ddispatch_model_t {
 	init_vtable_slots_t           init_vtable_slots;
 	ident                        *abstract_method_ident;
 	construct_interface_lookup_t  construct_interface_lookup;
-	construct_runtime_classinfo_t construct_runtime_classinfo;
 } ddispatch_model;
 
 void __abstract_method(void);
@@ -41,12 +40,6 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	return NULL;
 }
 
-static void default_construct_class_info(ir_type *klass)
-{
-	(void) klass;
-	panic("default_construct_class_info NYI");
-}
-
 void ddispatch_init(void)
 {
 	mode_reference = mode_P;
@@ -57,7 +50,6 @@ void ddispatch_init(void)
 	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
 	ddispatch_model.abstract_method_ident       = new_id_from_str("__abstract_method");
 	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
-	ddispatch_model.construct_runtime_classinfo = default_construct_class_info;
 }
 
 void ddispatch_setup_vtable(ir_type *klass)
@@ -244,11 +236,6 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	*mem = cur_mem;
 }
 
-void ddispatch_construct_runtime_classinfo(ir_type *klass)
-{
-	(*ddispatch_model.construct_runtime_classinfo)(klass);
-}
-
 void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, init_vtable_slots_t func)
 {
 	assert (index_of_first_method >= vptr_points_to_index);
@@ -269,10 +256,4 @@ void ddispatch_set_abstract_method_ident(ident* ami)
 {
 	assert (ami);
 	ddispatch_model.abstract_method_ident = ami;
-}
-
-void ddispatch_set_runtime_classinfo_constructor(construct_runtime_classinfo_t func)
-{
-	assert (func);
-	ddispatch_model.construct_runtime_classinfo = func;
 }

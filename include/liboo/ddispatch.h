@@ -33,17 +33,14 @@ typedef enum { bind_unknown, bind_static, bind_dynamic, bind_interface } ddispat
 
 typedef void     (*init_vtable_slots_t)           (ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size);
 typedef ir_node* (*construct_interface_lookup_t)  (ir_node *objptr, ir_type *iface, ir_entity *method, ir_graph *irg, ir_node *block, ir_node **mem);
-typedef void     (*construct_runtime_classinfo_t) (ir_type* klass);
 
 void ddispatch_init(void);
 void ddispatch_setup_vtable(ir_type *klass);
 void ddispatch_lower_Call(ir_node* call);
 void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem);
-void ddispatch_construct_runtime_classinfo(ir_type *klass);
 
 void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, init_vtable_slots_t func);
 void ddispatch_set_interface_lookup_constructor(construct_interface_lookup_t func);
 void ddispatch_set_abstract_method_ident(ident* ami);
-void ddispatch_set_runtime_classinfo_constructor(construct_runtime_classinfo_t func);
 
 #endif
