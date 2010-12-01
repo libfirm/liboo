@@ -11,7 +11,7 @@ static struct {
 static void default_construct_runtime_typeinfo(ir_type *klass)
 {
 	(void) klass;
-	panic("default_construct_runtime_typeinfo NYI.");
+	// FIXME: NYI. This no-op instead of panic, because the RTTI not needed yet in liboo.
 }
 
 void rtti_init()
