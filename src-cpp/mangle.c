@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "adt/obst.h"
 #include "adt/cpset.h"
 #include "adt/error.h"
@@ -136,7 +137,7 @@ static void mangle_primitive_type(ir_type *type, struct obstack *obst)
 	obstack_grow(obst, tag, len);
 }
 
-static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, struct obstack *obst)
+static bool mangle_qualified_class_name(ir_type *class_type, int is_pointer, struct obstack *obst)
 {
 	assert(is_Class_type(class_type));
 
@@ -147,7 +148,7 @@ static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, stru
 	const char *string      = get_id_str(class_ident);
 	const char *p           = string;
 	size_t      slen        = strlen(string);
-	int         emitted_N   = 0;
+	bool        emitted_N   = false;
 
 	int   full_match        = find_in_ct(string);
 	int   full_match_p      = -1;
@@ -180,7 +181,7 @@ static int mangle_qualified_class_name(ir_type *class_type, int is_pointer, stru
 	if (is_pointer)
 		obstack_1grow(obst, 'P');
 	obstack_1grow(obst, 'N');
-	emitted_N = 1;
+	emitted_N = true;
 
 	int last_match          = -1;
 	while (*p != '\0') {
@@ -285,7 +286,7 @@ static void mangle_type(ir_type *type, struct obstack *obst)
 	} else if (is_Pointer_type(type)) {
 		ir_type *pointsto = get_pointer_points_to_type(type);
 		if (is_Class_type(pointsto)) {
-			int emitted_N = mangle_qualified_class_name(pointsto, 1, obst);
+			bool emitted_N = mangle_qualified_class_name(pointsto, 1, obst);
 			if (emitted_N)
 				obstack_1grow(obst, 'E');
 		} else {

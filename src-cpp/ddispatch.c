@@ -15,8 +15,7 @@ struct ddispatch_model_t {
 	construct_interface_lookup_t  construct_interface_lookup;
 } ddispatch_model;
 
-void __abstract_method(void);
-void __abstract_method(void)
+static void __abstract_method(void)
 {
 	panic("Cannot invoke abstract method.");
 }
@@ -50,6 +49,8 @@ void ddispatch_init(void)
 	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
 	ddispatch_model.abstract_method_ident       = new_id_from_str("__abstract_method");
 	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
+
+	(void) __abstract_method;
 }
 
 void ddispatch_setup_vtable(ir_type *klass)
