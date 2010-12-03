@@ -1,0 +1,3 @@
+FIRM_HOME="../../libfirm"
+FIRM_INC="${FIRM_HOME}/include"
+FIRM_BUILD="${FIRM_HOME}/build/debug/"
