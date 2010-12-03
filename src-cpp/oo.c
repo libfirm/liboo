@@ -16,10 +16,10 @@ typedef enum {
 } oo_info_kind;
 
 typedef struct {
-	oo_info_kind kind;
-	ir_entity **vptr;
-	bool needs_vtable;
-	void *link;
+	oo_info_kind  kind;
+	ir_entity    *vptr;
+	bool          needs_vtable;
+	void         *link;
 } oo_type_info;
 
 typedef struct {
@@ -73,13 +73,13 @@ void set_class_needs_vtable(ir_type *classtype, bool needs_vtable)
 	ti->needs_vtable = needs_vtable;
 }
 
-ir_entity **get_class_vptr_entity_ptr(ir_type *classtype)
+ir_entity *get_class_vptr_entity(ir_type *classtype)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	return ti->vptr;
 }
-void set_class_vptr_entity_ptr(ir_type *classtype, ir_entity **vptr)
+void set_class_vptr_entity(ir_type *classtype, ir_entity *vptr)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);

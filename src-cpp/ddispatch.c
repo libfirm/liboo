@@ -191,21 +191,22 @@ void ddispatch_lower_Call(ir_node* call)
 		break;
 	}
 	case bind_dynamic: {
-		ir_node *vptr          = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *get_class_vptr_entity_ptr(classtype));
+		ir_entity *vptr_entity  = get_class_vptr_entity(classtype);
+		ir_node   *vptr         = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
-		ir_node *vtable_load   = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
-		ir_node *vtable_addr   = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
-		cur_mem                = new_r_Proj(vtable_load, mode_M, pn_Load_M);
+		ir_node   *vtable_load  = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
+		ir_node   *vtable_addr  = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
+		cur_mem                 = new_r_Proj(vtable_load, mode_M, pn_Load_M);
 
-		unsigned vtable_id     = get_entity_vtable_number(method_entity);
+		unsigned vtable_id      = get_entity_vtable_number(method_entity);
 		assert(vtable_id != IR_VTABLE_NUM_NOT_SET);
 
-		unsigned type_ref_size = get_type_size_bytes(type_reference);
-		ir_node *vtable_offset = new_r_Const_long(irg, mode_reference, vtable_id * type_ref_size);
-		ir_node *funcptr_addr  = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
-		ir_node *callee_load   = new_r_Load(block, cur_mem, funcptr_addr, mode_reference, cons_none);
-		real_callee            = new_r_Proj(callee_load, mode_reference, pn_Load_res);
-		cur_mem                = new_r_Proj(callee_load, mode_M, pn_Load_M);
+		unsigned type_ref_size  = get_type_size_bytes(type_reference);
+		ir_node *vtable_offset  = new_r_Const_long(irg, mode_reference, vtable_id * type_ref_size);
+		ir_node *funcptr_addr   = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
+		ir_node *callee_load    = new_r_Load(block, cur_mem, funcptr_addr, mode_reference, cons_none);
+		real_callee             = new_r_Proj(callee_load, mode_reference, pn_Load_res);
+		cur_mem                 = new_r_Proj(callee_load, mode_M, pn_Load_M);
 		break;
 	}
 	case bind_interface: {
@@ -225,7 +226,8 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	assert(is_Class_type(klass));
 
 	ir_node   *cur_mem         = *mem;
-	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, *get_class_vptr_entity_ptr(klass));
+	ir_entity *vptr_entity     = get_class_vptr_entity(klass);
+	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
 	ir_type   *global_type     = get_glob_type();
 	ir_entity *vtable_entity   = get_class_member_by_name(global_type, mangle_vtable_name(klass));

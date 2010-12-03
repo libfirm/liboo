@@ -16,8 +16,8 @@ void lower_oo(void);
 
 bool  get_class_needs_vtable(ir_type *classtype);
 void  set_class_needs_vtable(ir_type *classtype, bool needs_vtable);
-ir_entity **get_class_vptr_entity_ptr(ir_type *classtype);
-void  set_class_vptr_entity_ptr(ir_type *classtype, ir_entity **vptr);
+ir_entity *get_class_vptr_entity(ir_type *classtype);
+void  set_class_vptr_entity(ir_type *classtype, ir_entity *vptr);
 void *get_oo_type_link(ir_type *type);
 void  set_oo_type_link(ir_type *type, void* link);
 bool  get_method_include_in_vtable(ir_entity *method);
