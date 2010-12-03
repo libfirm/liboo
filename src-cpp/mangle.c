@@ -1,8 +1,11 @@
-#include <liboo/mangle.h>
+#include "config.h"
+
+#include "liboo/mangle.h"
 
 #include <string.h>
 #include <assert.h>
 #include <stdbool.h>
+#include "liboo/oo.h"
 #include "adt/obst.h"
 #include "adt/cpset.h"
 #include "adt/error.h"

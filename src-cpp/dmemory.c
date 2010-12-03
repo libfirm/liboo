@@ -1,7 +1,9 @@
-#include <liboo/dmemory.h>
+#include "config.h"
 
-#include <liboo/ddispatch.h>
+#include "liboo/dmemory.h"
+
 #include <assert.h>
+#include "liboo/ddispatch.h"
 #include "adt/error.h"
 
 static ir_entity *builtin_arraylength;

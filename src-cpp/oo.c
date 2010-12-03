@@ -1,6 +1,11 @@
-#include <liboo/oo.h>
+#include "config.h"
+
+#include "liboo/oo.h"
 
 #include <assert.h>
+#include "liboo/rtti.h"
+#include "liboo/dmemory.h"
+#include "liboo/mangle.h"
 #include "adt/obst.h"
 #include "adt/error.h"
 

@@ -1,8 +1,12 @@
-#include <liboo/ddispatch.h>
+#include "config.h"
 
-#include <liboo/oo.h>
-#include "adt/error.h"
+#include "liboo/ddispatch.h"
+
 #include <assert.h>
+#include "liboo/oo.h"
+#include "liboo/mangle.h"
+#include "liboo/dmemory.h"
+#include "adt/error.h"
 
 static ir_mode *mode_reference;
 static ir_type *type_reference;

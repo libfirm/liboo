@@ -6,9 +6,6 @@
  */
 
 #include <liboo/ddispatch.h>
-#include <liboo/dmemory.h>
-#include <liboo/mangle.h>
-#include <liboo/rtti.h>
 #include <libfirm/firm.h>
 
 #include <stdbool.h>

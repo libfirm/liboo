@@ -1,5 +1,6 @@
+#include "config.h"
 
-#include <liboo/rtti.h>
+#include "liboo/rtti.h"
 
 #include <assert.h>
 #include "adt/error.h"
