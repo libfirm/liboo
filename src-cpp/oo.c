@@ -32,6 +32,7 @@ static oo_type_info *get_type_info(ir_type *type)
 	oo_type_info *ti = (oo_type_info*) get_type_link(type);
 	if (ti == NULL) {
 		ti = (oo_type_info*) obstack_alloc(&oo_info_obst, sizeof(oo_type_info));
+		memset(ti, 0, sizeof(*ti));
 		ti->kind = k_oo_type_info;
 		set_type_link(type, ti);
 	} else {
@@ -45,6 +46,7 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 	oo_entity_info *ei = (oo_entity_info*) get_entity_link(entity);
 	if (ei == NULL) {
 		ei = (oo_entity_info*) obstack_alloc(&oo_info_obst, sizeof(oo_entity_info));
+		memset(ei, 0, sizeof(*ei));
 		ei->kind = k_oo_entity_info;
 		set_entity_link(entity, ei);
 	} else {
