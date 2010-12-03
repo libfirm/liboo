@@ -174,7 +174,7 @@ void ddispatch_lower_Call(ir_node* call)
 	if (! is_Class_type(classtype))
 		return;
 
-	ddispatch_binding binding = get_method_binding(method_entity);
+	ddispatch_binding binding = get_entity_binding(method_entity);
 	if (binding == bind_unknown)
 		return;
 

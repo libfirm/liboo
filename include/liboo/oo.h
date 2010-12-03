@@ -24,8 +24,8 @@ bool  get_method_include_in_vtable(ir_entity *method);
 void  set_method_include_in_vtable(ir_entity *method, bool include_in_vtable);
 bool  get_method_is_abstract(ir_entity *method);
 void  set_method_is_abstract(ir_entity *method, bool is_abstract);
-ddispatch_binding get_method_binding(ir_entity *method);
-void  set_method_binding(ir_entity *method, ddispatch_binding binding);
+ddispatch_binding get_entity_binding(ir_entity *method);
+void  set_entity_binding(ir_entity *method, ddispatch_binding binding);
 void *get_oo_entity_link(ir_entity *entity);
 void  set_oo_entity_link(ir_entity *entity, void* link);
 

@@ -123,15 +123,13 @@ void set_method_is_abstract(ir_entity *method, bool is_abstract)
 	ei->is_abstract = is_abstract;
 }
 
-ddispatch_binding get_method_binding(ir_entity *method)
+ddispatch_binding get_entity_binding(ir_entity *method)
 {
-	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	return ei->binding;
 }
-void set_method_binding(ir_entity *method, ddispatch_binding binding)
+void set_entity_binding(ir_entity *method, ddispatch_binding binding)
 {
-	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	ei->binding = binding;
 }
@@ -210,7 +208,7 @@ static void lower_type(type_or_ent tore, void *env)
 	for (int m = n_members-1; m >= 0; --m) {
 		ir_entity *entity = get_class_member(type, m);
 		if (is_method_entity(entity) ||
-				get_entity_allocation(entity) == allocation_static) {
+				get_entity_binding(entity) == bind_static) {
 			move_to_global(entity);
 		}
 	}
