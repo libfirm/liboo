@@ -355,7 +355,7 @@ ident *mangle_entity_name(ir_entity *entity)
 
 	/* mangle parameter types */
 	int n_params = get_method_n_params(type);
-	int start    = get_entity_binding(entity) == bind_static ? 0 : 1;
+	int start    = oo_get_entity_binding(entity) == bind_static ? 0 : 1;
 	if (n_params-start == 0) {
 		obstack_1grow(&obst, 'v');
 	} else {

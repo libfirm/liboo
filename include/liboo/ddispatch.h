@@ -1,5 +1,5 @@
-#ifndef DDISPATCH_H
-#define DDISPATCH_H
+#ifndef OO_DDISPATCH_H
+#define OO_DDISPATCH_H
 
 /*
  * Layout of the created dynamic dispatch table (vtable):

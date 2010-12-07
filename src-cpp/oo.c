@@ -73,7 +73,7 @@ void set_class_needs_vtable(ir_type *classtype, bool needs_vtable)
 	ti->needs_vtable = needs_vtable;
 }
 
-ir_entity *get_class_vptr_entity(ir_type *classtype)
+ir_entity *oo_get_class_vptr_entity(ir_type *classtype)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
@@ -90,19 +90,19 @@ ir_entity *get_class_vptr_entity(ir_type *classtype)
 	}
 	return NULL;
 }
-void set_class_vptr_entity(ir_type *classtype, ir_entity *vptr)
+void oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->vptr = vptr;
 }
 
-void *get_oo_type_link(ir_type *type)
+void *oo_get_type_link(ir_type *type)
 {
 	oo_type_info *ti = get_type_info(type);
 	return ti->link;
 }
-void set_oo_type_link(ir_type *type, void* link)
+void oo_set_type_link(ir_type *type, void* link)
 {
 	oo_type_info *ti = get_type_info(type);
 	ti->link = link;
@@ -121,36 +121,36 @@ void set_method_include_in_vtable(ir_entity *method, bool include_in_vtable)
 	ei->include_in_vtable = include_in_vtable;
 }
 
-bool get_method_is_abstract(ir_entity *method)
+bool oo_get_method_is_abstract(ir_entity *method)
 {
 	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	return ei->is_abstract;
 }
-void set_method_is_abstract(ir_entity *method, bool is_abstract)
+void oo_set_method_is_abstract(ir_entity *method, bool is_abstract)
 {
 	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	ei->is_abstract = is_abstract;
 }
 
-ddispatch_binding get_entity_binding(ir_entity *method)
+ddispatch_binding oo_get_entity_binding(ir_entity *entity)
 {
-	oo_entity_info *ei = get_entity_info(method);
+	oo_entity_info *ei = get_entity_info(entity);
 	return ei->binding;
 }
-void set_entity_binding(ir_entity *method, ddispatch_binding binding)
+void oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding)
 {
-	oo_entity_info *ei = get_entity_info(method);
+	oo_entity_info *ei = get_entity_info(entity);
 	ei->binding = binding;
 }
 
-void *get_oo_entity_link(ir_entity *entity)
+void *oo_get_entity_link(ir_entity *entity)
 {
 	oo_entity_info *ei = get_entity_info(entity);
 	return ei->link;
 }
-void set_oo_entity_link(ir_entity *entity, void* link)
+void oo_set_entity_link(ir_entity *entity, void* link)
 {
 	oo_entity_info *ei = get_entity_info(entity);
 	ei->link = link;
@@ -219,7 +219,7 @@ static void lower_type(type_or_ent tore, void *env)
 	for (int m = n_members-1; m >= 0; --m) {
 		ir_entity *entity = get_class_member(type, m);
 		if (is_method_entity(entity) ||
-				get_entity_binding(entity) == bind_static) {
+				oo_get_entity_binding(entity) == bind_static) {
 			move_to_global(entity);
 		}
 	}
@@ -243,7 +243,7 @@ void oo_deinit(void)
 	obstack_free(&oo_info_obst, NULL);
 }
 
-void lower_oo(void)
+void oo_lower(void)
 {
 	class_walk_super2sub(setup_vtable_proxy, NULL, NULL);
 	class_walk_super2sub(construct_runtime_typeinfo_proxy, NULL, NULL);

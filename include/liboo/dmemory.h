@@ -1,5 +1,5 @@
-#ifndef DMEMORY_H
-#define DMEMORY_H
+#ifndef OO_DMEMORY_H
+#define OO_DMEMORY_H
 
 #include <libfirm/firm.h>
 

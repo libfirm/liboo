@@ -135,7 +135,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 			unsigned member_vtid = get_entity_vtable_number(member);
 			if (member_vtid != IR_VTABLE_NUM_NOT_SET) {
 				union symconst_symbol sym;
-				if (! get_method_is_abstract(member)) {
+				if (! oo_get_method_is_abstract(member)) {
 					sym.entity_p = member;
 				} else {
 					sym.entity_p = new_entity(get_glob_type(), ddispatch_model.abstract_method_ident, get_entity_type(member));
@@ -174,7 +174,7 @@ void ddispatch_lower_Call(ir_node* call)
 	if (! is_Class_type(classtype))
 		return;
 
-	ddispatch_binding binding = get_entity_binding(method_entity);
+	ddispatch_binding binding = oo_get_entity_binding(method_entity);
 	if (binding == bind_unknown)
 		return;
 
@@ -191,7 +191,7 @@ void ddispatch_lower_Call(ir_node* call)
 		break;
 	}
 	case bind_dynamic: {
-		ir_entity *vptr_entity  = get_class_vptr_entity(classtype);
+		ir_entity *vptr_entity  = oo_get_class_vptr_entity(classtype);
 		ir_node   *vptr         = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
 		ir_node   *vtable_load  = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
@@ -226,7 +226,7 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	assert(is_Class_type(klass));
 
 	ir_node   *cur_mem         = *mem;
-	ir_entity *vptr_entity     = get_class_vptr_entity(klass);
+	ir_entity *vptr_entity     = oo_get_class_vptr_entity(klass);
 	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
 	ir_type   *global_type     = get_glob_type();

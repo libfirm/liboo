@@ -1,5 +1,5 @@
-#ifndef RTTI_H
-#define RTTI_H
+#ifndef OO_RTTI_H
+#define OO_RTTI_H
 
 #include <libfirm/firm.h>
 

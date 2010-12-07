@@ -1,5 +1,5 @@
-#ifndef MANGLE_H
-#define MANGLE_H
+#ifndef OO_MANGLE_H
+#define OO_MANGLE_H
 
 #include <libfirm/firm.h>
 
