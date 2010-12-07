@@ -39,15 +39,15 @@ public final class OO {
 	/**
 	 * lets you configure which compound-types need a vtable
 	 */
-	public static void setClassNeedsVTable(CompoundType type, boolean needsVTable) {
-		binding_oo.set_class_needs_vtable(type.ptr, needsVTable);
+	public static void setClassOmitVTable(CompoundType type, boolean needsVTable) {
+		binding_oo.set_class_omit_vtable(type.ptr, needsVTable);
 	}
 
 	/**
 	 * lets you configure which methods should be included in the vtable
 	 */
-	public static void setMethodIncludeInVTable(Entity entity, boolean includeInVTable) {
-		binding_oo.set_method_include_in_vtable(entity.ptr, includeInVTable);
+	public static void setMethodExcludeFromVTable(Entity entity, boolean includeInVTable) {
+		binding_oo.set_method_exclude_from_vtable(entity.ptr, includeInVTable);
 	}
 
 	/**

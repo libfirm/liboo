@@ -14,14 +14,14 @@ void oo_init(void);
 void oo_deinit(void);
 void oo_lower(void);
 
-bool  get_class_needs_vtable(ir_type *classtype);
-void  set_class_needs_vtable(ir_type *classtype, bool needs_vtable);
+bool  oo_get_class_omit_vtable(ir_type *classtype);
+void  oo_set_class_omit_vtable(ir_type *classtype, bool omit_vtable);
 ir_entity *oo_get_class_vptr_entity(ir_type *classtype);
 void  oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr);
 void *oo_get_type_link(ir_type *type);
 void  oo_set_type_link(ir_type *type, void* link);
-bool  get_method_include_in_vtable(ir_entity *method);
-void  set_method_include_in_vtable(ir_entity *method, bool include_in_vtable);
+bool  oo_get_method_exclude_from_vtable(ir_entity *method);
+void  oo_set_method_exclude_from_vtable(ir_entity *method, bool exclude_from_vtable);
 bool  oo_get_method_is_abstract(ir_entity *method);
 void  oo_set_method_is_abstract(ir_entity *method, bool is_abstract);
 ddispatch_binding oo_get_entity_binding(ir_entity *entity);

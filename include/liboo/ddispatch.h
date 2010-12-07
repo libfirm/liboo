@@ -29,7 +29,12 @@
 
 #include <libfirm/firm.h>
 
-typedef enum { bind_unknown, bind_static, bind_dynamic, bind_interface } ddispatch_binding;
+typedef enum {
+	bind_unknown,
+	bind_static,
+	bind_dynamic,
+	bind_interface
+} ddispatch_binding;
 
 typedef void     (*init_vtable_slots_t)           (ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size);
 typedef ir_node* (*construct_interface_lookup_t)  (ir_node *objptr, ir_type *iface, ir_entity *method, ir_graph *irg, ir_node *block, ir_node **mem);

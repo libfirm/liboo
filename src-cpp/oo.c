@@ -18,16 +18,16 @@ typedef enum {
 typedef struct {
 	oo_info_kind  kind;
 	ir_entity    *vptr;
-	bool          needs_vtable;
+	bool          omit_vtable;
 	void         *link;
 } oo_type_info;
 
 typedef struct {
-	oo_info_kind kind;
-	bool include_in_vtable;
-	bool is_abstract;
+	oo_info_kind      kind;
+	bool              exclude_from_vtable;
+	bool              is_abstract;
 	ddispatch_binding binding;
-	void *link;
+	void             *link;
 } oo_entity_info;
 
 static struct obstack oo_info_obst;
@@ -60,17 +60,17 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 	return ei;
 }
 
-bool get_class_needs_vtable(ir_type *classtype)
+bool oo_get_class_omit_vtable(ir_type *classtype)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-	return ti->needs_vtable;
+	return ti->omit_vtable;
 }
-void set_class_needs_vtable(ir_type *classtype, bool needs_vtable)
+void oo_set_class_omit_vtable(ir_type *classtype, bool omit_vtable)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-	ti->needs_vtable = needs_vtable;
+	ti->omit_vtable = omit_vtable;
 }
 
 ir_entity *oo_get_class_vptr_entity(ir_type *classtype)
@@ -108,17 +108,17 @@ void oo_set_type_link(ir_type *type, void* link)
 	ti->link = link;
 }
 
-bool get_method_include_in_vtable(ir_entity *method)
+bool oo_get_method_exclude_from_vtable(ir_entity *method)
 {
 	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
-	return ei->include_in_vtable;
+	return ei->exclude_from_vtable;
 }
-void set_method_include_in_vtable(ir_entity *method, bool include_in_vtable)
+void oo_set_method_exclude_from_vtable(ir_entity *method, bool exclude_from_vtable)
 {
 	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
-	ei->include_in_vtable = include_in_vtable;
+	ei->exclude_from_vtable = exclude_from_vtable;
 }
 
 bool oo_get_method_is_abstract(ir_entity *method)
