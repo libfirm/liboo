@@ -3173,9 +3173,9 @@ public class binding_oo {
 
 	public static native void lower_oo();
 
-	public static native boolean get_class_needs_vtable(Pointer classtype);
+	public static native boolean get_class_omit_vtable(Pointer classtype);
 
-	public static native void set_class_needs_vtable(Pointer classtype, boolean needs_vtable);
+	public static native void set_class_omit_vtable(Pointer classtype, boolean omit_vtable);
 
 	public static native Pointer get_class_vptr_entity(Pointer classtype);
 
@@ -3185,9 +3185,9 @@ public class binding_oo {
 
 	public static native void set_oo_type_link(Pointer type, Pointer link);
 
-	public static native boolean get_method_include_in_vtable(Pointer method);
+	public static native boolean get_method_exclude_from_vtable(Pointer method);
 
-	public static native void set_method_include_in_vtable(Pointer method, boolean include_in_vtable);
+	public static native void set_method_exclude_from_vtable(Pointer method, boolean exclude);
 
 	public static native boolean get_method_is_abstract(Pointer method);
 

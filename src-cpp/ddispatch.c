@@ -61,7 +61,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 {
 	assert(is_Class_type(klass));
 
-	if (! get_class_needs_vtable(klass))
+	if (get_class_omit_vtable(klass))
 		return;
 
 	ident *vtable_name = mangle_vtable_name(klass);
@@ -77,27 +77,28 @@ void ddispatch_setup_vtable(ir_type *klass)
 		superclass = get_class_supertype(klass, 0);
 		vtable_size = get_class_vtable_size(superclass);
 	}
-	set_class_vtable_size(klass, vtable_size);
 
 	// assign vtable ids
 	for (int i = 0; i < get_class_n_members(klass); i++) {
 		ir_entity *member = get_class_member(klass, i);
-		if (is_method_entity(member)) {
-			if (get_method_include_in_vtable(member)) {
-				int n_overwrites = get_entity_n_overwrites(member);
-				if (n_overwrites > 0) { // this method already has a vtable id, copy it from the superclass' implementation
-					assert (n_overwrites == 1);
-					ir_entity *overwritten_entity = get_entity_overwrites(member, 0);
-					unsigned vtable_id = get_entity_vtable_number(overwritten_entity);
-					assert (vtable_id != IR_VTABLE_NUM_NOT_SET);
-					set_entity_vtable_number(member, vtable_id);
-				} else {
-					set_entity_vtable_number(member, vtable_size);
-					set_class_vtable_size(klass, ++vtable_size);
-				}
-			}
+		if (!is_method_entity(member))
+			continue;
+		if (get_method_exclude_from_vtable(member))
+			continue;
+
+		int n_overwrites = get_entity_n_overwrites(member);
+		if (n_overwrites > 0) { // this method already has a vtable id, copy it from the superclass' implementation
+			assert (n_overwrites == 1);
+			ir_entity *overwritten_entity = get_entity_overwrites(member, 0);
+			unsigned vtable_id = get_entity_vtable_number(overwritten_entity);
+			assert (vtable_id != IR_VTABLE_NUM_NOT_SET);
+			set_entity_vtable_number(member, vtable_id);
+		} else {
+			set_entity_vtable_number(member, vtable_size);
+			++vtable_size;
 		}
 	}
+	set_class_vtable_size(klass, vtable_size);
 
 	// the vtable currently is an array of pointers
 	unsigned type_reference_size = get_type_size_bytes(type_reference);
@@ -175,8 +176,10 @@ void ddispatch_lower_Call(ir_node* call)
 		return;
 
 	ddispatch_binding binding = get_entity_binding(method_entity);
-	if (binding == bind_unknown)
-		return;
+	if (binding == bind_unknown) {
+		panic("method %s has no binding specified",
+		      get_entity_name(method_entity));
+	}
 
 	ir_graph  *irg           = get_irn_irg(call);
 	ir_node   *block         = get_nodes_block(call);
