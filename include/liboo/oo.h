@@ -26,6 +26,8 @@ bool  oo_get_method_is_abstract(ir_entity *method);
 void  oo_set_method_is_abstract(ir_entity *method, bool is_abstract);
 ddispatch_binding oo_get_entity_binding(ir_entity *entity);
 void  oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding);
+ir_type *oo_get_entity_alt_namespace(ir_entity *entity);
+void  oo_set_entity_alt_namespace(ir_entity *entity, ir_type *namespace);
 void *oo_get_entity_link(ir_entity *entity);
 void  oo_set_entity_link(ir_entity *entity, void* link);
 

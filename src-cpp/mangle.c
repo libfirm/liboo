@@ -309,13 +309,19 @@ ident *mangle_entity_name(ir_entity *entity)
 
 	flush_ct();
 
-	ir_type *owner = get_entity_owner(entity);
-	ir_type *type  = get_entity_type(entity);
+	ir_type *owner  = get_entity_owner(entity);
+	ir_type *alt_ns = oo_get_entity_alt_namespace(entity);
+	ir_type *type   = get_entity_type(entity);
+	ir_type *glob   = get_glob_type();
+
+	ir_type *ns     = alt_ns != NULL ? alt_ns : owner;
+
+	assert (ns != glob);
 
 	obstack_grow(&obst, mangle_prefix, strlen(mangle_prefix));
 	obstack_grow(&obst, "_Z", 2);
 
-	mangle_qualified_class_name(owner, 0, &obst);
+	mangle_qualified_class_name(ns, 0, &obst);
 
 	/* mangle entity name */
 	const char *name_sig  = get_entity_name(entity);
@@ -355,7 +361,7 @@ ident *mangle_entity_name(ir_entity *entity)
 
 	/* mangle parameter types */
 	int n_params = get_method_n_params(type);
-	int start    = oo_get_entity_binding(entity) == bind_static ? 0 : 1;
+	int start    = (owner == glob) ? 0 : 1; // skip implicit this param of non-static methods
 	if (n_params-start == 0) {
 		obstack_1grow(&obst, 'v');
 	} else {

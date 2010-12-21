@@ -27,6 +27,7 @@ typedef struct {
 	bool              exclude_from_vtable;
 	bool              is_abstract;
 	ddispatch_binding binding;
+	ir_type          *alt_namespace;
 	void             *link;
 } oo_entity_info;
 
@@ -134,6 +135,17 @@ void oo_set_method_is_abstract(ir_entity *method, bool is_abstract)
 	ei->is_abstract = is_abstract;
 }
 
+ir_type *oo_get_entity_alt_namespace(ir_entity *entity)
+{
+	oo_entity_info *ei = get_entity_info(entity);
+	return ei->alt_namespace;
+}
+void oo_set_entity_alt_namespace(ir_entity *entity, ir_type *namespace)
+{
+	oo_entity_info *ei = get_entity_info(entity);
+	ei->alt_namespace = namespace;
+}
+
 ddispatch_binding oo_get_entity_binding(ir_entity *entity)
 {
 	oo_entity_info *ei = get_entity_info(entity);
@@ -178,15 +190,6 @@ static void lower_node(ir_node *node, void *env)
 	}
 }
 
-static void move_to_global(ir_entity *entity)
-{
-	/* move to global type */
-	ir_type *owner = get_entity_owner(entity);
-	assert(is_Class_type(owner));
-	ir_type *global_type = get_glob_type();
-	set_entity_owner(entity, global_type);
-}
-
 static void lower_type(type_or_ent tore, void *env)
 {
 	(void) env;
@@ -199,29 +202,16 @@ static void lower_type(type_or_ent tore, void *env)
 		return;
 	}
 
-	ir_type *global_type = get_glob_type();
-	if (type == global_type)
-		return;
-
 	/* mangle entity names */
 	int n_members = get_class_n_members(type);
 	for (int m = 0; m < n_members; ++m) {
 		ir_entity *entity = get_class_member(type, m);
 		/* don't mangle names of entities with explicitely set names */
-		if (entity_has_ld_ident(entity)) {
+		if (entity_has_ld_ident(entity))
 			continue;
-		}
+
 		ident *mangled_id = mangle_entity_name(entity);
 		set_entity_ld_ident(entity, mangled_id);
-	}
-
-	n_members = get_class_n_members(type);
-	for (int m = n_members-1; m >= 0; --m) {
-		ir_entity *entity = get_class_member(type, m);
-		if (is_method_entity(entity) ||
-				oo_get_entity_binding(entity) == bind_static) {
-			move_to_global(entity);
-		}
 	}
 
 	/* layout fields */
