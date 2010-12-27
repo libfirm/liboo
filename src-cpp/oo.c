@@ -18,6 +18,7 @@ typedef enum {
 typedef struct {
 	oo_info_kind  kind;
 	ir_entity    *vptr;
+	ir_entity    *rtti;
 	bool          omit_vtable;
 	void         *link;
 } oo_type_info;
@@ -96,6 +97,20 @@ void oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr)
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->vptr = vptr;
+}
+
+ir_entity *oo_get_class_rtti_entity(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->rtti;
+}
+
+void  oo_set_class_rtti_entity(ir_type *classtype, ir_entity *rtti)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->rtti = rtti;
 }
 
 void *oo_get_type_link(ir_type *type)
@@ -212,6 +227,15 @@ static void lower_type(type_or_ent tore, void *env)
 
 		ident *mangled_id = mangle_entity_name(entity);
 		set_entity_ld_ident(entity, mangled_id);
+	}
+
+	ir_type *glob = get_glob_type();
+	if (type != glob) {
+		for (int m = n_members-1; m >= 0; m--) {
+			ir_entity *entity = get_class_member(type, m);
+			if (is_method_entity(entity))
+				set_entity_owner(entity, glob);
+		}
 	}
 
 	/* layout fields */

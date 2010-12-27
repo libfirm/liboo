@@ -29,6 +29,24 @@
 
 #include <libfirm/firm.h>
 
+/*
+ * This property specifies how a
+ *
+ * class   method entity
+ *     \   /
+ *      Sel
+ *       |
+ *      Call
+ *
+ * construction should be lowered.
+ *
+ * bind_static   : no further indirection should be performed, just call the specified method.
+ * bind_dynamic  : use the vtable mechanism to determine the real callee.
+ * bind_interface: invoke a special lookup method at runtime to get the callee.
+ *
+ * NOTE: This does not distinguish class/static vs. instance methods or fields.
+ *
+ */
 typedef enum {
 	bind_unknown,
 	bind_static,

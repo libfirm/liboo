@@ -316,7 +316,8 @@ ident *mangle_entity_name(ir_entity *entity)
 
 	ir_type *ns     = alt_ns != NULL ? alt_ns : owner;
 
-	assert (ns != glob);
+	if (ns == glob)
+		return id_mangle(new_id_from_str(mangle_prefix), get_entity_ident(entity));
 
 	obstack_grow(&obst, mangle_prefix, strlen(mangle_prefix));
 	obstack_grow(&obst, "_Z", 2);
