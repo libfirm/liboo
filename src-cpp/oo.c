@@ -27,6 +27,7 @@ typedef struct {
 	oo_info_kind      kind;
 	bool              exclude_from_vtable;
 	bool              is_abstract;
+	bool              is_constructor;
 	ddispatch_binding binding;
 	ir_type          *alt_namespace;
 	void             *link;
@@ -148,6 +149,19 @@ void oo_set_method_is_abstract(ir_entity *method, bool is_abstract)
 	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	ei->is_abstract = is_abstract;
+}
+
+bool oo_get_method_is_constructor(ir_entity *method)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	return ei->is_constructor;
+}
+void oo_set_method_is_constructor(ir_entity *method, bool is_constructor)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	ei->is_constructor = is_constructor;
 }
 
 ir_type *oo_get_entity_alt_namespace(ir_entity *entity)

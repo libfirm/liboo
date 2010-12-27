@@ -344,10 +344,10 @@ ident *mangle_entity_name(ir_entity *entity)
 
 	obstack_1grow(&obst, 'E');
 
-	if (!is_Method_type(type))
+	if (! is_Method_type(type))
 		goto name_finished;
 
-	if (strcmp(name_only, "<init>") != 0) { //XXX: Java specific
+	if (! oo_get_method_is_constructor(entity)) {
 		obstack_1grow(&obst, 'J');
 
 		/* mangle return type */

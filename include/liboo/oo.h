@@ -26,6 +26,8 @@ bool  oo_get_method_exclude_from_vtable(ir_entity *method);
 void  oo_set_method_exclude_from_vtable(ir_entity *method, bool exclude_from_vtable);
 bool  oo_get_method_is_abstract(ir_entity *method);
 void  oo_set_method_is_abstract(ir_entity *method, bool is_abstract);
+bool  oo_get_method_is_constructor(ir_entity *method);
+void  oo_set_method_is_constructor(ir_entity *method, bool is_constructor);
 ddispatch_binding oo_get_entity_binding(ir_entity *entity);
 void  oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding);
 ir_type *oo_get_entity_alt_namespace(ir_entity *entity);
