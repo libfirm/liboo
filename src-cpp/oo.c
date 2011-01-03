@@ -216,6 +216,8 @@ static void lower_node(ir_node *node, void *env)
 		dmemory_lower_Alloc(node);
 	} else if (is_Call(node)) {
 		ddispatch_lower_Call(node);
+	} else if (is_Arraylength(node)) {
+		dmemory_lower_Arraylength(node);
 	}
 }
 

@@ -158,12 +158,8 @@ void ddispatch_lower_Call(ir_node* call)
 	assert(is_Call(call));
 
 	ir_node   *callee        = get_Call_ptr(call);
-	if (! is_Sel(callee)) {
-		if (is_SymConst_addr_ent(callee)
-		 && get_SymConst_entity(callee) == dmemory_get_arraylength_entity())
-			dmemory_lower_arraylength(call);
+	if (! is_Sel(callee))
 		return;
-	}
 
 	ir_node   *objptr        = get_Sel_ptr(callee);
 	ir_entity *method_entity = get_Sel_entity(callee);

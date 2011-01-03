@@ -6,7 +6,80 @@
 #include "liboo/ddispatch.h"
 #include "adt/error.h"
 
-static ir_entity *builtin_arraylength;
+static ir_op *op_Arraylength;
+
+enum {
+	dmemory_pos_Arraylength_mem = 0,
+	dmemory_pos_Arraylength_arrayref = 1
+};
+
+static void dump_node(FILE *f, ir_node *irn, dump_reason_t reason)
+{
+	switch (reason) {
+	case dump_node_opcode_txt:
+		fputs(get_op_name(get_irn_op(irn)), f);
+		break;
+	case dump_node_mode_txt:
+		break;
+	case dump_node_nodeattr_txt:
+		break;
+	case dump_node_info_txt:
+		break;
+	default:
+		break;
+	}
+}
+
+static const ir_op_ops dmemory_node_op_ops = {
+	firm_default_hash,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	dump_node,
+	NULL,
+	NULL
+};
+
+ir_node *new_Arraylength(ir_node* mem, ir_node *arrayref)
+{
+	ir_graph *irg   = get_irn_irg(arrayref);
+	ir_node  *block = get_nodes_block(arrayref);
+
+	ir_node  *in[2];
+	in[dmemory_pos_Arraylength_mem]      = mem;
+	in[dmemory_pos_Arraylength_arrayref] = arrayref;
+
+	ir_node *res = new_ir_node(NULL, irg, block, op_Arraylength, mode_T, 2,	in);
+
+	return res;
+}
+
+ir_node *get_Arraylength_mem(const ir_node *node)
+{
+	assert (is_Arraylength(node));
+	return get_irn_n(node, dmemory_pos_Arraylength_mem);
+}
+
+ir_node *get_Arraylength_arrayref(const ir_node *node)
+{
+	assert (is_Arraylength(node));
+	return get_irn_n(node, dmemory_pos_Arraylength_arrayref);
+}
+
+bool is_Arraylength(const ir_node *node)
+{
+	return get_irn_op(node) == op_Arraylength;
+}
 
 struct dmemory_model_t {
 	alloc_object_t    alloc_object;
@@ -103,6 +176,9 @@ static ir_node *default_get_arraylength(ir_node* objptr, ir_graph *irg, ir_node 
 
 void dmemory_init(void)
 {
+	unsigned opcode = get_next_ir_opcode();
+	op_Arraylength = new_ir_op(opcode, "Arraylength", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, 0, &dmemory_node_op_ops);
+
 	ir_type *type_reference = new_type_primitive(mode_P);
 	ir_type *type_int       = new_type_primitive(mode_Is);
 	ir_type *type_size_t    = new_type_primitive(mode_Iu);
@@ -123,11 +199,6 @@ void dmemory_init(void)
 	set_method_param_type(arraylength_type, 0, type_reference);
 	set_method_res_type(arraylength_type, 0, type_int);
 	set_method_additional_properties(arraylength_type, mtp_property_pure);
-
-	ir_type *global_type    = get_glob_type();
-	ident   *arraylength_id = new_id_from_str("$builtin_arraylength");
-	builtin_arraylength     = new_entity(global_type, arraylength_id, arraylength_type);
-	set_entity_additional_properties(builtin_arraylength, mtp_property_intrinsic|mtp_property_private);
 
 	default_arraylength_mode = mode_Is;
 
@@ -165,24 +236,17 @@ void dmemory_lower_Alloc(ir_node *node)
 	set_irn_n(node, pn_Alloc_res, res);
 }
 
-void dmemory_lower_arraylength(ir_node *call)
+void dmemory_lower_Arraylength(ir_node *arraylength)
 {
-	ir_node  *array_ref = get_Call_param(call, 0);
-	ir_node  *block     = get_nodes_block(call);
+	ir_node  *array_ref = get_Arraylength_arrayref(arraylength);
+	ir_node  *block     = get_nodes_block(arraylength);
 	ir_graph *irg       = get_irn_irg(block);
-	ir_node  *cur_mem   = get_Call_mem(call);
+	ir_node  *cur_mem   = get_Arraylength_mem(arraylength);
 	ir_node  *len       = (*dmemory_model.get_arraylength)(array_ref, irg, block, &cur_mem);
-	ir_node  *in[]      = { len };
-	ir_node  *lent      = new_r_Tuple(block, sizeof(in)/sizeof(*in), in);
 
-	turn_into_tuple(call, pn_Call_max);
-	set_irn_n(call, pn_Call_M, cur_mem);
-	set_irn_n(call, pn_Call_T_result, lent);
-}
-
-ir_entity* dmemory_get_arraylength_entity(void)
-{
-	return builtin_arraylength;
+	turn_into_tuple(arraylength, pn_Arraylength_max);
+	set_irn_n(arraylength, pn_Arraylength_M, cur_mem);
+	set_irn_n(arraylength, pn_Arraylength_Is_result, len);
 }
 
 void dmemory_set_allocation_methods(alloc_object_t ao_func, alloc_array_t aa_func, get_arraylength_t ga_func)
