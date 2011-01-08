@@ -218,6 +218,8 @@ static void lower_node(ir_node *node, void *env)
 		ddispatch_lower_Call(node);
 	} else if (is_Arraylength(node)) {
 		dmemory_lower_Arraylength(node);
+	} else if (is_InstanceOf(node)) {
+		rtti_lower_InstanceOf(node);
 	}
 }
 

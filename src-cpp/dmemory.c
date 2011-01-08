@@ -15,6 +15,7 @@ enum {
 
 static void dump_node(FILE *f, ir_node *irn, dump_reason_t reason)
 {
+	assert (is_Arraylength(irn));
 	switch (reason) {
 	case dump_node_opcode_txt:
 		fputs(get_op_name(get_irn_op(irn)), f);
