@@ -9,6 +9,35 @@ public class binding_oo {
 		Native.register("oo");
 	}
 
+	public static enum ir_cons_flags {
+		cons_none(0),
+		cons_volatile((1 << 0)),
+		cons_unaligned((1 << 1)),
+		cons_floats((1 << 2));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_cons_flags(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_cons_flags() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_cons_flags getEnum(int val) {
+			for (ir_cons_flags entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum op_pin_state {
 		op_pin_state_floats(0),
 		op_pin_state_pinned(1),
@@ -2555,35 +2584,6 @@ public class binding_oo {
 		}
 	}
 
-	public static enum ir_cons_flags {
-		cons_none(0),
-		cons_volatile((1 << 0)),
-		cons_unaligned((1 << 1)),
-		cons_floats((1 << 2));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_cons_flags(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_cons_flags() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_cons_flags getEnum(int val) {
-			for (ir_cons_flags entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum range_types {
 		VRP_UNDEFINED(),
 		VRP_RANGE(),
@@ -3171,33 +3171,49 @@ public class binding_oo {
 
 	public static native void oo_deinit();
 
-	public static native void lower_oo();
+	public static native void oo_lower();
 
-	public static native boolean get_class_omit_vtable(Pointer classtype);
+	public static native boolean oo_get_class_omit_vtable(Pointer classtype);
 
-	public static native void set_class_omit_vtable(Pointer classtype, boolean omit_vtable);
+	public static native void oo_set_class_omit_vtable(Pointer classtype, boolean omit_vtable);
 
-	public static native Pointer get_class_vptr_entity(Pointer classtype);
+	public static native Pointer oo_get_class_vptr_entity(Pointer classtype);
 
-	public static native void set_class_vptr_entity(Pointer classtype, Pointer vptr);
+	public static native void oo_set_class_vptr_entity(Pointer classtype, Pointer vptr);
 
-	public static native Pointer get_oo_type_link(Pointer type);
+	public static native Pointer oo_get_class_rtti_entity(Pointer classtype);
 
-	public static native void set_oo_type_link(Pointer type, Pointer link);
+	public static native void oo_set_class_rtti_entity(Pointer classtype, Pointer rtti);
 
-	public static native boolean get_method_exclude_from_vtable(Pointer method);
+	public static native Pointer oo_get_type_link(Pointer type);
 
-	public static native void set_method_exclude_from_vtable(Pointer method, boolean exclude);
+	public static native void oo_set_type_link(Pointer type, Pointer link);
 
-	public static native boolean get_method_is_abstract(Pointer method);
+	public static native boolean oo_get_method_exclude_from_vtable(Pointer method);
 
-	public static native void set_method_is_abstract(Pointer method, boolean is_abstract);
+	public static native void oo_set_method_exclude_from_vtable(Pointer method, boolean exclude_from_vtable);
 
-	public static native /* ddispatch_binding */int get_entity_binding(Pointer method);
+	public static native int oo_get_method_vtable_index(Pointer method);
 
-	public static native void set_entity_binding(Pointer method, /* ddispatch_binding */int binding);
+	public static native void oo_set_method_vtable_index(Pointer method, int vtable_slot);
 
-	public static native Pointer get_oo_entity_link(Pointer entity);
+	public static native boolean oo_get_method_is_abstract(Pointer method);
 
-	public static native void set_oo_entity_link(Pointer entity, Pointer link);
+	public static native void oo_set_method_is_abstract(Pointer method, boolean is_abstract);
+
+	public static native boolean oo_get_method_is_constructor(Pointer method);
+
+	public static native void oo_set_method_is_constructor(Pointer method, boolean is_constructor);
+
+	public static native /* ddispatch_binding */int oo_get_entity_binding(Pointer entity);
+
+	public static native void oo_set_entity_binding(Pointer entity, /* ddispatch_binding */int binding);
+
+	public static native Pointer oo_get_entity_alt_namespace(Pointer entity);
+
+	public static native void oo_set_entity_alt_namespace(Pointer entity, Pointer namespace);
+
+	public static native Pointer oo_get_entity_link(Pointer entity);
+
+	public static native void oo_set_entity_link(Pointer entity, Pointer link);
 }

@@ -9,6 +9,35 @@ public class binding_mangle {
 		Native.register("oo");
 	}
 
+	public static enum ir_cons_flags {
+		cons_none(0),
+		cons_volatile((1 << 0)),
+		cons_unaligned((1 << 1)),
+		cons_floats((1 << 2));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_cons_flags(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_cons_flags() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_cons_flags getEnum(int val) {
+			for (ir_cons_flags entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum op_pin_state {
 		op_pin_state_floats(0),
 		op_pin_state_pinned(1),
@@ -2548,35 +2577,6 @@ public class binding_mangle {
 
 		public static firmstat_optimizations_t getEnum(int val) {
 			for (firmstat_optimizations_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_cons_flags {
-		cons_none(0),
-		cons_volatile((1 << 0)),
-		cons_unaligned((1 << 1)),
-		cons_floats((1 << 2));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_cons_flags(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_cons_flags() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_cons_flags getEnum(int val) {
-			for (ir_cons_flags entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}

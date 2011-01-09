@@ -33,39 +33,66 @@ public final class OO {
 	 * Lower Object-Oriented constructs into low-level stuff
 	 */
 	public static void lowerProgram() {
-		binding_oo.lower_oo();
+		binding_oo.oo_lower();
 	}
 
 	/**
 	 * lets you configure which compound-types need a vtable
 	 */
-	public static void setClassOmitVTable(CompoundType type, boolean needsVTable) {
-		binding_oo.set_class_omit_vtable(type.ptr, needsVTable);
+	public static void setClassOmitVTable(CompoundType type, boolean omitVTable) {
+		binding_oo.oo_set_class_omit_vtable(type.ptr, omitVTable);
 	}
 
 	/**
 	 * lets you configure which methods should be included in the vtable
 	 */
 	public static void setMethodExcludeFromVTable(Entity entity, boolean includeInVTable) {
-		binding_oo.set_method_exclude_from_vtable(entity.ptr, includeInVTable);
+		binding_oo.oo_set_method_exclude_from_vtable(entity.ptr, includeInVTable);
 	}
 
 	/**
 	 * lets you mark a method as abstract
 	 */
 	public static void setMethodAbstract(Entity entity, boolean isAbstract) {
-		binding_oo.set_method_is_abstract(entity.ptr, isAbstract);
+		binding_oo.oo_set_method_is_abstract(entity.ptr, isAbstract);
+	}
+	
+	/**
+	 * lets you mark a method as a constructor
+	 */
+	public static void setMethodConstructor(Entity entity, boolean isConstructor) {
+		binding_oo.oo_set_method_is_constructor(entity.ptr, isConstructor);
 	}
 
 	/**
 	 * lets you specify the binding mode of a method
 	 */
 	public static void setEntityBinding(Entity entity, binding_oo.ddispatch_binding binding) {
-		binding_oo.set_entity_binding(entity.ptr, binding.val);
+		binding_oo.oo_set_entity_binding(entity.ptr, binding.val);
 	}
-
-	public static void setClassVTableEntity(ClassType classType, Entity entity) {
-		binding_oo.set_class_vptr_entity(classType.ptr, entity.ptr);
+	
+	/**
+	 * lets you specify an alternative namespace for an entity.
+	 * This namespace is then used instead of the entity's owner
+	 * during name mangling. (e.g. if the entity is a member of 
+	 * GlobalType)
+	 */
+	public static void setEntityAltNamespace(Entity entity, Type namespace) {
+		binding_oo.oo_set_entity_alt_namespace(entity.ptr, namespace.ptr);
+	}
+	
+	/**
+	 * lets you specify the entity that represents the pointer to the vtable in an instance 
+	 */
+	public static void setClassVPtrEntity(ClassType classType, Entity entity) {
+		binding_oo.oo_set_class_vptr_entity(classType.ptr, entity.ptr);
+	}
+	
+	/**
+	 * lets you specify the entity that represents the run-time type info data. 
+	 */
+	public static void setClassRTTIEntity(ClassType classType, Entity entity) {
+		binding_oo.oo_set_class_rtti_entity(classType.ptr, entity.ptr);
 	}
 
 	/**
