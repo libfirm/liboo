@@ -24,6 +24,8 @@ void *oo_get_type_link(ir_type *type);
 void  oo_set_type_link(ir_type *type, void* link);
 bool  oo_get_method_exclude_from_vtable(ir_entity *method);
 void  oo_set_method_exclude_from_vtable(ir_entity *method, bool exclude_from_vtable);
+int   oo_get_method_vtable_index(ir_entity *method);
+void  oo_set_method_vtable_index(ir_entity *method, int vtable_slot);
 bool  oo_get_method_is_abstract(ir_entity *method);
 void  oo_set_method_is_abstract(ir_entity *method, bool is_abstract);
 bool  oo_get_method_is_constructor(ir_entity *method);

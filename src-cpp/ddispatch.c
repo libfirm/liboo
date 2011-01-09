@@ -90,11 +90,11 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (n_overwrites > 0) { // this method already has a vtable id, copy it from the superclass' implementation
 			assert (n_overwrites == 1);
 			ir_entity *overwritten_entity = get_entity_overwrites(member, 0);
-			unsigned vtable_id = get_entity_vtable_number(overwritten_entity);
-			assert (vtable_id != IR_VTABLE_NUM_NOT_SET);
-			set_entity_vtable_number(member, vtable_id);
+			int vtable_id = oo_get_method_vtable_index(overwritten_entity);
+			assert (vtable_id != -1);
+			oo_set_method_vtable_index(member, vtable_id);
 		} else {
-			set_entity_vtable_number(member, vtable_size);
+			oo_set_method_vtable_index(member, vtable_size);
 			++vtable_size;
 		}
 	}
@@ -133,8 +133,8 @@ void ddispatch_setup_vtable(ir_type *klass)
 	for (int i = 0; i < get_class_n_members(klass); i++) {
 		ir_entity *member = get_class_member(klass, i);
 		if (is_method_entity(member)) {
-			unsigned member_vtid = get_entity_vtable_number(member);
-			if (member_vtid != IR_VTABLE_NUM_NOT_SET) {
+			int member_vtid = oo_get_method_vtable_index(member);
+			if (member_vtid != -1) {
 				union symconst_symbol sym;
 				if (! oo_get_method_is_abstract(member)) {
 					sym.entity_p = member;
@@ -195,8 +195,8 @@ void ddispatch_lower_Call(ir_node* call)
 		ir_node   *vtable_addr  = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
 		cur_mem                 = new_r_Proj(vtable_load, mode_M, pn_Load_M);
 
-		unsigned vtable_id      = get_entity_vtable_number(method_entity);
-		assert(vtable_id != IR_VTABLE_NUM_NOT_SET);
+		int        vtable_id    = oo_get_method_vtable_index(method_entity);
+		assert(vtable_id != -1);
 
 		unsigned type_ref_size  = get_type_size_bytes(type_reference);
 		ir_node *vtable_offset  = new_r_Const_long(irg, mode_reference, vtable_id * type_ref_size);

@@ -26,6 +26,7 @@ typedef struct {
 typedef struct {
 	oo_info_kind      kind;
 	bool              exclude_from_vtable;
+	int               vtable_index;
 	bool              is_abstract;
 	bool              is_constructor;
 	ddispatch_binding binding;
@@ -136,6 +137,19 @@ void oo_set_method_exclude_from_vtable(ir_entity *method, bool exclude_from_vtab
 	assert (is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	ei->exclude_from_vtable = exclude_from_vtable;
+}
+
+int  oo_get_method_vtable_index(ir_entity *method)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	return ei->vtable_index;
+}
+void oo_set_method_vtable_index(ir_entity *method, int vtable_index)
+{
+	assert (is_method_entity(method));
+	oo_entity_info *ei = get_entity_info(method);
+	ei->vtable_index = vtable_index;
 }
 
 bool oo_get_method_is_abstract(ir_entity *method)
