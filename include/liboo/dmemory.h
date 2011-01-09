@@ -6,7 +6,7 @@
 
 enum {
 	pn_Arraylength_M         = pn_Generic_M,
-	pn_Arraylength_Is_result = pn_Generic_other,
+	pn_Arraylength_res = pn_Generic_other,
 	pn_Arraylength_max
 };
 

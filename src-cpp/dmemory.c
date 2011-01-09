@@ -247,7 +247,7 @@ void dmemory_lower_Arraylength(ir_node *arraylength)
 
 	turn_into_tuple(arraylength, pn_Arraylength_max);
 	set_irn_n(arraylength, pn_Arraylength_M, cur_mem);
-	set_irn_n(arraylength, pn_Arraylength_Is_result, len);
+	set_irn_n(arraylength, pn_Arraylength_res, len);
 }
 
 void dmemory_set_allocation_methods(alloc_object_t ao_func, alloc_array_t aa_func, get_arraylength_t ga_func)

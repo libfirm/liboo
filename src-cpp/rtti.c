@@ -143,10 +143,13 @@ void rtti_lower_InstanceOf(ir_node *instanceof)
 	ir_graph *irg     = get_irn_irg(instanceof);
 	ir_node  *cur_mem = get_InstanceOf_mem(instanceof);
 	ir_node  *res     = (*rtti_model.construct_instanceof)(objptr, type, irg, block, &cur_mem);
+	ir_node  *zero    = new_r_Const_long(irg, mode_Is, 0);
+	ir_node  *cmp     = new_r_Cmp(block, res, zero);
+	ir_node  *proj    = new_r_Proj(cmp, mode_b, pn_Cmp_Ne);
 
 	turn_into_tuple(instanceof, pn_InstanceOf_max);
 	set_irn_n(instanceof, pn_InstanceOf_M, cur_mem);
-	set_irn_n(instanceof, pn_InstanceOf_Is_result, res);
+	set_irn_n(instanceof, pn_InstanceOf_res, proj);
 }
 
 void rtti_set_runtime_typeinfo_constructor(construct_runtime_typeinfo_t func)

@@ -6,7 +6,7 @@
 
 enum {
 	pn_InstanceOf_M         = pn_Generic_M,
-	pn_InstanceOf_Is_result = pn_Generic_other,
+	pn_InstanceOf_res = pn_Generic_other,
 	pn_InstanceOf_max
 };
 
