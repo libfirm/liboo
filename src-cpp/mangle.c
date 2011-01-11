@@ -4,9 +4,7 @@
 
 #include <string.h>
 #include <assert.h>
-#include <stdbool.h>
 #include "liboo/oo.h"
-#include "adt/obst.h"
 #include "adt/cpset.h"
 #include "adt/error.h"
 
@@ -19,29 +17,6 @@ static const char *mangle_prefix = "";
 static struct obstack obst;
 
 static const char* base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-#define CT_SIZE 36 // theoretically, there could be substitution patterns with more than one digit.
-typedef struct {
-	char *name;
-} cte_entry;
-
-/*
- * The compression table contains prefixes of currently mangled name.
- * Pointers to and arrays of a specific type, and the JArray keyword, cause an additional entry.
- * Example: mangling
- * JArray<java::lang::Object*>* java::lang::ClassLoader::putDeclaredAnnotations(java::lang::Class*, int, int, int, JArray<java::lang::Object*>*)
- * S_  = java
- * S0_ = java/lang
- * S1_ = java/lang/ClassLoader
- * S2_ = JArray
- * S3_ = java/lang/Object
- * S4_ = Pjava/lang/Object
- * S5_ = JArray<Pjava/lang/Object>
- * S6_ = PJArray<Pjava/lang/Object>
- * => _ZN4java4lang11ClassLoader22putDeclaredAnnotationsEJP6JArrayIPNS0_6ObjectEEPNS0_5ClassEiiiS6_
- */
-static cte_entry ct[CT_SIZE];
-static int next_ct_entry;
 
 static char *duplicate_string_n(const char* s, size_t n)
 {
@@ -57,38 +32,13 @@ static char *duplicate_string(const char *s)
 	return duplicate_string_n(s, len);
 }
 
-static void flush_ct(void)
-{
-	for (int i = 0; i < CT_SIZE; i++) {
-		if (ct[i].name != NULL)
-			free(ct[i].name);
-		ct[i].name = NULL;
-	}
-	next_ct_entry = 0;
-}
-
-static int find_in_ct(const char* name)
-{
-	for (int i = 0; i < next_ct_entry; i++) {
-		if (strcmp(ct[i].name, name) == 0) {
-			return i;
-		}
-	}
-	return -1;
-}
-
-static void insert_ct(const char* name)
-{
-	assert(next_ct_entry < CT_SIZE);
-	ct[next_ct_entry].name = duplicate_string(name);
-	next_ct_entry++;
-}
-
 // (entity name) substitution table
 typedef struct {
 	char *name;
 	char *mangled;
 } st_entry;
+
+static cpset_t st;
 
 static int string_cmp (const void *p1, const void *p2)
 {
@@ -118,9 +68,41 @@ static void free_ste(st_entry *ste)
 	free(ste);
 }
 
-static cpset_t st;
+// compression table utility functions
+void mangle_ct_init(compression_table_t *ct)
+{
+	memset(ct, 0, sizeof(compression_table_t));
+}
 
-static void emit_substitution(int match, struct obstack *obst)
+void mangle_ct_flush(compression_table_t *ct)
+{
+	for (int i = 0; i < COMPRESSION_TABLE_SIZE; i++) {
+		if (ct->entries[i].prefix) {
+			free(ct->entries[i].prefix);
+		}
+		ct->entries[i].prefix = NULL;
+	}
+	ct->next_slot = 0;
+}
+
+int mangle_ct_find(compression_table_t* ct, const char* prefix)
+{
+	for (int i = 0; i < ct->next_slot; i++) {
+		if (strcmp(ct->entries[i].prefix, prefix) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void mangle_ct_insert(compression_table_t *ct, const char* prefix)
+{
+	assert(ct->next_slot < COMPRESSION_TABLE_SIZE);
+	ct->entries[ct->next_slot].prefix = duplicate_string(prefix);
+	ct->next_slot++;
+}
+
+void mangle_emit_substitution(int match, struct obstack *obst)
 {
 	obstack_1grow(obst, 'S');
 	if (match > 0)
@@ -128,9 +110,47 @@ static void emit_substitution(int match, struct obstack *obst)
 	obstack_1grow(obst, '_');
 }
 
-static void mangle_type(ir_type *type, struct obstack *obst);
+void mangle_pointer_type(ir_type *type, struct obstack *obst, compression_table_t *ct) {
+	assert (is_Pointer_type(type));
+	ir_type *ptarget = get_pointer_points_to_type(type);
 
-static void mangle_primitive_type(ir_type *type, struct obstack *obst)
+	struct obstack uobst; // obstack for unsubstituted type name
+	obstack_init(&uobst);
+
+	obstack_1grow(&uobst, '*');
+	mangle_type_for_compression_table(ptarget, &uobst);
+	const char *unsubstituted = obstack_finish(&uobst);
+
+	// 1. Check if the ct contains the "* ptarget" entry...
+	int full_match_p = mangle_ct_find(ct, unsubstituted);
+	if (full_match_p > 0) {
+		// ...it is available. Emit it and go on.
+		mangle_emit_substitution(full_match_p, obst);
+		return;
+	}
+
+	// 2. Check if the ct contains the "ptarget" (e.g. full match for the target type)...
+	int full_match   = mangle_ct_find(ct, unsubstituted+1);
+	if (full_match > 0) {
+		// ...it does. Emit P and the substitution, then insert the "* ptarget" entry.
+		obstack_1grow(obst, 'P');
+		mangle_emit_substitution(full_match, obst);
+		mangle_ct_insert(ct, unsubstituted);
+		return;
+	}
+
+	// 3. "ptarget" wasn't known yet. We can emit the P, and recurse...
+	obstack_1grow(obst, 'P');
+	mangle_type(ptarget, obst, ct);
+
+	// ...mangle_type will introduce the "ptarget" entry if appropriate.
+	// This is the right time to insert the "* ptarget" entry.
+	mangle_ct_insert(ct, unsubstituted);
+
+	obstack_free(&uobst, NULL);
+}
+
+void mangle_primitive_type(ir_type *type, struct obstack *obst)
 {
 	assert(is_Primitive_type(type));
 	const char *tag = get_type_link(type);
@@ -140,53 +160,34 @@ static void mangle_primitive_type(ir_type *type, struct obstack *obst)
 	obstack_grow(obst, tag, len);
 }
 
-static bool mangle_qualified_class_name(ir_type *class_type, int is_pointer, struct obstack *obst)
+bool mangle_qualified_class_name(ir_type *classtype, struct obstack *obst, compression_table_t *ct)
 {
-	assert(is_Class_type(class_type));
-
-	if (class_type == get_glob_type())
+	assert (is_Class_type(classtype));
+	if (classtype == get_glob_type())
 		return 0;
 
-	ident      *class_ident = get_class_ident(class_type);
+	ident      *class_ident = get_class_ident(classtype);
 	const char *string      = get_id_str(class_ident);
 	const char *p           = string;
 	size_t      slen        = strlen(string);
 	bool        emitted_N   = false;
 
-	int   full_match        = find_in_ct(string);
-	int   full_match_p      = -1;
-
-	char *request_buffer    = XMALLOCN(char, slen+2);
-
-	if (is_pointer) {
-		request_buffer[0] = 'P';
-		strcpy(request_buffer+1, string);
-		request_buffer[slen+1] = '\0';
-		full_match_p = find_in_ct(request_buffer);
-	}
-
-	if (full_match_p >= 0) {
-		// we already have the *class entry
-		emit_substitution(full_match_p, obst);
+	// check for a full match, which is not considered a composite name.
+	int         full_match  = mangle_ct_find(ct, string);
+	if (full_match > 0) {
+		mangle_emit_substitution(full_match, obst);
 		return emitted_N;
 	}
 
-	if (full_match >= 0) {
-		if (is_pointer) {
-			insert_ct(request_buffer); // we have the class entry -> use it and introduce the *class entry
-			obstack_1grow(obst, 'P');
-		}
-		emit_substitution(full_match, obst);
-		return emitted_N;
-	}
-
-	// no full match, we'll construct a new composite name
-	if (is_pointer)
-		obstack_1grow(obst, 'P');
+	// no full match, we have to construct a new composite name
 	obstack_1grow(obst, 'N');
 	emitted_N = true;
 
-	int last_match          = -1;
+	char *request_buffer = XMALLOCN(char, slen+1);
+
+	// search for the longest prefix (component-wise) that is in the ct and use it.
+	// New components are emitted as "<length>component" (e.g. "4java2io")
+	int   last_match     = -1;
 	while (*p != '\0') {
 		while (*p == '/')
 			++p;
@@ -202,14 +203,14 @@ static bool mangle_qualified_class_name(ir_type *class_type, int is_pointer, str
 		request_buffer[comp_end_idx] = '\0';
 		p = comp_end;
 
-		int match = find_in_ct(request_buffer);
+		int match = mangle_ct_find(ct, request_buffer);
 		if (match >= 0) {
 			last_match = match;
 		} else {
-			insert_ct(request_buffer);
+			mangle_ct_insert(ct, request_buffer);
 
 			if (last_match >= 0) {
-				emit_substitution(last_match, obst);
+				mangle_emit_substitution(last_match, obst);
 				last_match = -1;
 			}
 			obstack_printf(obst, "%d", l);
@@ -217,85 +218,38 @@ static bool mangle_qualified_class_name(ir_type *class_type, int is_pointer, str
 		}
 	}
 
-	if (is_pointer) {
-		// insert the *class entry AFTER the class entry (that has been created in the last loop iteration above)
-		request_buffer[0] = 'P';
-		strcpy(request_buffer+1, string);
-		request_buffer[slen+1] = '\0';
-		assert(find_in_ct(request_buffer) == -1);
-		insert_ct(request_buffer);
-	}
-
 	free(request_buffer);
+
+	// FIXME: support type parameter
+
 	return emitted_N;
 }
 
-static void mangle_type_without_substitition(ir_type *type, struct obstack *obst)
+void mangle_type(ir_type *type, struct obstack *obst, compression_table_t *ct)
 {
-	if (is_Primitive_type(type)) {
+	if (is_Pointer_type(type)) {
+		mangle_pointer_type(type, obst, ct);
+	} else if (is_Primitive_type(type)) {
 		mangle_primitive_type(type, obst);
-	} else if (is_Pointer_type(type)) {
-		ir_type *pt = get_pointer_points_to_type(type);
-		if (is_Class_type(pt)) {
-			obstack_1grow(obst, 'P');
-			obstack_printf(obst, "%s", get_class_name(pt));
-		} else {
-			obstack_grow(obst, "JArray<", 7);
-			mangle_type_without_substitition(pt, obst);
-			obstack_1grow(obst, '>');
-		}
+	} else if (is_Class_type(type)) {
+		bool emitted_N = mangle_qualified_class_name(type, obst, ct);
+		if (emitted_N)
+			obstack_1grow(obst, 'E');
 	}
 }
 
-// XXX: the mangling scheme for arrays is Java specific.
-static void mangle_array_type(ir_type *type, struct obstack *obst)
+void mangle_type_for_compression_table(ir_type *type, struct obstack *obst)
 {
-	struct obstack unsubstituted_obst;
-	obstack_init(&unsubstituted_obst);
-	obstack_grow(&unsubstituted_obst, "PJArray<", 8);
-	mangle_type_without_substitition(type, &unsubstituted_obst);
-	obstack_1grow(&unsubstituted_obst, '>');
-	const char *unsubstituted = obstack_finish(&unsubstituted_obst);
-
-	int full_match = find_in_ct(unsubstituted);
-	if (full_match >= 0) {
-		emit_substitution(full_match, obst);
+	if (is_Primitive_type(type)) {
+		mangle_primitive_type(type, obst);
+	} else if (is_Class_type(type)) {
+		obstack_printf(obst, "%s", get_class_name(type));
+		//FIXME: Support type parameter
+	} else if (is_Pointer_type(type)) {
+		obstack_1grow(obst, '*');
+		mangle_type_for_compression_table(get_pointer_points_to_type(type), obst);
 	} else {
-		obstack_1grow(obst, 'P');
-
-		int jarray_match = find_in_ct("JArray");
-		if (jarray_match >= 0) {
-			emit_substitution(jarray_match, obst);
-		} else {
-			obstack_grow(obst, "6JArray", 7);
-			insert_ct("JArray");
-		}
-		obstack_1grow(obst, 'I');
-
-		mangle_type(type, obst);
-		obstack_1grow(obst, 'E');
-
-		insert_ct(unsubstituted+1); // insert the non-pointer version of the JArray.
-		insert_ct(unsubstituted);
-	}
-
-	obstack_free(&unsubstituted_obst, NULL);
-}
-
-static void mangle_type(ir_type *type, struct obstack *obst)
-{
-	if (is_Primitive_type(type)) {
-		mangle_primitive_type(type, obst);
-	} else if (is_Pointer_type(type)) {
-		ir_type *pointsto = get_pointer_points_to_type(type);
-		if (is_Class_type(pointsto)) {
-			bool emitted_N = mangle_qualified_class_name(pointsto, 1, obst);
-			if (emitted_N)
-				obstack_1grow(obst, 'E');
-		} else {
-			// assume it's an array
-			mangle_array_type(pointsto, obst);
-		}
+		assert (0);
 	}
 }
 
@@ -307,7 +261,8 @@ ident *mangle_entity_name(ir_entity *entity)
 	assert(obstack_object_size(&obst) == 0);
 	assert(entity != NULL);
 
-	flush_ct();
+	compression_table_t ct;
+	mangle_ct_init(&ct);
 
 	ir_type *owner  = get_entity_owner(entity);
 	ir_type *alt_ns = oo_get_entity_alt_namespace(entity);
@@ -322,7 +277,7 @@ ident *mangle_entity_name(ir_entity *entity)
 	obstack_grow(&obst, mangle_prefix, strlen(mangle_prefix));
 	obstack_grow(&obst, "_Z", 2);
 
-	mangle_qualified_class_name(ns, 0, &obst);
+	mangle_qualified_class_name(ns, &obst, &ct);
 
 	/* mangle entity name */
 	const char *name_sig  = get_entity_name(entity);
@@ -356,7 +311,7 @@ ident *mangle_entity_name(ir_entity *entity)
 			obstack_1grow(&obst, 'v');
 		} else {
 			assert(n_ress == 1);
-			mangle_type(get_method_res_type(type, 0), &obst);
+			mangle_type(get_method_res_type(type, 0), &obst, &ct);
 		}
 	}
 
@@ -368,7 +323,7 @@ ident *mangle_entity_name(ir_entity *entity)
 	} else {
 		for (int i = start; i < n_params; ++i) {
 			ir_type *parameter = get_method_param_type(type, i);
-			mangle_type(parameter, &obst);
+			mangle_type(parameter, &obst, &ct);
 		}
 	}
 
@@ -379,6 +334,8 @@ name_finished: ;
 	obstack_free(&obst, result_string);
 
 	free(name_only);
+
+	mangle_ct_flush(&ct);
 	return result;
 }
 
@@ -387,12 +344,13 @@ ident *mangle_vtable_name(ir_type *clazz)
 	assert(obstack_object_size(&obst) == 0);
 	assert(clazz != NULL && is_Class_type(clazz));
 
-	flush_ct();
+	compression_table_t ct;
+	mangle_ct_init(&ct);
 
 	obstack_grow(&obst, mangle_prefix, strlen(mangle_prefix));
 	obstack_grow(&obst, "_ZTV", 4);
 
-	int emitted_N = mangle_qualified_class_name(clazz, 0, &obst);
+	int emitted_N = mangle_qualified_class_name(clazz, &obst, &ct);
 	assert(emitted_N);
 
 	obstack_1grow(&obst, 'E');
@@ -402,6 +360,7 @@ ident *mangle_vtable_name(ir_type *clazz)
 	ident  *result        = new_id_from_chars(result_string, result_len);
 	obstack_free(&obst, result_string);
 
+	mangle_ct_flush(&ct);
 	return result;
 }
 
@@ -445,7 +404,6 @@ void mangle_add_name_substitution(const char *name, const char *mangled)
 
 void mangle_deinit(void)
 {
-	flush_ct();
 	obstack_free(&obst, NULL);
 
 	cpset_iterator_t iter;
