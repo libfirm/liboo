@@ -57,6 +57,7 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 		ei = (oo_entity_info*) obstack_alloc(&oo_info_obst, sizeof(oo_entity_info));
 		memset(ei, 0, sizeof(*ei));
 		ei->kind = k_oo_entity_info;
+		ei->vtable_index = -1;
 		set_entity_link(entity, ei);
 	} else {
 		assert (ei->kind == k_oo_entity_info);
