@@ -9,35 +9,6 @@ public class binding_oo {
 		Native.register("oo");
 	}
 
-	public static enum ir_cons_flags {
-		cons_none(0),
-		cons_volatile((1 << 0)),
-		cons_unaligned((1 << 1)),
-		cons_floats((1 << 2));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_cons_flags(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_cons_flags() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_cons_flags getEnum(int val) {
-			for (ir_cons_flags entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum op_pin_state {
 		op_pin_state_floats(0),
 		op_pin_state_pinned(1),
@@ -2584,6 +2555,35 @@ public class binding_oo {
 		}
 	}
 
+	public static enum ir_cons_flags {
+		cons_none(0),
+		cons_volatile((1 << 0)),
+		cons_unaligned((1 << 1)),
+		cons_floats((1 << 2));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_cons_flags(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_cons_flags() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_cons_flags getEnum(int val) {
+			for (ir_cons_flags entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum range_types {
 		VRP_UNDEFINED(),
 		VRP_RANGE(),
@@ -3176,6 +3176,10 @@ public class binding_oo {
 	public static native boolean oo_get_class_omit_vtable(Pointer classtype);
 
 	public static native void oo_set_class_omit_vtable(Pointer classtype, boolean omit_vtable);
+
+	public static native Pointer oo_get_class_vtable_ld_ident(Pointer classtype);
+
+	public static native void oo_set_class_vtable_ld_ident(Pointer classtype, Pointer ld_ident);
 
 	public static native Pointer oo_get_class_vptr_entity(Pointer classtype);
 

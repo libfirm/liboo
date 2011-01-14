@@ -16,6 +16,8 @@ void oo_lower(void);
 
 bool  oo_get_class_omit_vtable(ir_type *classtype);
 void  oo_set_class_omit_vtable(ir_type *classtype, bool omit_vtable);
+ident *oo_get_class_vtable_ld_ident(ir_type *classtype);
+void  oo_set_class_vtable_ld_ident(ir_type *classtype, ident *ld_ident);
 ir_entity *oo_get_class_vptr_entity(ir_type *classtype);
 void  oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr);
 ir_entity *oo_get_class_rtti_entity(ir_type *classtype);

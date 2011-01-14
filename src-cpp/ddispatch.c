@@ -64,7 +64,10 @@ void ddispatch_setup_vtable(ir_type *klass)
 	if (oo_get_class_omit_vtable(klass))
 		return;
 
-	ident *vtable_name = mangle_vtable_name(klass);
+	ident *vtable_name = oo_get_class_vtable_ld_ident(klass);
+	if (! vtable_name) { // XXX: will become an assert after mangling is removed from liboo
+		vtable_name = mangle_vtable_name(klass);
+	}
 
 	ir_type *global_type = get_glob_type();
 	assert (get_class_member_by_name(global_type, vtable_name) == NULL);
@@ -116,7 +119,11 @@ void ddispatch_setup_vtable(ir_type *klass)
 
 	if (superclass != NULL) {
 		unsigned superclass_vtable_size = get_class_vtable_size(superclass);
-		ir_entity *superclass_vtable_entity = get_class_member_by_name(global_type, mangle_vtable_name(superclass));
+		ident *superclass_vtable_ident = oo_get_class_vtable_ld_ident(superclass);
+		if (! superclass_vtable_ident) // XXX: will become an assert after mangling is removed from liboo
+			superclass_vtable_ident = mangle_vtable_name(superclass);
+
+		ir_entity *superclass_vtable_entity = get_class_member_by_name(global_type, superclass_vtable_ident);
 		assert (superclass_vtable_entity != NULL);
 		ir_initializer_t *superclass_vtable_init = get_entity_initializer(superclass_vtable_entity);
 

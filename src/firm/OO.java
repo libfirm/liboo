@@ -82,6 +82,13 @@ public final class OO {
 	}
 	
 	/**
+	 * lets you specify the mangled name for classType's vtable entity  
+	 */
+	public static void setClassVTableLdIdent(ClassType classType, Ident ldIdent) {
+		binding_oo.oo_set_class_vtable_ld_ident(classType.ptr, ldIdent.ptr);
+	}
+	
+	/**
 	 * lets you specify the entity that represents the pointer to the vtable in an instance 
 	 */
 	public static void setClassVPtrEntity(ClassType classType, Entity entity) {

@@ -9,35 +9,6 @@ public class binding_mangle {
 		Native.register("oo");
 	}
 
-	public static enum ir_cons_flags {
-		cons_none(0),
-		cons_volatile((1 << 0)),
-		cons_unaligned((1 << 1)),
-		cons_floats((1 << 2));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_cons_flags(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_cons_flags() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_cons_flags getEnum(int val) {
-			for (ir_cons_flags entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum op_pin_state {
 		op_pin_state_floats(0),
 		op_pin_state_pinned(1),
@@ -2584,6 +2555,35 @@ public class binding_mangle {
 		}
 	}
 
+	public static enum ir_cons_flags {
+		cons_none(0),
+		cons_volatile((1 << 0)),
+		cons_unaligned((1 << 1)),
+		cons_floats((1 << 2));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_cons_flags(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_cons_flags() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_cons_flags getEnum(int val) {
+			for (ir_cons_flags entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum range_types {
 		VRP_UNDEFINED(),
 		VRP_RANGE(),
@@ -3137,6 +3137,26 @@ public class binding_mangle {
 		}
 	}
 
+
+	public static native void mangle_ct_init(Pointer ct);
+
+	public static native void mangle_ct_flush(Pointer ct);
+
+	public static native int mangle_ct_find(Pointer ct, String prefix);
+
+	public static native void mangle_ct_insert(Pointer ct, String prefix);
+
+	public static native void mangle_emit_substitution(int match, Pointer obst);
+
+	public static native void mangle_pointer_type(Pointer type, Pointer obst, Pointer ct);
+
+	public static native void mangle_primitive_type(Pointer type, Pointer obst);
+
+	public static native boolean mangle_qualified_class_name(Pointer type, Pointer obst, Pointer ct);
+
+	public static native void mangle_type(Pointer type, Pointer obst, Pointer ct);
+
+	public static native void mangle_type_for_compression_table(Pointer type, Pointer obst);
 
 	public static native Pointer mangle_entity_name(Pointer entity);
 
