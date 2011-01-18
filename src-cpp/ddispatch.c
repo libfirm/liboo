@@ -31,11 +31,22 @@ static void __abstract_method(void)
 static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size)
 {
 	(void) klass; (void) vtable_size;
-	ir_graph *ccode_irg = get_const_code_irg();
-	ir_node  *const_0   = new_r_Const_long(ccode_irg, mode_reference, 0);
+	ir_graph         *ccode_irg = get_const_code_irg();
+
+	ir_entity        *ci        = oo_get_class_rtti_entity(klass);
+	assert (ci);
+
+	symconst_symbol ci_sym;
+	ci_sym.entity_p             = ci;
+	ir_node          *ci_symc   = new_r_SymConst(ccode_irg, mode_P, ci_sym, symconst_addr_ent);
+	ir_initializer_t *ci_init   = create_initializer_const(ci_symc);
+	set_initializer_compound_value(vtable_init, ddispatch_model.vptr_points_to_index, ci_init);
+
+	ir_node          *const_0   = new_r_Const_long(ccode_irg, mode_reference, 0);
 	ir_initializer_t *slot_init = create_initializer_const(const_0);
 
 	for (unsigned i = 0; i < ddispatch_model.index_of_first_method; i++) {
+		if (i == ddispatch_model.vptr_points_to_index) continue;
 		set_initializer_compound_value(vtable_init, i, slot_init);
 	}
 }
@@ -85,7 +96,7 @@ void ddispatch_init(void)
 	type_reference = new_type_primitive(mode_reference);
 
 	ddispatch_model.vptr_points_to_index        = 0;
-	ddispatch_model.index_of_first_method       = 0;
+	ddispatch_model.index_of_first_method       = 1;
 	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
 	ddispatch_model.abstract_method_ident       = new_id_from_str("__abstract_method");
 	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;

@@ -7,7 +7,8 @@
  * Default layout:
  *
  * _ZTVNxyzE:
- *   <vtable slot 0> addr(first method)
+ *   <vtable slot 0> runtime classinfo
+ *   <vtable slot 1> addr(first method)
  *   ...
  *   <vtable slot n> addr(last method)
  *
@@ -17,7 +18,7 @@
  * _ZTVNxyzE:
  *   0               uninitialized*
  *   0               uninitialized*
- *   <vtable slot 0> uninitialized*     <-- vtable_vptr_points_to_index (e.g., == 2)
+ *   <vtable slot 0> runtime classinfo  <-- vtable_vptr_points_to_index (e.g., == 2)
  *   <vtable slot 1> uninitialized*
  *   <vtable slot 2> addr(first method) <-- vtable_index_of_first_method (e.g., == 4)
  *   ...
