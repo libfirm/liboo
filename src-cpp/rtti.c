@@ -1,9 +1,18 @@
 #include "config.h"
 
 #include "liboo/rtti.h"
+#include "liboo/oo.h"
+#include "liboo/rts_types.h"
 
 #include <assert.h>
+#include <stdint.h>
+#include <string.h>
 #include "adt/error.h"
+
+static ir_mode *mode_uint16_t;
+static ir_type *type_uint16_t;
+static ir_type *type_reference;
+static ir_type *type_int;
 
 static ir_op *op_InstanceOf;
 
@@ -109,10 +118,223 @@ static struct {
 	construct_instanceof_t       construct_instanceof;
 } rtti_model;
 
+static uint16_t string_hash(const char* s)
+{
+	unsigned hash = 0;
+	size_t len = strlen(s);
+	for (size_t i = 0; i < len; i++) {
+		hash = (31 * hash) + s[i]; // FIXME: this doesn't work for codepoints that are not ASCII.
+	}
+	return hash & 0xFFFF;
+}
+
+static ir_entity *emit_string_const(const char *bytes)
+{
+	size_t            len        = strlen(bytes);
+	size_t            len0       = len + 1; // incl. the '\0' byte
+	uint16_t          hash       = string_hash(bytes);
+
+	ir_graph         *ccode      = get_const_code_irg();
+
+	ident            *id         = id_unique("_String_%u_");
+	ir_type          *strc_type  = new_type_struct(id_mangle(id, new_id_from_str("type")));
+	ir_initializer_t *cinit      = create_initializer_compound(3);
+
+	// hash
+	ir_entity        *hash_ent   = new_entity(strc_type, new_id_from_str("hash"), type_uint16_t);
+	ir_initializer_t *hash_init  = create_initializer_const(new_r_Const_long(ccode, mode_uint16_t, hash));
+	set_entity_initializer(hash_ent, hash_init);
+	set_initializer_compound_value(cinit, 0, hash_init);
+
+	// length
+	ir_entity        *length_ent = new_entity(strc_type, new_id_from_str("length"), type_uint16_t);
+	ir_initializer_t *length_init= create_initializer_const(new_r_Const_long(ccode, mode_uint16_t, len));
+	set_entity_initializer(length_ent, length_init);
+	set_initializer_compound_value(cinit, 1, length_init);
+
+	// data
+	ir_mode          *el_mode    = mode_Bu;
+	ir_type          *el_type    = new_type_primitive(el_mode);
+	ir_type          *array_type = new_type_array(1, el_type);
+
+	set_array_lower_bound_int(array_type, 0, 0);
+	set_array_upper_bound_int(array_type, 0, len0);
+	set_type_size_bytes(array_type, len0);
+	set_type_state(array_type, layout_fixed);
+
+	ir_entity        *data_ent   = new_entity(strc_type, new_id_from_str("data"), array_type);
+
+	// initialize each array element to an input byte
+	ir_initializer_t *data_init  = create_initializer_compound(len0);
+	for (size_t i = 0; i < len0; ++i) {
+		ir_tarval        *tv  = new_tarval_from_long(bytes[i], el_mode);
+		ir_initializer_t *val = create_initializer_tarval(tv);
+		set_initializer_compound_value(data_init, i, val);
+	}
+	set_entity_initializer(data_ent, data_init);
+	set_initializer_compound_value(cinit, 2, data_init);
+
+	set_type_size_bytes(strc_type, get_type_size_bytes(type_uint16_t)*2 + get_type_size_bytes(array_type));
+	default_layout_compound_type(strc_type);
+
+	// finally, the entity for the string constant
+	ir_entity *strc   = new_entity(get_glob_type(), id, strc_type);
+	set_entity_initializer(strc, cinit);
+	set_entity_ld_ident(strc, id);
+
+	return strc;
+}
+
+static ir_node *create_ccode_symconst(ir_entity *ent)
+{
+	ir_graph *ccode = get_const_code_irg();
+	symconst_symbol sym;
+	sym.entity_p = ent;
+	ir_node *symc = new_r_SymConst(ccode, mode_P, sym, symconst_addr_ent);
+	return symc;
+}
+
+static ir_entity *emit_primitive_member(ir_type *owner, const char *name, ir_type *type, ir_node *value)
+{
+	assert (is_Primitive_type(type));
+	ident            *id   = new_id_from_str(name);
+	ir_entity        *ent  = new_entity(owner, id, type);
+	ir_initializer_t *init = create_initializer_const(value);
+	set_entity_initializer(ent, init);
+	return ent;
+}
+
+#define MD_SIZE_BYTES (get_type_size_bytes(type_reference)*2)
+static ir_entity *emit_method_desc(ir_type *owner, ir_entity *ent)
+{
+	ident            *id            = id_unique("_MD_%u_");
+	ir_type          *md_type       = new_type_struct(id_mangle(id, new_id_from_str("type")));
+
+	ir_initializer_t *cinit         = create_initializer_compound(2);
+
+	const char       *name_str      = get_entity_name(ent);
+	ir_entity        *name_const_ent= emit_string_const(name_str);
+	ir_entity        *name_ent      = emit_primitive_member(md_type, "name", type_reference, create_ccode_symconst(name_const_ent));
+	set_initializer_compound_value(cinit, 0, get_entity_initializer(name_ent));
+
+	ir_node          *funcptr       = NULL;
+	if (oo_get_method_is_abstract(ent)) {
+		funcptr = new_r_Const_long(get_const_code_irg(), mode_P, 0);
+	} else {
+		funcptr = create_ccode_symconst(ent);
+	}
+
+	ir_entity        *funcptr_ent   = emit_primitive_member(md_type, "funcptr", type_reference, funcptr);
+	set_initializer_compound_value(cinit, 1, get_entity_initializer(funcptr_ent));
+
+	set_type_size_bytes(md_type, MD_SIZE_BYTES);
+	default_layout_compound_type(md_type);
+
+	ir_entity        *md_ent        = new_entity(owner, id, md_type);
+	set_entity_initializer(md_ent, cinit);
+	set_entity_ld_ident(md_ent, id);
+
+	return md_ent;
+}
+
+static ir_entity *emit_method_table(ir_type *klass, int n_methods)
+{
+	ident            *id            = id_unique("_MT_%u_");
+	ir_type          *mt_type       = new_type_struct(id_mangle(id, new_id_from_str("type")));
+
+	int               n_members     = get_class_n_members(klass);
+	ir_initializer_t *cinit         = create_initializer_compound(n_methods);
+	int               cur_init_slot = 0;
+
+	for (int i = 0; i < n_members; i++) {
+		ir_entity *member = get_class_member(klass, i);
+		if (! is_method_entity(member) || oo_get_method_exclude_from_vtable(member)) continue;
+
+		ir_entity *md_ent = emit_method_desc(mt_type, member);
+		set_initializer_compound_value(cinit, cur_init_slot++, get_entity_initializer(md_ent));
+	}
+
+	assert (cur_init_slot == n_methods);
+
+	set_type_size_bytes(mt_type, n_methods * MD_SIZE_BYTES);
+	default_layout_compound_type(mt_type);
+
+	ir_entity        *mt_ent        = new_entity(get_glob_type(), id, mt_type);
+	set_entity_initializer(mt_ent, cinit);
+	set_entity_ld_ident(mt_ent, id);
+
+	return mt_ent;
+}
+
+
+#define NUM_FIELDS 4
+#define EMIT_PRIM(name, tp, val) do { \
+  ir_entity        *ent  = emit_primitive_member(ci_type, name, tp, val); \
+  ir_initializer_t *init = get_entity_initializer(ent); \
+  set_initializer_compound_value(ci_init, cur_init_slot++, init); \
+  ir_type          *tp   = get_entity_type(ent); \
+  cur_type_size         += get_type_size_bytes(tp); \
+} while(0);
+
 static void default_construct_runtime_typeinfo(ir_type *klass)
 {
-	(void) klass;
-	// FIXME: NYI. This no-op instead of panic, because the RTTI not needed yet in liboo.
+	assert (is_Class_type(klass));
+	ir_entity        *ci = oo_get_class_rtti_entity(klass);
+	assert (ci && "RTTI entity not set. Please create and set such an entity yourself. A primitive pointer type is fine");
+
+	ident            *cname_id = get_class_ident(klass);
+	ir_type          *ci_type = new_type_struct(id_mangle_dot(cname_id, new_id_from_str("class$")));
+	ir_initializer_t *ci_init = create_initializer_compound(NUM_FIELDS);
+	unsigned cur_init_slot = 0;
+	unsigned cur_type_size = 0;
+
+	ir_graph *ccode_irg = get_const_code_irg();
+	ir_node *const_0 = new_r_Const_long(ccode_irg, mode_P, 0);
+
+	ir_entity *cname_ent = emit_string_const(get_id_str(cname_id));
+	ir_node   *cname_symc = create_ccode_symconst(cname_ent);
+	EMIT_PRIM("name", type_reference, cname_symc);
+
+	int n_superclasses = get_class_n_supertypes(klass);
+	if (n_superclasses > 0) {
+		assert (n_superclasses == 1);
+		ir_type *superclass = get_class_supertype(klass, 0);
+		ir_entity *superclass_rtti = oo_get_class_rtti_entity(superclass);
+		assert (superclass_rtti);
+		ir_node *superclass_rtti_symc = create_ccode_symconst(superclass_rtti);
+		EMIT_PRIM("superclass", type_reference, superclass_rtti_symc);
+	} else {
+		EMIT_PRIM("superclass", type_reference, const_0);
+	}
+
+	int n_methods = 0;
+	int n_members = get_class_n_members(klass);
+	for (int i = 0; i < n_members; i++) {
+		ir_entity *member = get_class_member(klass, i);
+		if (is_method_entity(member) && ! oo_get_method_exclude_from_vtable(member)) {
+			n_methods++;
+		}
+	}
+	ir_node *n_methods_const = new_r_Const_long(ccode_irg, mode_Is, n_methods);
+	EMIT_PRIM("n_methods", type_int, n_methods_const);
+
+	if (n_methods > 0) {
+		ir_entity *method_table = emit_method_table(klass, n_methods);
+		ir_node *method_table_symc = create_ccode_symconst(method_table);
+		EMIT_PRIM("methods", type_reference, method_table_symc);
+	} else {
+		EMIT_PRIM("methods", type_reference, const_0);
+	}
+
+	assert (cur_init_slot == NUM_FIELDS);
+
+	set_type_size_bytes(ci_type, cur_type_size);
+	default_layout_compound_type(ci_type);
+
+	set_entity_type(ci, ci_type);
+	set_entity_initializer(ci, ci_init);
+	set_entity_visibility(ci, ir_visibility_default);
+	set_entity_alignment(ci, 32);
 }
 
 static ir_node *default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_graph *irg, ir_node *block, ir_node **mem)
@@ -124,7 +346,12 @@ static ir_node *default_construct_instanceof(ir_node *objptr, ir_type *klass, ir
 void rtti_init()
 {
 	unsigned opcode = get_next_ir_opcode();
-	op_InstanceOf = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(rtti_InstanceOf_attr_t), &rtti_node_op_ops);
+	op_InstanceOf  = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(rtti_InstanceOf_attr_t), &rtti_node_op_ops);
+
+	mode_uint16_t  = new_ir_mode("US", irms_int_number, 16, 0, irma_twos_complement, 16);
+	type_uint16_t  = new_type_primitive(mode_uint16_t);
+	type_reference = new_type_primitive(mode_P);
+	type_int       = new_type_primitive(mode_Is);
 
 	rtti_model.construct_runtime_typeinfo = default_construct_runtime_typeinfo;
 	rtti_model.construct_instanceof = default_construct_instanceof;
