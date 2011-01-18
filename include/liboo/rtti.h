@@ -25,4 +25,6 @@ void rtti_lower_InstanceOf(ir_node *instanceof);
 void rtti_set_runtime_typeinfo_constructor(construct_runtime_typeinfo_t func);
 void rtti_set_instanceof_constructor(construct_instanceof_t func);
 
+ir_entity *rtti_emit_string_const(const char *bytes);
+
 #endif

@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include "liboo/ddispatch.h"
+#include "liboo/rtti.h"
 
 #include <assert.h>
 #include "liboo/oo.h"
@@ -8,8 +9,10 @@
 #include "liboo/dmemory.h"
 #include "adt/error.h"
 
-static ir_mode *mode_reference;
-static ir_type *type_reference;
+static ir_mode   *mode_reference;
+static ir_type   *type_reference;
+
+static ir_entity *default_lookup_interface_entity;
 
 struct ddispatch_model_t {
 	unsigned                      vptr_points_to_index;
@@ -19,6 +22,7 @@ struct ddispatch_model_t {
 	construct_interface_lookup_t  construct_interface_lookup;
 } ddispatch_model;
 
+__attribute__ ((unused))
 static void __abstract_method(void)
 {
 	panic("Cannot invoke abstract method.");
@@ -38,9 +42,41 @@ static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_i
 
 static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface, ir_entity *method, ir_graph *irg, ir_node *block, ir_node **mem)
 {
-	(void) objptr; (void) iface; (void) method; (void) irg; (void) block; (void) mem;
-	panic("Invoking an interface method depends on runtime class information. Currently there's no default mechanism.");
-	return NULL;
+	ir_node    *cur_mem        = *mem;
+
+	// we need the reference to the object's class$ field
+	// first, dereference the vptr in order to get the vtable address.
+	ir_entity  *vptr_entity    = oo_get_class_vptr_entity(iface);
+	ir_node    *vptr_addr      = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node    *vptr_load      = new_r_Load(block, cur_mem, vptr_addr, mode_P, cons_none);
+	ir_node    *vtable_addr    = new_r_Proj(vptr_load, mode_P, pn_Load_res);
+	            cur_mem        = new_r_Proj(vptr_load, mode_M, pn_Load_M);
+
+	// second, dereference vtable_addr (it points to the slot where the address of the class$ field is stored).
+	ir_node    *ci_load        = new_r_Load(block, cur_mem, vtable_addr, mode_P, cons_none);
+	ir_node    *ci_ref         = new_r_Proj(ci_load, mode_P, pn_Load_res);
+	            cur_mem        = new_r_Proj(ci_load, mode_M, pn_Load_M);
+
+	const char *method_name    = get_entity_name(method);
+	ir_entity  *name_const_ent = rtti_emit_string_const(method_name);
+	symconst_symbol name_const_sym;
+	name_const_sym.entity_p = name_const_ent;
+	ir_node    *name_ref       = new_r_SymConst(irg, mode_P, name_const_sym, symconst_addr_ent);
+
+	symconst_symbol callee_sym;
+	callee_sym.entity_p      = default_lookup_interface_entity;
+	ir_node   *callee        = new_r_SymConst(irg, mode_P, callee_sym, symconst_addr_ent);
+
+	ir_node   *args[2]       = { ci_ref, name_ref };
+	ir_type   *call_type     = get_entity_type(default_lookup_interface_entity);
+	ir_node   *call          = new_r_Call(block, cur_mem, callee, 2, args, call_type);
+	           cur_mem       = new_r_Proj(call, mode_M, pn_Call_M);
+	ir_node   *ress          = new_r_Proj(call, mode_T, pn_Call_T_result);
+	ir_node   *res           = new_r_Proj(ress, mode_P, 0);
+
+	*mem = cur_mem;
+
+	return res;
 }
 
 void ddispatch_init(void)
@@ -54,7 +90,13 @@ void ddispatch_init(void)
 	ddispatch_model.abstract_method_ident       = new_id_from_str("__abstract_method");
 	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
 
-	(void) __abstract_method;
+	ir_type *default_li_type = new_type_method(2, 1);
+	set_method_param_type(default_li_type, 0, type_reference);
+	set_method_param_type(default_li_type, 1, type_reference);
+	set_method_res_type(default_li_type, 0, type_reference);
+	ident *default_li_ident = new_id_from_str("oo_rt_lookup_interface_method");
+	default_lookup_interface_entity = new_entity(get_glob_type(), default_li_ident, default_li_type);
+	set_entity_visibility(default_lookup_interface_entity, ir_visibility_external);
 }
 
 void ddispatch_setup_vtable(ir_type *klass)

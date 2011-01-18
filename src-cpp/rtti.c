@@ -14,7 +14,7 @@ static ir_type *type_uint16_t;
 static ir_type *type_reference;
 static ir_type *type_int;
 
-static ir_op *op_InstanceOf;
+static ir_op   *op_InstanceOf;
 
 enum {
 	rtti_pos_InstanceOf_mem = 0,
@@ -118,17 +118,7 @@ static struct {
 	construct_instanceof_t       construct_instanceof;
 } rtti_model;
 
-static uint16_t string_hash(const char* s)
-{
-	unsigned hash = 0;
-	size_t len = strlen(s);
-	for (size_t i = 0; i < len; i++) {
-		hash = (31 * hash) + s[i]; // FIXME: this doesn't work for codepoints that are not ASCII.
-	}
-	return hash & 0xFFFF;
-}
-
-static ir_entity *emit_string_const(const char *bytes)
+ir_entity *rtti_emit_string_const(const char *bytes)
 {
 	size_t            len        = strlen(bytes);
 	size_t            len0       = len + 1; // incl. the '\0' byte
@@ -213,7 +203,7 @@ static ir_entity *emit_method_desc(ir_type *owner, ir_entity *ent)
 	ir_initializer_t *cinit         = create_initializer_compound(2);
 
 	const char       *name_str      = get_entity_name(ent);
-	ir_entity        *name_const_ent= emit_string_const(name_str);
+	ir_entity        *name_const_ent= rtti_emit_string_const(name_str);
 	ir_entity        *name_ent      = emit_primitive_member(md_type, "name", type_reference, create_ccode_symconst(name_const_ent));
 	set_initializer_compound_value(cinit, 0, get_entity_initializer(name_ent));
 
@@ -291,7 +281,7 @@ static void default_construct_runtime_typeinfo(ir_type *klass)
 	ir_graph *ccode_irg = get_const_code_irg();
 	ir_node *const_0 = new_r_Const_long(ccode_irg, mode_P, 0);
 
-	ir_entity *cname_ent = emit_string_const(get_id_str(cname_id));
+	ir_entity *cname_ent = rtti_emit_string_const(get_id_str(cname_id));
 	ir_node   *cname_symc = create_ccode_symconst(cname_ent);
 	EMIT_PRIM("name", type_reference, cname_symc);
 

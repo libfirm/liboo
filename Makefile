@@ -7,6 +7,7 @@ DLLEXT ?= .so
 
 BUILDDIR=build
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
+GOAL_RT = $(BUILDDIR)/liboo_rt$(DLLEXT)
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS)
 CXXFLAGS = -Wall -W -O0 -g3
 CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -O0 -g3 -std=c99 -pedantic
@@ -16,19 +17,26 @@ CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -O0 -g3 -std=
 #CFLAGS += -Wunreachable-code -Wlogical-op
 LFLAGS = $(LIBFIRM_LFLAGS)
 SOURCES = $(wildcard src-cpp/*.c) $(wildcard src-cpp/adt/*.c)
+SOURCES_RT = $(wildcard src-cpp/rt/*.c)
 DEPS = $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $(SOURCES))))
+DEPS_RT = $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $(SOURCES_RT))))
 OBJECTS = $(addprefix $(BUILDDIR)/, $(addsuffix .o, $(basename $(SOURCES))))
+OBJECTS_RT = $(addprefix $(BUILDDIR)/, $(addsuffix .o, $(basename $(SOURCES_RT))))
 
 Q ?= @
 
-all: $(GOAL)
+all: $(GOAL) $(GOAL_RT)
 
 # Make sure our build-directories are created
-UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/adt)
+UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/adt $(BUILDDIR)/src-cpp/rt)
 
--include $(DEPS)
+-include $(DEPS) $(DEPS_RT)
 
 $(GOAL): $(OBJECTS)
+	@echo '===> LD $@'
+	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS)
+
+$(GOAL_RT): $(OBJECTS_RT)
 	@echo '===> LD $@'
 	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS)
 
@@ -37,4 +45,5 @@ $(BUILDDIR)/%.o: %.c
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 clean:
-	rm -rf $(OBJECTS) $(GOAL) $(DEPS)
+	rm -rf $(OBJECTS) $(GOAL) $(GOAL_RT) $(DEPS)
+
