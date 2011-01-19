@@ -1,12 +1,12 @@
 #include "config.h"
 
 #include "liboo/ddispatch.h"
-#include "liboo/rtti.h"
-
-#include <assert.h>
 #include "liboo/oo.h"
+#include "liboo/rtti.h"
 #include "liboo/mangle.h"
 #include "liboo/dmemory.h"
+
+#include <assert.h>
 #include "adt/error.h"
 
 static ir_mode   *mode_reference;
@@ -21,12 +21,6 @@ struct ddispatch_model_t {
 	ident                        *abstract_method_ident;
 	construct_interface_lookup_t  construct_interface_lookup;
 } ddispatch_model;
-
-__attribute__ ((unused))
-static void __abstract_method(void)
-{
-	panic("Cannot invoke abstract method.");
-}
 
 static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size)
 {
@@ -98,7 +92,7 @@ void ddispatch_init(void)
 	ddispatch_model.vptr_points_to_index        = 0;
 	ddispatch_model.index_of_first_method       = 1;
 	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
-	ddispatch_model.abstract_method_ident       = new_id_from_str("__abstract_method");
+	ddispatch_model.abstract_method_ident       = new_id_from_str("oo_rt_abstract_method_error");
 	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
 
 	ir_type *default_li_type = new_type_method(2, 1);
