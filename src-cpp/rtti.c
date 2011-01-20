@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <string.h>
 #include "adt/error.h"
+#include "adt/cpset.h"
+#include "adt/obst.h"
 
 static ir_mode *mode_uint16_t;
 static ir_type *type_uint16_t;
@@ -15,6 +17,36 @@ static ir_type *type_reference;
 static ir_type *type_int;
 
 static ir_op   *op_InstanceOf;
+
+static cpset_t string_constant_pool;
+
+typedef struct {
+	char      *string;
+	ir_entity *entity;
+} scp_entry_t;
+
+static void free_scpe(scp_entry_t *scpe)
+{
+	if (scpe == NULL)
+		return;
+
+	free(scpe->string);
+	free(scpe);
+}
+
+static int scp_cmp_function(const void *p1, const void *p2)
+{
+	scp_entry_t *scpe1 = (scp_entry_t*) p1;
+	scp_entry_t *scpe2 = (scp_entry_t*) p2;
+
+	return strcmp(scpe1->string, scpe2->string) == 0;
+}
+
+static unsigned scp_hash_function(const void *obj)
+{
+	scp_entry_t *scpe = (scp_entry_t*) obj;
+	return string_hash(scpe->string);
+}
 
 enum {
 	rtti_pos_InstanceOf_mem = 0,
@@ -120,6 +152,16 @@ static struct {
 
 ir_entity *rtti_emit_string_const(const char *bytes)
 {
+	scp_entry_t lookup_scpe;
+	lookup_scpe.string = (char*) bytes;
+
+	scp_entry_t *found_scpe = cpset_find(&string_constant_pool, &lookup_scpe);
+	if (found_scpe != NULL) {
+		ir_entity *string_const = found_scpe->entity;
+		assert (is_entity(string_const));
+		return string_const;
+	}
+
 	size_t            len        = strlen(bytes);
 	size_t            len0       = len + 1; // incl. the '\0' byte
 	uint16_t          hash       = string_hash(bytes);
@@ -171,6 +213,14 @@ ir_entity *rtti_emit_string_const(const char *bytes)
 	ir_entity *strc   = new_entity(get_glob_type(), id, strc_type);
 	set_entity_initializer(strc, cinit);
 	set_entity_ld_ident(strc, id);
+
+	scp_entry_t *new_scpe = XMALLOC(scp_entry_t);
+	new_scpe->string = XMALLOCN(char, len0);
+	for (unsigned i = 0; i < len0; i++)
+		new_scpe->string[i] = bytes[i];
+
+	new_scpe->entity = strc;
+	cpset_insert(&string_constant_pool, new_scpe);
 
 	return strc;
 }
@@ -345,6 +395,21 @@ void rtti_init()
 
 	rtti_model.construct_runtime_typeinfo = default_construct_runtime_typeinfo;
 	rtti_model.construct_instanceof = default_construct_instanceof;
+
+	cpset_init(&string_constant_pool, scp_hash_function, scp_cmp_function);
+}
+
+void rtti_deinit()
+{
+	cpset_iterator_t iter;
+	cpset_iterator_init(&iter, &string_constant_pool);
+
+	scp_entry_t *cur_scpe;
+	while ((cur_scpe = (scp_entry_t*)cpset_iterator_next(&iter)) != NULL) {
+		free_scpe(cur_scpe);
+	}
+
+	cpset_destroy(&string_constant_pool);
 }
 
 void rtti_construct_runtime_typeinfo(ir_type *klass)

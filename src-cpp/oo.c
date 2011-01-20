@@ -301,6 +301,7 @@ void oo_init(void)
 void oo_deinit(void)
 {
 	mangle_deinit();
+	rtti_deinit();
 	obstack_free(&oo_info_obst, NULL);
 }
 
