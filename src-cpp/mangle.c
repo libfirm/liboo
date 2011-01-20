@@ -189,11 +189,11 @@ bool mangle_qualified_class_name(ir_type *classtype, struct obstack *obst, compr
 	// New components are emitted as "<length>component" (e.g. "4java2io")
 	int   last_match     = -1;
 	while (*p != '\0') {
-		while (*p == '/')
+		while (*p == '.')
 			++p;
 		/* search for '/' or '\0' */
 		size_t l;
-		for (l = 0; p[l] != '\0' && p[l] != '/'; ++l) {
+		for (l = 0; p[l] != '\0' && p[l] != '.'; ++l) {
 		}
 
 		const char *comp_begin   = p;
