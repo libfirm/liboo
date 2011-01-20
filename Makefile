@@ -15,7 +15,7 @@ CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -O0 -g3 -std=
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
 #CFLAGS += -Wunreachable-code -Wlogical-op
-LFLAGS = $(LIBFIRM_LFLAGS)
+LFLAGS = 
 SOURCES = $(wildcard src-cpp/*.c) $(wildcard src-cpp/adt/*.c)
 SOURCES_RT = $(wildcard src-cpp/rt/*.c)
 DEPS = $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $(SOURCES))))
@@ -34,7 +34,7 @@ UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/adt $(BUILDDIR)/src-cpp/rt)
 
 $(GOAL): $(OBJECTS)
 	@echo '===> LD $@'
-	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS)
+	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS) $(LIBFIRM_LFLAGS)
 
 $(GOAL_RT): $(OBJECTS_RT)
 	@echo '===> LD $@'
