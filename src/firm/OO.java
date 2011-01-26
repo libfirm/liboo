@@ -1,6 +1,5 @@
 package firm;
 
-import firm.bindings.binding_mangle;
 import firm.bindings.binding_oo;
 
 /**
@@ -58,27 +57,10 @@ public final class OO {
 	}
 	
 	/**
-	 * lets you mark a method as a constructor
-	 */
-	public static void setMethodConstructor(Entity entity, boolean isConstructor) {
-		binding_oo.oo_set_method_is_constructor(entity.ptr, isConstructor);
-	}
-
-	/**
 	 * lets you specify the binding mode of a method
 	 */
 	public static void setEntityBinding(Entity entity, binding_oo.ddispatch_binding binding) {
 		binding_oo.oo_set_entity_binding(entity.ptr, binding.val);
-	}
-	
-	/**
-	 * lets you specify an alternative namespace for an entity.
-	 * This namespace is then used instead of the entity's owner
-	 * during name mangling. (e.g. if the entity is a member of 
-	 * GlobalType)
-	 */
-	public static void setEntityAltNamespace(Entity entity, Type namespace) {
-		binding_oo.oo_set_entity_alt_namespace(entity.ptr, namespace.ptr);
 	}
 	
 	/**
@@ -100,20 +82,5 @@ public final class OO {
 	 */
 	public static void setClassRTTIEntity(ClassType classType, Entity entity) {
 		binding_oo.oo_set_class_rtti_entity(classType.ptr, entity.ptr);
-	}
-
-	/**
-	 * define names for primitive names for the name mangling
-	 */
-	public static void setPrimitiveTypeName(Type type, String name) {
-		binding_mangle.mangle_set_primitive_type_name(type.ptr, name);
-	}
-
-	/**
-	 * define method name substitions for name mangling
-	 * (typically used for operator X methods)
-	 */
-	public static void addNameSubstitution(String name, String mangled) {
-		binding_mangle.mangle_add_name_substitution(name, mangled);
 	}
 }

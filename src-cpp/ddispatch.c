@@ -3,7 +3,6 @@
 #include "liboo/ddispatch.h"
 #include "liboo/oo.h"
 #include "liboo/rtti.h"
-#include "liboo/mangle.h"
 #include "liboo/dmemory.h"
 
 #include <assert.h>
@@ -112,9 +111,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 		return;
 
 	ident *vtable_name = oo_get_class_vtable_ld_ident(klass);
-	if (! vtable_name) { // XXX: will become an assert after mangling is removed from liboo
-		vtable_name = mangle_vtable_name(klass);
-	}
+	assert (vtable_name);
 
 	ir_type *global_type = get_glob_type();
 	assert (get_class_member_by_name(global_type, vtable_name) == NULL);
@@ -167,8 +164,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	if (superclass != NULL) {
 		unsigned superclass_vtable_size = get_class_vtable_size(superclass);
 		ident *superclass_vtable_ident = oo_get_class_vtable_ld_ident(superclass);
-		if (! superclass_vtable_ident) // XXX: will become an assert after mangling is removed from liboo
-			superclass_vtable_ident = mangle_vtable_name(superclass);
+		assert (superclass_vtable_ident);
 
 		ir_entity *superclass_vtable_entity = get_class_member_by_name(global_type, superclass_vtable_ident);
 		assert (superclass_vtable_entity != NULL);
@@ -281,7 +277,8 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
 	ir_type   *global_type     = get_glob_type();
-	ir_entity *vtable_entity   = get_class_member_by_name(global_type, mangle_vtable_name(klass));
+	ident     *vtable_ident    = oo_get_class_vtable_ld_ident(klass);
+	ir_entity *vtable_entity   = get_class_member_by_name(global_type, vtable_ident);
 
 	union symconst_symbol sym;
 	sym.entity_p = vtable_entity;

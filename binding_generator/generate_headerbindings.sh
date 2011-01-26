@@ -4,7 +4,7 @@
 
 . config
 
-for i in oo mangle; do
+for i in oo ; do
 	RES="../src/firm/bindings/binding_$i.java"
 	TMP="/tmp/tmp.java"
 	TMP2="/tmp/tmp2.java"
