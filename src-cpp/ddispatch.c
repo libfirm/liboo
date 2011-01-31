@@ -107,14 +107,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 {
 	assert(is_Class_type(klass));
 
-	if (oo_get_class_omit_vtable(klass))
+	ir_entity *vtable = oo_get_class_vtable_entity(klass);
+	if (! vtable)
 		return;
-
-	ident *vtable_name = oo_get_class_vtable_ld_ident(klass);
-	assert (vtable_name);
-
-	ir_type *global_type = get_glob_type();
-	assert (get_class_member_by_name(global_type, vtable_name) == NULL);
 
 	ir_type *superclass = NULL;
 	unsigned vtable_size = ddispatch_model.index_of_first_method-ddispatch_model.vptr_points_to_index;
@@ -154,20 +149,16 @@ void ddispatch_setup_vtable(ir_type *klass)
 	set_array_bounds_int(vtable_type, 0, 0, vtable_ent_size);
 	set_type_size_bytes(vtable_type, type_reference_size * vtable_ent_size);
 	set_type_state(vtable_type, layout_fixed);
-
-	ir_entity *vtable = new_entity(global_type, vtable_name, vtable_type);
+	set_entity_type(vtable, vtable_type);
 	set_entity_alignment(vtable, 32);
 
 	ir_graph *const_code = get_const_code_irg();
 	ir_initializer_t * init = create_initializer_compound(vtable_ent_size);
 
 	if (superclass != NULL) {
-		unsigned superclass_vtable_size = get_class_vtable_size(superclass);
-		ident *superclass_vtable_ident = oo_get_class_vtable_ld_ident(superclass);
-		assert (superclass_vtable_ident);
-
-		ir_entity *superclass_vtable_entity = get_class_member_by_name(global_type, superclass_vtable_ident);
-		assert (superclass_vtable_entity != NULL);
+		unsigned   superclass_vtable_size   = get_class_vtable_size(superclass);
+		ir_entity *superclass_vtable_entity = oo_get_class_vtable_entity(superclass);
+		assert (superclass_vtable_entity);
 		ir_initializer_t *superclass_vtable_init = get_entity_initializer(superclass_vtable_entity);
 
 		// copy vtable initialization from superclass
@@ -276,15 +267,18 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	ir_entity *vptr_entity     = oo_get_class_vptr_entity(klass);
 	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
-	ir_type   *global_type     = get_glob_type();
-	ident     *vtable_ident    = oo_get_class_vtable_ld_ident(klass);
-	ir_entity *vtable_entity   = get_class_member_by_name(global_type, vtable_ident);
+	ir_node   *vptr_target     = NULL;
+	ir_entity *vtable_entity   = oo_get_class_vtable_entity(klass);
+	if (vtable_entity) {
+		union symconst_symbol sym;
+		sym.entity_p = vtable_entity;
+		ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
+		ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference));
+		vptr_target                = new_r_Add(block, vtable_symconst, const_offset, mode_reference);
+	} else {
+		vptr_target                = new_r_Const_long(irg, mode_P, 0);
+	}
 
-	union symconst_symbol sym;
-	sym.entity_p = vtable_entity;
-	ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
-	ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference));
-	ir_node   *vptr_target     = new_r_Add(block, vtable_symconst, const_offset, mode_reference);
 	ir_node   *vptr_store      = new_r_Store(block, cur_mem, vptr, vptr_target, cons_none);
 	cur_mem                    = new_r_Proj(vptr_store, mode_M, pn_Store_M);
 

@@ -36,13 +36,6 @@ public final class OO {
 	}
 
 	/**
-	 * lets you configure which compound-types need a vtable
-	 */
-	public static void setClassOmitVTable(CompoundType type, boolean omitVTable) {
-		binding_oo.oo_set_class_omit_vtable(type.ptr, omitVTable);
-	}
-
-	/**
 	 * lets you configure which methods should be included in the vtable
 	 */
 	public static void setMethodExcludeFromVTable(Entity entity, boolean includeInVTable) {
@@ -64,10 +57,11 @@ public final class OO {
 	}
 	
 	/**
-	 * lets you specify the mangled name for classType's vtable entity  
+	 * lets you specify the entity containing classType's vtable.
+	 * Use an entity with a primitive pointer type, and set the ld name.
 	 */
-	public static void setClassVTableLdIdent(ClassType classType, Ident ldIdent) {
-		binding_oo.oo_set_class_vtable_ld_ident(classType.ptr, ldIdent.ptr);
+	public static void setClassVTableEntity(ClassType classType, Entity vtable) {
+		binding_oo.oo_set_class_vtable_entity(classType.ptr, vtable.ptr);
 	}
 	
 	/**
@@ -78,7 +72,8 @@ public final class OO {
 	}
 	
 	/**
-	 * lets you specify the entity that represents the run-time type info data. 
+	 * lets you specify the entity that represents the run-time type info data.
+	 * Use an entity with a primitive pointer type, and set the ld name.
 	 */
 	public static void setClassRTTIEntity(ClassType classType, Entity entity) {
 		binding_oo.oo_set_class_rtti_entity(classType.ptr, entity.ptr);

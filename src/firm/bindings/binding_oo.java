@@ -3173,13 +3173,9 @@ public class binding_oo {
 
 	public static native void oo_lower();
 
-	public static native boolean oo_get_class_omit_vtable(Pointer classtype);
+	public static native Pointer oo_get_class_vtable_entity(Pointer classtype);
 
-	public static native void oo_set_class_omit_vtable(Pointer classtype, boolean omit_vtable);
-
-	public static native Pointer oo_get_class_vtable_ld_ident(Pointer classtype);
-
-	public static native void oo_set_class_vtable_ld_ident(Pointer classtype, Pointer ld_ident);
+	public static native void oo_set_class_vtable_entity(Pointer classtype, Pointer vtable);
 
 	public static native Pointer oo_get_class_vptr_entity(Pointer classtype);
 

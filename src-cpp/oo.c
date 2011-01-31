@@ -18,8 +18,7 @@ typedef struct {
 	oo_info_kind  kind;
 	ir_entity    *vptr;
 	ir_entity    *rtti;
-	bool          omit_vtable;
-	ident        *vtable_ld_ident;
+	ir_entity    *vtable;
 	void         *link;
 } oo_type_info;
 
@@ -63,30 +62,17 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 	return ei;
 }
 
-bool oo_get_class_omit_vtable(ir_type *classtype)
+ir_entity *oo_get_class_vtable_entity(ir_type *classtype)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-	return ti->omit_vtable;
+	return ti->vtable;
 }
-void oo_set_class_omit_vtable(ir_type *classtype, bool omit_vtable)
+void oo_set_class_vtable_entity(ir_type *classtype, ir_entity *vtable)
 {
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-	ti->omit_vtable = omit_vtable;
-}
-
-ident *oo_get_class_vtable_ld_ident(ir_type *classtype)
-{
-	assert (is_Class_type(classtype));
-	oo_type_info *ti = get_type_info(classtype);
-	return ti->vtable_ld_ident;
-}
-void oo_set_class_vtable_ld_ident(ir_type *classtype, ident *ld_ident)
-{
-	assert (is_Class_type(classtype));
-	oo_type_info *ti = get_type_info(classtype);
-	ti->vtable_ld_ident = ld_ident;
+	ti->vtable = vtable;
 }
 
 ir_entity *oo_get_class_vptr_entity(ir_type *classtype)
