@@ -20,6 +20,8 @@ ir_entity *oo_get_class_vptr_entity(ir_type *classtype);
 void  oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr);
 ir_entity *oo_get_class_rtti_entity(ir_type *classtype);
 void  oo_set_class_rtti_entity(ir_type *classtype, ir_entity *rtti);
+bool  oo_get_class_is_interface(ir_type *classtype);
+void  oo_set_class_is_interface(ir_type *classtype, bool is_interface);
 void *oo_get_type_link(ir_type *type);
 void  oo_set_type_link(ir_type *type, void* link);
 bool  oo_get_method_exclude_from_vtable(ir_entity *method);

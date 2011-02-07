@@ -18,6 +18,8 @@ static ir_type *type_int;
 
 static ir_op   *op_InstanceOf;
 
+static ir_entity *default_instanceof_entity;
+
 static cpset_t string_constant_pool;
 
 typedef struct {
@@ -306,8 +308,40 @@ static ir_entity *emit_method_table(ir_type *klass, int n_methods)
 	return mt_ent;
 }
 
+static ir_entity *emit_interface_table(ir_type *klass, int n_interfaces)
+{
+	ident            *id            = id_unique("_IF_%u_");
+	ir_type          *if_type       = new_type_struct(id_mangle(id, new_id_from_str("type")));
 
-#define NUM_FIELDS 4
+	int               n_supertypes  = get_class_n_supertypes(klass);
+
+	ir_initializer_t *cinit         = create_initializer_compound(n_interfaces);
+	int               cur_init_slot = 0;
+
+	for (int i = 0; i < n_supertypes; i++) {
+		ir_type *iface = get_class_supertype(klass, i);
+		if (! oo_get_class_is_interface(iface))
+			continue;
+
+		ir_entity *ci = oo_get_class_rtti_entity(iface);
+		ir_entity *entry_ent = emit_primitive_member(if_type, "entry", type_reference, create_ccode_symconst(ci));
+		set_initializer_compound_value(cinit, cur_init_slot++, get_entity_initializer(entry_ent));
+	}
+
+	assert (cur_init_slot == n_interfaces);
+
+	set_type_size_bytes(if_type, n_interfaces * get_type_size_bytes(type_reference));
+	default_layout_compound_type(if_type);
+
+	ir_entity        *if_ent        = new_entity(get_glob_type(), id, if_type);
+	set_entity_initializer(if_ent, cinit);
+	set_entity_ld_ident(if_ent, id);
+
+	return if_ent;
+}
+
+
+#define NUM_FIELDS 6
 #define EMIT_PRIM(name, tp, val) do { \
   ir_entity        *ent  = emit_primitive_member(ci_type, name, tp, val); \
   ir_initializer_t *init = get_entity_initializer(ent); \
@@ -335,17 +369,17 @@ static void default_construct_runtime_typeinfo(ir_type *klass)
 	ir_node   *cname_symc = create_ccode_symconst(cname_ent);
 	EMIT_PRIM("name", type_reference, cname_symc);
 
+	ir_node *superclass_symc = NULL;
 	int n_superclasses = get_class_n_supertypes(klass);
 	if (n_superclasses > 0) {
-		assert (n_superclasses == 1);
 		ir_type *superclass = get_class_supertype(klass, 0);
-		ir_entity *superclass_rtti = oo_get_class_rtti_entity(superclass);
-		assert (superclass_rtti);
-		ir_node *superclass_rtti_symc = create_ccode_symconst(superclass_rtti);
-		EMIT_PRIM("superclass", type_reference, superclass_rtti_symc);
-	} else {
-		EMIT_PRIM("superclass", type_reference, const_0);
+		if (! oo_get_class_is_interface(superclass)) {
+			ir_entity *superclass_rtti = oo_get_class_rtti_entity(superclass);
+			assert (superclass_rtti);
+			superclass_symc = create_ccode_symconst(superclass_rtti);
+		}
 	}
+	EMIT_PRIM("superclass", type_reference, superclass_symc ? superclass_symc : const_0);
 
 	int n_methods = 0;
 	int n_members = get_class_n_members(klass);
@@ -366,6 +400,23 @@ static void default_construct_runtime_typeinfo(ir_type *klass)
 		EMIT_PRIM("methods", type_reference, const_0);
 	}
 
+	int n_interfaces = 0;
+	int n_supertypes = get_class_n_supertypes(klass);
+	for (int i = 0; i < n_supertypes; i++) {
+		ir_type *stype = get_class_supertype(klass, i);
+		if (oo_get_class_is_interface(stype)) n_interfaces++;
+	}
+	ir_node *n_interfaces_const = new_r_Const_long(ccode_irg, mode_Is, n_interfaces);
+	EMIT_PRIM("n_interfaces", type_int, n_interfaces_const);
+
+	if (n_interfaces > 0) {
+		ir_entity *iface_table = emit_interface_table(klass, n_interfaces);
+		ir_node *iface_table_symc = create_ccode_symconst(iface_table);
+		EMIT_PRIM("interfaces", type_reference, iface_table_symc);
+	} else {
+		EMIT_PRIM("interfaces", type_reference, const_0);
+	}
+
 	assert (cur_init_slot == NUM_FIELDS);
 
 	set_type_size_bytes(ci_type, cur_type_size);
@@ -379,8 +430,41 @@ static void default_construct_runtime_typeinfo(ir_type *klass)
 
 static ir_node *default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_graph *irg, ir_node *block, ir_node **mem)
 {
-	(void) objptr; (void) klass; (void) irg; (void) block; (void) mem;
-	panic("Default InstanceOf implementation NYI");
+	ir_node    *cur_mem      = *mem;
+
+	// we need the reference to the object's class$ field
+	// first, dereference the vptr in order to get the vtable address.
+	ir_entity  *vptr_entity  = oo_get_class_vptr_entity(klass); // XXX: this is a bit weird and works iff the vptr entity is the same in the whole type hierarchy.
+	ir_node    *vptr_addr    = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node    *vptr_load    = new_r_Load(block, cur_mem, vptr_addr, mode_P, cons_none);
+	ir_node    *vtable_addr  = new_r_Proj(vptr_load, mode_P, pn_Load_res);
+	            cur_mem      = new_r_Proj(vptr_load, mode_M, pn_Load_M);
+
+	// second, dereference vtable_addr (it points to the slot where the address of the class$ field is stored).
+	ir_node    *obj_ci_load  = new_r_Load(block, cur_mem, vtable_addr, mode_P, cons_none);
+	ir_node    *obj_ci_ref   = new_r_Proj(obj_ci_load, mode_P, pn_Load_res);
+	            cur_mem      = new_r_Proj(obj_ci_load, mode_M, pn_Load_M);
+
+	// get a symconst to klass' classinfo.
+	ir_entity  *test_ci      = oo_get_class_rtti_entity(klass);
+	assert (test_ci);
+	symconst_symbol test_ci_sym;
+	test_ci_sym.entity_p = test_ci;
+	ir_node   *test_ci_ref   = new_r_SymConst(irg, mode_P, test_ci_sym, symconst_addr_ent);
+
+	symconst_symbol callee_sym;
+	callee_sym.entity_p      = default_instanceof_entity;
+	ir_node   *callee        = new_r_SymConst(irg, mode_P, callee_sym, symconst_addr_ent);
+	ir_node   *args[2]       = { obj_ci_ref, test_ci_ref };
+	ir_type   *call_type     = get_entity_type(default_instanceof_entity);
+	ir_node   *call          = new_r_Call(block, cur_mem, callee, 2, args, call_type);
+	           cur_mem       = new_r_Proj(call, mode_M, pn_Call_M);
+	ir_node   *ress          = new_r_Proj(call, mode_T, pn_Call_T_result);
+	ir_node   *res           = new_r_Proj(ress, mode_Is, 0);
+
+	*mem = cur_mem;
+
+	return res;
 }
 
 void rtti_init()
@@ -395,6 +479,14 @@ void rtti_init()
 
 	rtti_model.construct_runtime_typeinfo = default_construct_runtime_typeinfo;
 	rtti_model.construct_instanceof = default_construct_instanceof;
+
+	ir_type *default_io_type = new_type_method(2, 1);
+	set_method_param_type(default_io_type, 0, type_reference);
+	set_method_param_type(default_io_type, 1, type_reference);
+	set_method_res_type(default_io_type, 0, type_int);
+	ident *default_io_ident = new_id_from_str("oo_rt_instanceof");
+	default_instanceof_entity = new_entity(get_glob_type(), default_io_ident, default_io_type);
+	set_entity_visibility(default_instanceof_entity, ir_visibility_external);
 
 	cpset_init(&string_constant_pool, scp_hash_function, scp_cmp_function);
 }

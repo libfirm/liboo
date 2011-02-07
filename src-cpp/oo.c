@@ -19,6 +19,7 @@ typedef struct {
 	ir_entity    *vptr;
 	ir_entity    *rtti;
 	ir_entity    *vtable;
+	bool          is_interface;
 	void         *link;
 } oo_type_info;
 
@@ -111,6 +112,19 @@ void  oo_set_class_rtti_entity(ir_type *classtype, ir_entity *rtti)
 	assert (is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->rtti = rtti;
+}
+
+bool oo_get_class_is_interface(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->is_interface;
+}
+void oo_set_class_is_interface(ir_type *classtype, bool is_interface)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->is_interface = is_interface;
 }
 
 void *oo_get_type_link(ir_type *type)
@@ -211,17 +225,10 @@ static void lower_node(ir_node *node, void *env)
 	}
 }
 
-static void lower_type(type_or_ent tore, void *env)
+static void lower_type(ir_type *type, void *env)
 {
 	(void) env;
-	if (get_kind(tore.typ) != k_type)
-		return;
-
-	ir_type *type = tore.typ;
-	if (!is_Class_type(type)) {
-		set_type_state(type, layout_fixed);
-		return;
-	}
+	assert (is_Class_type(type));
 
 	ir_type *glob = get_glob_type();
 	if (type != glob) {
@@ -262,5 +269,5 @@ void oo_lower(void)
 		irg_walk_graph(irg, NULL, lower_node, NULL);
 	}
 
-	type_walk_super2sub(lower_type, NULL, NULL);
+	class_walk_super2sub(lower_type, NULL, NULL);
 }

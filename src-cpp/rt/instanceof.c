@@ -5,7 +5,6 @@
 
 extern bool oo_rt_instanceof(class_info_t *objclass, class_info_t *refclass);
 
-
 __attribute__ ((unused))
 bool oo_rt_instanceof(class_info_t *objclass, class_info_t *refclass)
 {

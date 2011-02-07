@@ -115,9 +115,11 @@ void ddispatch_setup_vtable(ir_type *klass)
 	unsigned vtable_size = ddispatch_model.index_of_first_method-ddispatch_model.vptr_points_to_index;
 	int n_supertypes = get_class_n_supertypes(klass);
 	if (n_supertypes > 0) {
-		assert (n_supertypes == 1);
-		superclass = get_class_supertype(klass, 0);
-		vtable_size = get_class_vtable_size(superclass);
+		ir_type *superclass_ = get_class_supertype(klass, 0);
+		if (! oo_get_class_is_interface(superclass_)) {
+			superclass = superclass_;
+			vtable_size = get_class_vtable_size(superclass);
+		}
 	}
 
 	// assign vtable ids
