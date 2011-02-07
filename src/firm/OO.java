@@ -78,4 +78,11 @@ public final class OO {
 	public static void setClassRTTIEntity(ClassType classType, Entity entity) {
 		binding_oo.oo_set_class_rtti_entity(classType.ptr, entity.ptr);
 	}
+	
+	/**
+	 * lets you specify whether the given classType is representing an interface type
+	 */
+	public static void setClassIsInterface(ClassType classType, boolean isInterface) {
+		binding_oo.oo_set_class_is_interface(classType.ptr, isInterface);
+	}
 }

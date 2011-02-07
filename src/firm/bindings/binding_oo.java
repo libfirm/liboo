@@ -3185,6 +3185,10 @@ public class binding_oo {
 
 	public static native void oo_set_class_rtti_entity(Pointer classtype, Pointer rtti);
 
+	public static native boolean oo_get_class_is_interface(Pointer classtype);
+
+	public static native void oo_set_class_is_interface(Pointer classtype, boolean is_interface);
+
 	public static native Pointer oo_get_type_link(Pointer type);
 
 	public static native void oo_set_type_link(Pointer type, Pointer link);
