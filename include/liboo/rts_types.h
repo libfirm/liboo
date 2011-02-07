@@ -24,8 +24,8 @@ struct _class_info_t {
 	class_info_t   *superclass;
 	int             n_methods;
 	method_info_t  *methods;
-
-	/* will need a list of interface in order to perform the instance of operation */
+	int             n_interfaces;
+	class_info_t   *interfaces;
 };
 
 inline static uint16_t string_hash(const char* s)
