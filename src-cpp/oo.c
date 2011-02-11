@@ -5,6 +5,7 @@
 #include <assert.h>
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
+#include "liboo/oo_nodes.h"
 #include "adt/obst.h"
 #include "adt/error.h"
 
@@ -247,6 +248,7 @@ static void lower_type(ir_type *type, void *env)
 void oo_init(void)
 {
 	obstack_init(&oo_info_obst);
+	oo_nodes_init();
 	ddispatch_init();
 	dmemory_init();
 	rtti_init();

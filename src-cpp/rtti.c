@@ -3,6 +3,7 @@
 #include "liboo/rtti.h"
 #include "liboo/oo.h"
 #include "liboo/rts_types.h"
+#include "liboo/oo_nodes.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -15,8 +16,6 @@ static ir_mode *mode_uint16_t;
 static ir_type *type_uint16_t;
 static ir_type *type_reference;
 static ir_type *type_int;
-
-static ir_op   *op_InstanceOf;
 
 static ir_entity *default_instanceof_entity;
 
@@ -48,103 +47,6 @@ static unsigned scp_hash_function(const void *obj)
 {
 	scp_entry_t *scpe = (scp_entry_t*) obj;
 	return string_hash(scpe->string);
-}
-
-enum {
-	rtti_pos_InstanceOf_mem = 0,
-	rtti_pos_InstanceOf_objptr = 1
-};
-
-typedef struct {
-	ir_type *classtype;
-} rtti_InstanceOf_attr_t;
-
-static void dump_node(FILE *f, ir_node *irn, dump_reason_t reason)
-{
-	assert (is_InstanceOf(irn));
-	switch (reason) {
-	case dump_node_opcode_txt:
-		fputs(get_op_name(get_irn_op(irn)), f);
-		break;
-	case dump_node_mode_txt:
-		break;
-	case dump_node_nodeattr_txt: {
-		rtti_InstanceOf_attr_t *attr = (rtti_InstanceOf_attr_t*) get_irn_generic_attr(irn);
-		fprintf(f, "%s ", get_class_name(attr->classtype));
-		break;
-	}
-	case dump_node_info_txt: {
-		rtti_InstanceOf_attr_t *attr = (rtti_InstanceOf_attr_t*) get_irn_generic_attr(irn);
-		fprintf(f, "type: %s ", get_class_name(attr->classtype));
-		break;
-	}
-	default:
-		break;
-	}
-}
-
-/* XXX: might be needed to define a function that extracts the type from an InstanceOf node's attributes
- * -> get_irn_attr_type */
-static const ir_op_ops rtti_node_op_ops = {
-	firm_default_hash,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	dump_node,
-	NULL,
-	NULL
-};
-
-ir_node *new_InstanceOf(ir_node *mem, ir_node *objptr, ir_type *classtype)
-{
-	assert (is_Class_type(classtype));
-
-	ir_node  *block = get_nodes_block(objptr);
-	ir_graph *irg   = get_irn_irg(block);
-
-	ir_node  *in[2];
-	in[rtti_pos_InstanceOf_mem]    = mem;
-	in[rtti_pos_InstanceOf_objptr] = objptr;
-
-	ir_node *res = new_ir_node(NULL, irg, block, op_InstanceOf, mode_T, 2,	in);
-	rtti_InstanceOf_attr_t *attr = (rtti_InstanceOf_attr_t*) get_irn_generic_attr(res);
-	attr->classtype = classtype;
-
-	return res;
-}
-
-ir_node *get_InstanceOf_mem(const ir_node *node)
-{
-	assert (is_InstanceOf(node));
-	return get_irn_n(node, rtti_pos_InstanceOf_mem);
-}
-
-ir_node *get_InstanceOf_objptr(const ir_node *node)
-{
-	assert (is_InstanceOf(node));
-	return get_irn_n(node, rtti_pos_InstanceOf_objptr);
-}
-
-ir_type *get_InstanceOf_type(const ir_node *node)
-{
-	assert (is_InstanceOf(node));
-	rtti_InstanceOf_attr_t *attr = (rtti_InstanceOf_attr_t*) get_irn_generic_attr_const(node);
-	return attr->classtype;
-}
-
-bool is_InstanceOf(const ir_node *node)
-{
-	return get_irn_op(node) == op_InstanceOf;
 }
 
 static struct {
@@ -340,18 +242,17 @@ static ir_entity *emit_interface_table(ir_type *klass, int n_interfaces)
 	return if_ent;
 }
 
-
-#define NUM_FIELDS 6
-#define EMIT_PRIM(name, tp, val) do { \
-  ir_entity        *ent  = emit_primitive_member(ci_type, name, tp, val); \
-  ir_initializer_t *init = get_entity_initializer(ent); \
-  set_initializer_compound_value(ci_init, cur_init_slot++, init); \
-  ir_type          *tp   = get_entity_type(ent); \
-  cur_type_size         += get_type_size_bytes(tp); \
-} while(0);
-
-static void default_construct_runtime_typeinfo(ir_type *klass)
+void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 {
+	#define NUM_FIELDS 6
+	#define EMIT_PRIM(name, tp, val) do { \
+		ir_entity        *ent  = emit_primitive_member(ci_type, name, tp, val); \
+		ir_initializer_t *init = get_entity_initializer(ent); \
+		set_initializer_compound_value(ci_init, cur_init_slot++, init); \
+		ir_type          *tp   = get_entity_type(ent); \
+		cur_type_size         += get_type_size_bytes(tp); \
+	} while(0);
+
 	assert (is_Class_type(klass));
 	ir_entity        *ci = oo_get_class_rtti_entity(klass);
 	assert (ci && "RTTI entity not set. Please create and set such an entity yourself. A primitive pointer type is fine");
@@ -428,7 +329,7 @@ static void default_construct_runtime_typeinfo(ir_type *klass)
 	set_entity_alignment(ci, 32);
 }
 
-static ir_node *default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_graph *irg, ir_node *block, ir_node **mem)
+ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_graph *irg, ir_node *block, ir_node **mem)
 {
 	ir_node    *cur_mem      = *mem;
 
@@ -440,8 +341,10 @@ static ir_node *default_construct_instanceof(ir_node *objptr, ir_type *klass, ir
 	ir_node    *vtable_addr  = new_r_Proj(vptr_load, mode_P, pn_Load_res);
 	            cur_mem      = new_r_Proj(vptr_load, mode_M, pn_Load_M);
 
-	// second, dereference vtable_addr (it points to the slot where the address of the class$ field is stored).
-	ir_node    *obj_ci_load  = new_r_Load(block, cur_mem, vtable_addr, mode_P, cons_none);
+	// second, dereference vtable_addr+index_of_rtti_ptr.
+	ir_node    *obj_ci_offset= new_r_Const_long(irg, mode_P, get_type_size_bytes(type_reference) * ddispatch_get_index_of_rtti_ptr());
+	ir_node    *obj_ci_add   = new_r_Add(block, vtable_addr, obj_ci_offset, mode_P);
+	ir_node    *obj_ci_load  = new_r_Load(block, cur_mem, obj_ci_add, mode_P, cons_none);
 	ir_node    *obj_ci_ref   = new_r_Proj(obj_ci_load, mode_P, pn_Load_res);
 	            cur_mem      = new_r_Proj(obj_ci_load, mode_M, pn_Load_M);
 
@@ -469,16 +372,13 @@ static ir_node *default_construct_instanceof(ir_node *objptr, ir_type *klass, ir
 
 void rtti_init()
 {
-	unsigned opcode = get_next_ir_opcode();
-	op_InstanceOf  = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(rtti_InstanceOf_attr_t), &rtti_node_op_ops);
-
 	mode_uint16_t  = new_ir_mode("US", irms_int_number, 16, 0, irma_twos_complement, 16);
 	type_uint16_t  = new_type_primitive(mode_uint16_t);
 	type_reference = new_type_primitive(mode_P);
 	type_int       = new_type_primitive(mode_Is);
 
-	rtti_model.construct_runtime_typeinfo = default_construct_runtime_typeinfo;
-	rtti_model.construct_instanceof = default_construct_instanceof;
+	rtti_model.construct_runtime_typeinfo = rtti_default_construct_runtime_typeinfo;
+	rtti_model.construct_instanceof = rtti_default_construct_instanceof;
 
 	ir_type *default_io_type = new_type_method(2, 1);
 	set_method_param_type(default_io_type, 0, type_reference);

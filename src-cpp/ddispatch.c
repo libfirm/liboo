@@ -16,6 +16,7 @@ static ir_entity *default_lookup_interface_entity;
 struct ddispatch_model_t {
 	unsigned                      vptr_points_to_index;
 	unsigned                      index_of_first_method;
+	unsigned                      index_of_rtti_ptr;
 	init_vtable_slots_t           init_vtable_slots;
 	ident                        *abstract_method_ident;
 	construct_interface_lookup_t  construct_interface_lookup;
@@ -33,13 +34,13 @@ static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_i
 	ci_sym.entity_p             = ci;
 	ir_node          *ci_symc   = new_r_SymConst(ccode_irg, mode_P, ci_sym, symconst_addr_ent);
 	ir_initializer_t *ci_init   = create_initializer_const(ci_symc);
-	set_initializer_compound_value(vtable_init, ddispatch_model.vptr_points_to_index, ci_init);
+	set_initializer_compound_value(vtable_init, ddispatch_model.index_of_rtti_ptr, ci_init);
 
 	ir_node          *const_0   = new_r_Const_long(ccode_irg, mode_reference, 0);
 	ir_initializer_t *slot_init = create_initializer_const(const_0);
 
 	for (unsigned i = 0; i < ddispatch_model.index_of_first_method; i++) {
-		if (i == ddispatch_model.vptr_points_to_index) continue;
+		if (i == ddispatch_model.index_of_rtti_ptr) continue;
 		set_initializer_compound_value(vtable_init, i, slot_init);
 	}
 }
@@ -56,8 +57,10 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	ir_node    *vtable_addr    = new_r_Proj(vptr_load, mode_P, pn_Load_res);
 	            cur_mem        = new_r_Proj(vptr_load, mode_M, pn_Load_M);
 
-	// second, dereference vtable_addr (it points to the slot where the address of the class$ field is stored).
-	ir_node    *ci_load        = new_r_Load(block, cur_mem, vtable_addr, mode_P, cons_none);
+	// second, dereference vtable_addr+index_of_rtti_ptr.
+	ir_node    *ci_offset      = new_r_Const_long(irg, mode_P, get_type_size_bytes(type_reference) * ddispatch_model.index_of_rtti_ptr);
+	ir_node    *ci_add         = new_r_Add(block, vtable_addr, ci_offset, mode_P);
+	ir_node    *ci_load        = new_r_Load(block, cur_mem, ci_add, mode_P, cons_none);
 	ir_node    *ci_ref         = new_r_Proj(ci_load, mode_P, pn_Load_res);
 	            cur_mem        = new_r_Proj(ci_load, mode_M, pn_Load_M);
 
@@ -90,6 +93,7 @@ void ddispatch_init(void)
 
 	ddispatch_model.vptr_points_to_index        = 0;
 	ddispatch_model.index_of_first_method       = 1;
+	ddispatch_model.index_of_rtti_ptr           = 0;
 	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
 	ddispatch_model.abstract_method_ident       = new_id_from_str("oo_rt_abstract_method_error");
 	ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
@@ -287,13 +291,14 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 	*mem = cur_mem;
 }
 
-void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, init_vtable_slots_t func)
+void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, unsigned index_of_rtti_ptr, init_vtable_slots_t func)
 {
 	assert (index_of_first_method >= vptr_points_to_index);
 	assert (func);
 
 	ddispatch_model.vptr_points_to_index  = vptr_points_to_index;
 	ddispatch_model.index_of_first_method = index_of_first_method;
+	ddispatch_model.index_of_rtti_ptr     = index_of_rtti_ptr;
 	ddispatch_model.init_vtable_slots     = func;
 }
 
@@ -307,4 +312,9 @@ void ddispatch_set_abstract_method_ident(ident* ami)
 {
 	assert (ami);
 	ddispatch_model.abstract_method_ident = ami;
+}
+
+unsigned ddispatch_get_index_of_rtti_ptr()
+{
+	return ddispatch_model.index_of_rtti_ptr;
 }

@@ -63,8 +63,10 @@ void ddispatch_setup_vtable(ir_type *klass);
 void ddispatch_lower_Call(ir_node* call);
 void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem);
 
-void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, init_vtable_slots_t func);
+void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, unsigned index_of_rtti_ptr, init_vtable_slots_t func);
 void ddispatch_set_interface_lookup_constructor(construct_interface_lookup_t func);
 void ddispatch_set_abstract_method_ident(ident* ami);
+
+unsigned ddispatch_get_index_of_rtti_ptr(void);
 
 #endif
