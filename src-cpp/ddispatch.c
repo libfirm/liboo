@@ -57,7 +57,7 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	ir_node    *vtable_addr    = new_r_Proj(vptr_load, mode_P, pn_Load_res);
 	            cur_mem        = new_r_Proj(vptr_load, mode_M, pn_Load_M);
 
-	// second, calculate the position of the RTTI ref in relatio to the target of vptr and dereference it.
+	// second, calculate the position of the RTTI ref in relation to the target of vptr and dereference it.
 	int         offset         = (ddispatch_model.index_of_rtti_ptr - ddispatch_model.vptr_points_to_index) * get_type_size_bytes(type_reference);
 	ir_node    *ci_offset      = new_r_Const_long(irg, mode_P, offset);
 	ir_node    *ci_add         = new_r_Add(block, vtable_addr, ci_offset, mode_P);
