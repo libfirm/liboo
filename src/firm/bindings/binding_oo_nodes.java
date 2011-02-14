@@ -3194,6 +3194,8 @@ public class binding_oo_nodes {
 	}
 
 
+	public static native Pointer new_r_InstanceOf(Pointer block, Pointer mem, Pointer objptr, Pointer classtype);
+
 	public static native Pointer new_InstanceOf(Pointer mem, Pointer objptr, Pointer classtype);
 
 	public static native Pointer get_InstanceOf_mem(Pointer node);
@@ -3209,6 +3211,8 @@ public class binding_oo_nodes {
 	public static native void set_InstanceOf_type(Pointer node, Pointer type);
 
 	public static native boolean is_InstanceOf(Pointer node);
+
+	public static native Pointer new_r_Arraylength(Pointer block, Pointer mem, Pointer arrayref);
 
 	public static native Pointer new_Arraylength(Pointer mem, Pointer arrayref);
 

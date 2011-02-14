@@ -73,9 +73,14 @@ static const ir_op_ops oo_nodes_op_ops = {
 
 ir_node *new_InstanceOf(ir_node *mem, ir_node *objptr, ir_type *classtype)
 {
+	ir_node *block = get_cur_block();
+	return new_r_InstanceOf(block, mem, objptr, classtype);
+}
+
+ir_node *new_r_InstanceOf(ir_node *block, ir_node *mem, ir_node *objptr, ir_type *classtype)
+{
 	assert (is_Class_type(classtype));
 
-	ir_node  *block = get_nodes_block(objptr);
 	ir_graph *irg   = get_irn_irg(block);
 
 	ir_node  *in[2];
@@ -134,8 +139,13 @@ bool is_InstanceOf(const ir_node *node)
 
 ir_node *new_Arraylength(ir_node* mem, ir_node *arrayref)
 {
-	ir_graph *irg   = get_irn_irg(arrayref);
-	ir_node  *block = get_nodes_block(arrayref);
+	ir_node *block = get_cur_block();
+	return new_r_Arraylength(block, mem, arrayref);
+}
+
+ir_node *new_r_Arraylength(ir_node *block, ir_node* mem, ir_node *arrayref)
+{
+	ir_graph *irg   = get_irn_irg(block);
 
 	ir_node  *in[2];
 	in[pos_Arraylength_mem]      = mem;
