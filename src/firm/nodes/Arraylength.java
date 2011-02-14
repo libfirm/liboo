@@ -20,13 +20,13 @@ public class Arraylength extends Node {
 		binding_oo_nodes.set_Arraylength_mem(this.ptr, mem.ptr);
 	}
 	
-	public Node getArrayref() {
+	public Node getArrayRef() {
 		return OONodeWrapperConstruction.createWrapper(
 				binding_oo_nodes.get_Arraylength_arrayref(this.ptr));
 	}
 	
-	public void setArrayref(Node arrayref) {
-		binding_oo_nodes.set_Arraylength_arrayref(this.ptr, arrayref.ptr);
+	public void setArrayRef(Node arrayRef) {
+		binding_oo_nodes.set_Arraylength_arrayref(this.ptr, arrayRef.ptr);
 	}
 	
 	@Override

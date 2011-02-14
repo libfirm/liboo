@@ -21,13 +21,13 @@ public class InstanceOf extends Node {
 		binding_oo_nodes.set_InstanceOf_mem(this.ptr, mem.ptr);
 	}
 	
-	public Node getObjptr() {
+	public Node getObjPtr() {
 		return OONodeWrapperConstruction.createWrapper(
 				binding_oo_nodes.get_InstanceOf_objptr(this.ptr));
 	}
 	
-	public void setObjptr(Node objptr) {
-		binding_oo_nodes.set_InstanceOf_objptr(this.ptr, objptr.ptr);
+	public void setObjPtr(Node objPtr) {
+		binding_oo_nodes.set_InstanceOf_objptr(this.ptr, objPtr.ptr);
 	}
 	
 	public Type getType() {
