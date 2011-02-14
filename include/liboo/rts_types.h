@@ -25,7 +25,7 @@ struct _class_info_t {
 	int             n_methods;
 	method_info_t  *methods;
 	int             n_interfaces;
-	class_info_t   *interfaces;
+	class_info_t  **interfaces;
 };
 
 inline static uint16_t string_hash(const char* s)

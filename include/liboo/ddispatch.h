@@ -67,6 +67,7 @@ void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_o
 void ddispatch_set_interface_lookup_constructor(construct_interface_lookup_t func);
 void ddispatch_set_abstract_method_ident(ident* ami);
 
+unsigned ddispatch_get_vptr_points_to_index(void);
 unsigned ddispatch_get_index_of_rtti_ptr(void);
 
 #endif
