@@ -95,17 +95,36 @@ ir_node *get_InstanceOf_mem(const ir_node *node)
 	return get_irn_n(node, pos_InstanceOf_mem);
 }
 
+void set_InstanceOf_mem(ir_node *node, ir_node *mem)
+{
+	assert (is_InstanceOf(node));
+	set_irn_n(node, pos_InstanceOf_mem, mem);
+}
+
 ir_node *get_InstanceOf_objptr(const ir_node *node)
 {
 	assert (is_InstanceOf(node));
 	return get_irn_n(node, pos_InstanceOf_objptr);
 }
 
+void set_InstanceOf_objptr(ir_node *node, ir_node *objptr)
+{
+	assert (is_InstanceOf(node));
+	set_irn_n(node, pos_InstanceOf_objptr, objptr);
+}
+
 ir_type *get_InstanceOf_type(const ir_node *node)
 {
 	assert (is_InstanceOf(node));
-	op_InstanceOf_attr_t *attr = (op_InstanceOf_attr_t*) get_irn_generic_attr_const(node);
+	const op_InstanceOf_attr_t *attr = (const op_InstanceOf_attr_t*) get_irn_generic_attr_const(node);
 	return attr->classtype;
+}
+
+void set_InstanceOf_type(ir_node *node, ir_type *type)
+{
+	assert (is_InstanceOf(node));
+	op_InstanceOf_attr_t *attr = (op_InstanceOf_attr_t*) get_irn_generic_attr(node);
+	attr->classtype = type;
 }
 
 bool is_InstanceOf(const ir_node *node)
@@ -133,10 +152,22 @@ ir_node *get_Arraylength_mem(const ir_node *node)
 	return get_irn_n(node, pos_Arraylength_mem);
 }
 
+void set_Arraylength_mem(ir_node *node, ir_node *mem)
+{
+	assert (is_Arraylength(node));
+	set_irn_n(node, pos_Arraylength_mem, mem);
+}
+
 ir_node *get_Arraylength_arrayref(const ir_node *node)
 {
 	assert (is_Arraylength(node));
 	return get_irn_n(node, pos_Arraylength_arrayref);
+}
+
+void set_Arraylength_arrayref(ir_node *node, ir_node *arrayref)
+{
+	assert (is_Arraylength(node));
+	set_irn_n(node, pos_Arraylength_arrayref, arrayref);
 }
 
 bool is_Arraylength(const ir_node *node)

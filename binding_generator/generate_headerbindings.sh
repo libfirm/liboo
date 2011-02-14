@@ -4,7 +4,7 @@
 
 . config
 
-for i in oo ; do
+for i in oo oo_nodes ; do
 	RES="../src/firm/bindings/binding_$i.java"
 	TMP="/tmp/tmp.java"
 	TMP2="/tmp/tmp2.java"
