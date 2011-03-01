@@ -128,7 +128,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	}
 
 	// assign vtable ids
-	for (int i = 0; i < get_class_n_members(klass); i++) {
+	for (size_t i = 0; i < get_class_n_members(klass); i++) {
 		ir_entity *member = get_class_member(klass, i);
 		if (! is_method_entity(member))
 			continue;
@@ -178,7 +178,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	}
 
 	// setup / replace vtable entries to point to clazz's implementation
-	for (int i = 0; i < get_class_n_members(klass); i++) {
+	for (size_t i = 0; i < get_class_n_members(klass); i++) {
 		ir_entity *member = get_class_member(klass, i);
 		if (is_method_entity(member)) {
 			int member_vtid = oo_get_method_vtable_index(member);
