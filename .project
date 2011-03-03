@@ -3,6 +3,8 @@
 	<name>liboo</name>
 	<comment></comment>
 	<projects>
+		<project>jFirm</project>
+		<project>libfirm</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
