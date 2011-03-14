@@ -87,6 +87,38 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	return res;
 }
 
+// Filter out supertypes that are interfaces and return the first real superclass.
+static ir_type *get_superclass(ir_type *klass)
+{
+	assert (is_Class_type(klass));
+
+	ir_type *superclass = NULL;
+	size_t n_supertyes = get_class_n_supertypes(klass);
+	for (size_t s = 0; ! superclass && s < n_supertyes; s++) {
+		ir_type *st = get_class_supertype(klass, s);
+		if (! oo_get_class_is_interface(st))
+			superclass = st;
+	}
+	return superclass;
+}
+
+// Filter out the overwritten entites that belong to interfaces.
+static ir_entity *get_superclass_overwritten_entity(ir_entity *entity)
+{
+	assert (is_method_entity(entity));
+
+	ir_entity *superclass_entity = NULL;
+	size_t n_overwrites = get_entity_n_overwrites(entity);
+	for (size_t s = 0; ! superclass_entity && s < n_overwrites; s++) {
+		ir_entity *se = get_entity_overwrites(entity, s);
+		ir_type *owner = get_entity_owner(se);
+		assert (owner != get_glob_type());
+		if (! oo_get_class_is_interface(owner))
+			superclass_entity = se;
+	}
+	return superclass_entity;
+}
+
 void ddispatch_init(void)
 {
 	mode_reference = mode_P;
@@ -116,15 +148,12 @@ void ddispatch_setup_vtable(ir_type *klass)
 	if (! vtable)
 		return;
 
-	ir_type *superclass = NULL;
-	unsigned vtable_size = ddispatch_model.index_of_first_method-ddispatch_model.vptr_points_to_index;
-	int n_supertypes = get_class_n_supertypes(klass);
-	if (n_supertypes > 0) {
-		ir_type *superclass_ = get_class_supertype(klass, 0);
-		if (! oo_get_class_is_interface(superclass_)) {
-			superclass = superclass_;
-			vtable_size = get_class_vtable_size(superclass);
-		}
+	unsigned vtable_size;
+	ir_type *superclass = get_superclass(klass);
+	if (superclass) {
+		vtable_size = get_class_vtable_size(superclass);
+	} else {
+		vtable_size = ddispatch_model.index_of_first_method-ddispatch_model.vptr_points_to_index;
 	}
 
 	// assign vtable ids
@@ -135,14 +164,13 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (oo_get_method_exclude_from_vtable(member))
 			continue;
 
-		int n_overwrites = get_entity_n_overwrites(member);
-		if (n_overwrites > 0) { // this method already has a vtable id, copy it from the superclass' implementation
-			assert (n_overwrites == 1);
-			ir_entity *overwritten_entity = get_entity_overwrites(member, 0);
+		ir_entity *overwritten_entity = get_superclass_overwritten_entity(member);
+		if (overwritten_entity) {
 			int vtable_id = oo_get_method_vtable_index(overwritten_entity);
 			assert (vtable_id != -1);
 			oo_set_method_vtable_index(member, vtable_id);
 		} else {
+			// assign new vtable id
 			oo_set_method_vtable_index(member, vtable_size);
 			++vtable_size;
 		}
