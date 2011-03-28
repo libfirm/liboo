@@ -194,7 +194,14 @@ static ir_entity *emit_method_table(ir_type *klass, int n_methods)
 		ir_entity *member = get_class_member(klass, i);
 		if (! is_method_entity(member) || oo_get_method_exclude_from_vtable(member)) continue;
 
+		if (oo_get_method_is_inherited(member)) {
+			member = oo_get_entity_overwritten_superclass_entity(member);
+			assert (member);
+		}
+
 		ir_entity *md_ent = emit_method_desc(mt_type, member);
+
+
 		set_initializer_compound_value(cinit, cur_init_slot++, get_entity_initializer(md_ent));
 	}
 

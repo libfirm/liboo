@@ -87,38 +87,6 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	return res;
 }
 
-// Filter out supertypes that are interfaces and return the first real superclass.
-static ir_type *get_superclass(ir_type *klass)
-{
-	assert (is_Class_type(klass));
-
-	ir_type *superclass = NULL;
-	size_t n_supertyes = get_class_n_supertypes(klass);
-	for (size_t s = 0; ! superclass && s < n_supertyes; s++) {
-		ir_type *st = get_class_supertype(klass, s);
-		if (! oo_get_class_is_interface(st))
-			superclass = st;
-	}
-	return superclass;
-}
-
-// Filter out the overwritten entites that belong to interfaces.
-static ir_entity *get_superclass_overwritten_entity(ir_entity *entity)
-{
-	assert (is_method_entity(entity));
-
-	ir_entity *superclass_entity = NULL;
-	size_t n_overwrites = get_entity_n_overwrites(entity);
-	for (size_t s = 0; ! superclass_entity && s < n_overwrites; s++) {
-		ir_entity *se = get_entity_overwrites(entity, s);
-		ir_type *owner = get_entity_owner(se);
-		assert (owner != get_glob_type());
-		if (! oo_get_class_is_interface(owner))
-			superclass_entity = se;
-	}
-	return superclass_entity;
-}
-
 void ddispatch_init(void)
 {
 	mode_reference = mode_P;
@@ -149,9 +117,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 		return;
 
 	unsigned vtable_size;
-	ir_type *superclass = get_superclass(klass);
+	ir_type *superclass = oo_get_class_superclass(klass);
 	if (superclass) {
-		vtable_size = get_class_vtable_size(superclass);
+		vtable_size = oo_get_class_vtable_size(superclass);
 	} else {
 		vtable_size = ddispatch_model.index_of_first_method-ddispatch_model.vptr_points_to_index;
 	}
@@ -164,7 +132,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (oo_get_method_exclude_from_vtable(member))
 			continue;
 
-		ir_entity *overwritten_entity = get_superclass_overwritten_entity(member);
+		ir_entity *overwritten_entity = oo_get_entity_overwritten_superclass_entity(member);
 		if (overwritten_entity) {
 			int vtable_id = oo_get_method_vtable_index(overwritten_entity);
 			assert (vtable_id != -1);
@@ -175,7 +143,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 			++vtable_size;
 		}
 	}
-	set_class_vtable_size(klass, vtable_size);
+	oo_set_class_vtable_size(klass, vtable_size);
 
 	// the vtable currently is an array of pointers
 	unsigned type_reference_size = get_type_size_bytes(type_reference);
@@ -212,7 +180,11 @@ void ddispatch_setup_vtable(ir_type *klass)
 			int member_vtid = oo_get_method_vtable_index(member);
 			if (member_vtid != -1) {
 				union symconst_symbol sym;
-				if (! oo_get_method_is_abstract(member)) {
+				if (oo_get_method_is_inherited(member)) {
+					ir_entity *impl = oo_get_entity_overwritten_superclass_entity(member);
+					assert (impl);
+					sym.entity_p = impl;
+				} else if (! oo_get_method_is_abstract(member)) {
 					sym.entity_p = member;
 				} else {
 					sym.entity_p = new_entity(get_glob_type(), ddispatch_model.abstract_method_ident, get_entity_type(member));
