@@ -159,7 +159,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 	ir_initializer_t * init = create_initializer_compound(vtable_ent_size);
 
 	if (superclass != NULL) {
-		unsigned   superclass_vtable_size   = get_class_vtable_size(superclass);
+		unsigned   superclass_vtable_size   = oo_get_class_vtable_size(superclass);
 		ir_entity *superclass_vtable_entity = oo_get_class_vtable_entity(superclass);
 		assert (superclass_vtable_entity);
 		ir_initializer_t *superclass_vtable_init = get_entity_initializer(superclass_vtable_entity);
