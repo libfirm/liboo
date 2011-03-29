@@ -10,7 +10,7 @@
 
 #include <stdbool.h>
 
-#define OO_ALSO_USE_OLD_FIRM_PROPERTIES
+//#define OO_ALSO_USE_OLD_FIRM_PROPERTIES
 
 void oo_init(void);
 void oo_deinit(void);
@@ -30,6 +30,8 @@ bool  oo_get_class_is_abstract(ir_type *classtype);
 void  oo_set_class_is_abstract(ir_type *classtype, bool is_abstract);
 bool  oo_get_class_is_final(ir_type *classtype);
 void  oo_set_class_is_final(ir_type *classtype, bool is_final);
+bool  oo_get_class_is_extern(ir_type *classtype);
+void  oo_set_class_is_extern(ir_type *classtype, bool is_extern);
 void *oo_get_type_link(ir_type *type);
 void  oo_set_type_link(ir_type *type, void* link);
 

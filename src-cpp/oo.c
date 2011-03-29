@@ -13,7 +13,8 @@ typedef enum {
 	oo_is_abstract  = 1 << 0,
 	oo_is_final     = 1 << 1,
 	oo_is_interface = 1 << 2,
-	oo_is_inherited = 1 << 3
+	oo_is_inherited = 1 << 3,
+	oo_is_extern    = 1 << 4
 } oo_info_flags;
 
 typedef enum {
@@ -230,6 +231,24 @@ void oo_set_class_is_final(ir_type *classtype, bool is_final)
 #ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
 	set_class_final(classtype, is_final);
 #endif
+}
+
+bool oo_get_class_is_extern(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+
+	return ti->flags & oo_is_extern;
+}
+void oo_set_class_is_extern(ir_type *classtype, bool is_extern)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	if (is_extern)
+		ti->flags |= oo_is_extern;
+	else
+		ti->flags &= ~oo_is_extern;
+
 }
 
 void *oo_get_type_link(ir_type *type)
