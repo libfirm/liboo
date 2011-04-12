@@ -240,10 +240,6 @@ static void lower_type(ir_type *type, void *env)
 				set_entity_owner(entity, glob);
 		}
 	}
-
-	/* layout fields */
-	if (get_type_state(type) != layout_fixed)
-		default_layout_compound_type(type);
 }
 
 void oo_init(void)
