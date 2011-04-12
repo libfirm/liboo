@@ -6,6 +6,7 @@
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
 #include "liboo/oo_nodes.h"
+#include "liboo/oo_eh.h"
 #include "adt/obst.h"
 #include "adt/error.h"
 
@@ -486,11 +487,13 @@ void oo_init(void)
 	ddispatch_init();
 	dmemory_init();
 	rtti_init();
+	oo_eh_init();
 }
 
 void oo_deinit(void)
 {
 	rtti_deinit();
+	oo_eh_deinit();
 	obstack_free(&oo_info_obst, NULL);
 }
 
