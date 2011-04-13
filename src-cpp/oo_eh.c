@@ -18,6 +18,7 @@ static struct obstack lpads;
 static lpad_t *top;
 
 static ir_entity *exception_object_entity;
+static ir_entity *throw_entity;
 
 ir_node *oo_eh_get_exception_object(void)
 {
@@ -39,7 +40,13 @@ void oo_eh_init(void)
 {
 	obstack_init(&lpads);
 	ir_type *type_reference = new_type_primitive(mode_P);
-	exception_object_entity = new_entity(get_tls_type(), new_id_from_str("__oo_exception"), type_reference);
+	exception_object_entity = new_entity(get_tls_type(), new_id_from_str("__oo_rt_exception_object__"), type_reference);
+
+	ir_type *throw_type = new_type_method(1, 0);
+	set_method_param_type(throw_type, 0, type_reference);
+	throw_entity = new_entity(get_glob_type(), new_id_from_str("oo_rt_throw"), throw_type);
+	set_entity_visibility(throw_entity, ir_visibility_external);
+
 	top = NULL;
 }
 
@@ -145,7 +152,10 @@ void oo_eh_end_method(void)
 	set_cur_block(top->cur_block);
 	ir_node *cur_mem     = get_store();
 	ir_node *raise       = new_Raise(cur_mem, top->exception_object);
-	keep_alive(raise);
+	//keep_alive(raise);
+	ir_node *proj        = new_Proj(raise, mode_X, pn_Raise_X);
+	ir_node *end_block   = get_irg_end_block(get_current_ir_graph());
+	add_immBlock_pred(end_block, proj);
 
 	set_cur_block(saved_block);
 
@@ -153,3 +163,21 @@ void oo_eh_end_method(void)
 	top = NULL;
 }
 
+void oo_eh_lower_Raise(ir_node *raise)
+{
+	assert (is_Raise(raise));
+
+	ir_node  *ex_obj  = get_Raise_exo_ptr(raise);
+	ir_node  *block   = get_nodes_block(raise);
+	ir_graph *irg     = get_irn_irg(raise);
+	ir_node  *cur_mem = get_Raise_mem(raise);
+
+	symconst_symbol callee_sym;
+	callee_sym.entity_p = throw_entity;
+	ir_node  *c_symc  = new_r_SymConst(irg, mode_P, callee_sym, symconst_addr_ent);
+	ir_node  *in[1]   = { ex_obj };
+
+	ir_node  *throw   = new_r_Call(block, cur_mem, c_symc, 1, in, get_entity_type(throw_entity));
+
+	exchange(raise, throw);
+}

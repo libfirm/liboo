@@ -461,6 +461,8 @@ static void lower_node(ir_node *node, void *env)
 		dmemory_lower_Arraylength(node);
 	} else if (is_InstanceOf(node)) {
 		rtti_lower_InstanceOf(node);
+	} else if (is_Raise(node)) {
+		oo_eh_lower_Raise(node);
 	}
 }
 
