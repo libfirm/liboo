@@ -1,4 +1,4 @@
-#include "liboo/oo_eh.h"
+#include "liboo/eh.h"
 #include "liboo/oo_nodes.h"
 #include "adt/obst.h"
 
@@ -20,7 +20,7 @@ static lpad_t *top;
 static ir_entity *exception_object_entity;
 static ir_entity *throw_entity;
 
-ir_node *oo_eh_get_exception_object(void)
+ir_node *eh_get_exception_object(void)
 {
 	symconst_symbol ex_sym;
 	ex_sym.entity_p = exception_object_entity;
@@ -36,7 +36,7 @@ ir_node *oo_eh_get_exception_object(void)
 	return ex_obj;
 }
 
-void oo_eh_init(void)
+void eh_init(void)
 {
 	obstack_init(&lpads);
 	ir_type *type_reference = new_type_primitive(mode_P);
@@ -50,19 +50,19 @@ void oo_eh_init(void)
 	top = NULL;
 }
 
-void oo_eh_deinit(void)
+void eh_deinit(void)
 {
 	obstack_free(&lpads, NULL);
 }
 
-void oo_eh_start_method(void)
+void eh_start_method(void)
 {
 	assert (get_irg_phase_state(get_current_ir_graph()) == phase_building);
 	assert (obstack_object_size(&lpads) == 0);
-	oo_eh_new_lpad();
+	eh_new_lpad();
 }
 
-void oo_eh_new_lpad(void)
+void eh_new_lpad(void)
 {
 	lpad_t *new_pad = (lpad_t*) obstack_alloc(&lpads, sizeof(lpad_t));
 	new_pad->handler_header_block = new_immBlock();
@@ -75,12 +75,12 @@ void oo_eh_new_lpad(void)
 	ir_node *saved_block  = get_cur_block();
 	set_cur_block(new_pad->cur_block);
 
-	top->exception_object = oo_eh_get_exception_object();
+	top->exception_object = eh_get_exception_object();
 
 	set_cur_block(saved_block);
 }
 
-void oo_eh_add_handler(ir_type *catch_type, ir_node *catch_block)
+void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 {
 	assert (top->prev); //e.g., not the default handler
 
@@ -108,7 +108,7 @@ void oo_eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 	set_cur_block(saved_block);
 }
 
-ir_node *oo_eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
+ir_node *eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
 {
 	ir_node *call         = new_Call(irn_mem, irn_ptr, arity, in, type);
 	ir_node *proj_except  = new_Proj(call, mode_X, pn_Call_X_except);
@@ -123,7 +123,7 @@ ir_node *oo_eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node
 	return call;
 }
 
-void oo_eh_pop_lpad(void)
+void eh_pop_lpad(void)
 {
 	mature_immBlock(top->handler_header_block);
 
@@ -142,7 +142,7 @@ void oo_eh_pop_lpad(void)
 	top = prev;
 }
 
-void oo_eh_end_method(void)
+void eh_end_method(void)
 {
 	assert (! top->prev); // the explicit stuff is gone, we have the default handler
 
@@ -163,7 +163,7 @@ void oo_eh_end_method(void)
 	top = NULL;
 }
 
-void oo_eh_lower_Raise(ir_node *raise)
+void eh_lower_Raise(ir_node *raise)
 {
 	assert (is_Raise(raise));
 
