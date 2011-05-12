@@ -372,10 +372,11 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 	           cur_mem       = new_r_Proj(call, mode_M, pn_Call_M);
 	ir_node   *ress          = new_r_Proj(call, mode_T, pn_Call_T_result);
 	ir_node   *res           = new_r_Proj(ress, mode_Is, 0);
+	ir_node   *res_b         = new_r_Cmp(block, res, new_r_Const_long(irg, mode_Is, 0), ir_relation_less_greater);
 
 	*mem = cur_mem;
 
-	return res;
+	return res_b;
 }
 
 void rtti_init()
