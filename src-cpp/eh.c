@@ -3,6 +3,7 @@
 #include "adt/obst.h"
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 struct _lpad_t;
@@ -11,6 +12,7 @@ struct _lpad_t {
 	ir_node *handler_header_block;
 	ir_node *cur_block;
 	ir_node *exception_object;
+	bool     used;
 	lpad_t  *prev;
 };
 
@@ -68,6 +70,7 @@ void eh_new_lpad(void)
 	new_pad->handler_header_block = new_immBlock();
 	new_pad->cur_block            = new_pad->handler_header_block;
 	new_pad->exception_object     = NULL;
+	new_pad->used                 = false;
 	new_pad->prev                 = top;
 
 	top = new_pad;
@@ -110,15 +113,24 @@ void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 
 ir_node *eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
 {
+	ir_node *jmp          = new_Jmp();
+	ir_node *call_block   = new_immBlock();
+	add_immBlock_pred(call_block, jmp);
+	mature_immBlock(call_block);
+	set_cur_block(call_block);
+
 	ir_node *call         = new_Call(irn_mem, irn_ptr, arity, in, type);
 	ir_node *proj_except  = new_Proj(call, mode_X, pn_Call_X_except);
 	add_immBlock_pred(top->handler_header_block, proj_except);
 
 	ir_node *proj_regular = new_Proj(call, mode_X, pn_Call_X_regular);
+//	ir_node *jmp_regular  = new_Jmp();
 	ir_node *new_block    = new_immBlock();
 	add_immBlock_pred(new_block, proj_regular);
 	mature_immBlock(new_block);
 	set_cur_block(new_block);
+
+	top->used = true;
 
 	return call;
 }
@@ -126,6 +138,8 @@ ir_node *eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *c
 void eh_pop_lpad(void)
 {
 	mature_immBlock(top->handler_header_block);
+
+	assert (top->used && "No exception is ever thrown");
 
 	lpad_t *prev         = top->prev;
 	assert (prev);
@@ -146,18 +160,20 @@ void eh_end_method(void)
 {
 	assert (! top->prev); // the explicit stuff is gone, we have the default handler
 
-	mature_immBlock(top->handler_header_block);
+	if (top->used) {
+		mature_immBlock(top->handler_header_block);
 
-	ir_node *saved_block = get_cur_block();
-	set_cur_block(top->cur_block);
-	ir_node *cur_mem     = get_store();
-	ir_node *raise       = new_Raise(cur_mem, top->exception_object);
-	//keep_alive(raise);
-	ir_node *proj        = new_Proj(raise, mode_X, pn_Raise_X);
-	ir_node *end_block   = get_irg_end_block(get_current_ir_graph());
-	add_immBlock_pred(end_block, proj);
+		ir_node *saved_block = get_cur_block();
+		set_cur_block(top->cur_block);
+		ir_node *cur_mem     = get_store();
+		ir_node *raise       = new_Raise(cur_mem, top->exception_object);
+		//keep_alive(raise);
+		ir_node *proj        = new_Proj(raise, mode_X, pn_Raise_X);
+		ir_node *end_block   = get_irg_end_block(get_current_ir_graph());
+		add_immBlock_pred(end_block, proj);
 
-	set_cur_block(saved_block);
+		set_cur_block(saved_block);
+	}
 
 	obstack_free(&lpads, top);
 	top = NULL;

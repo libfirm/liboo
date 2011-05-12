@@ -8,9 +8,9 @@ DLLEXT ?= .so
 BUILDDIR=build
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT = $(BUILDDIR)/liboo_rt$(DLLEXT)
-CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS)
+CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS) $(LIBUNWIND_CPPFLAGS)
 CXXFLAGS = -Wall -W -O0 -g3
-CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -O0 -g3 -std=c99 -pedantic
+CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -O0 -g3 -std=c99 -pedantic
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
@@ -38,7 +38,7 @@ $(GOAL): $(OBJECTS)
 
 $(GOAL_RT): $(OBJECTS_RT)
 	@echo '===> LD $@'
-	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS)
+	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS) $(LIBUNWIND_LFLAGS)
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $<'

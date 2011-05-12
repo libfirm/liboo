@@ -28,6 +28,16 @@ struct _class_info_t {
 	class_info_t  **interfaces;
 };
 
+typedef struct {
+	void *ip;
+	void *handler;
+} lsda_entry_t;
+
+typedef struct {
+	uint32_t n_entries;
+	lsda_entry_t entries[1];
+} lsda_t;
+
 inline static char *get_string_const_chars(const string_const_t *s)
 {
 	return (char*)&s->data;
@@ -43,7 +53,7 @@ inline static uint16_t string_hash(const char* s)
 	return hash & 0xFFFF;
 }
 
-inline static bool string_const_equals(string_const_t *s1, string_const_t *s2)
+inline static bool string_const_equals(const string_const_t *s1, const string_const_t *s2)
 {
 	if (s1 == s2)                        // referencing the same string_const
 		return true;
@@ -54,8 +64,8 @@ inline static bool string_const_equals(string_const_t *s1, string_const_t *s2)
 	if (s1->hash != s2->hash)            // cannot be equal if hashes don't match
 		return false;
 
-	char *p1 = (char*)&s1->data;
-	char *p2 = (char*)&s2->data;
+	char *p1 = get_string_const_chars(s1);
+	char *p2 = get_string_const_chars(s2);
 	while (*p1 != '\0' && *p2 != '\0' && *p1 == *p2) {
 		p1++; p2++;
 	}
@@ -63,4 +73,8 @@ inline static bool string_const_equals(string_const_t *s1, string_const_t *s2)
 
 }
 
+inline static class_info_t *get_class_info(void *obj)
+{
+	return (class_info_t*)*(unsigned*)((*(unsigned*)obj)-4);
+}
 #endif
