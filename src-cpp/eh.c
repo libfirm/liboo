@@ -88,9 +88,9 @@ void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 	assert (top->prev); //e.g., not the default handler
 
 	ir_node *saved_block = get_cur_block();
-	ir_node *cur_mem     = get_store();
 	set_cur_block(top->cur_block);
 
+	ir_node *cur_mem     = get_store();
 	ir_node *instanceof  = new_InstanceOf(cur_mem, top->exception_object, catch_type);
 	cur_mem              = new_Proj(instanceof, mode_M, pn_InstanceOf_M);
 	ir_node *result      = new_Proj(instanceof, mode_Is, pn_InstanceOf_res);
@@ -111,7 +111,7 @@ void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 	set_cur_block(saved_block);
 }
 
-ir_node *eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
+ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
 {
 	ir_node *jmp          = new_Jmp();
 	ir_node *call_block   = new_immBlock();
@@ -119,12 +119,15 @@ ir_node *eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *c
 	mature_immBlock(call_block);
 	set_cur_block(call_block);
 
-	ir_node *call         = new_Call(irn_mem, irn_ptr, arity, in, type);
+	ir_node *cur_mem      = get_store();
+	ir_node *call         = new_Call(cur_mem, irn_ptr, arity, in, type);
 	ir_node *proj_except  = new_Proj(call, mode_X, pn_Call_X_except);
+	cur_mem               = new_Proj(call, mode_M, pn_Call_M);
+	set_store(cur_mem);
+
 	add_immBlock_pred(top->handler_header_block, proj_except);
 
 	ir_node *proj_regular = new_Proj(call, mode_X, pn_Call_X_regular);
-//	ir_node *jmp_regular  = new_Jmp();
 	ir_node *new_block    = new_immBlock();
 	add_immBlock_pred(new_block, proj_regular);
 	mature_immBlock(new_block);
@@ -167,8 +170,10 @@ void eh_end_method(void)
 		set_cur_block(top->cur_block);
 		ir_node *cur_mem     = get_store();
 		ir_node *raise       = new_Raise(cur_mem, top->exception_object);
-		//keep_alive(raise);
 		ir_node *proj        = new_Proj(raise, mode_X, pn_Raise_X);
+		cur_mem              = new_Proj(raise, mode_M, pn_Raise_M);
+		set_store(cur_mem);
+
 		ir_node *end_block   = get_irg_end_block(get_current_ir_graph());
 		add_immBlock_pred(end_block, proj);
 

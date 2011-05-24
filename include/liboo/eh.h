@@ -13,7 +13,7 @@ void eh_pop_lpad(void);
 void eh_end_method(void);
 
 ir_node *eh_get_exception_object(void);
-ir_node *eh_new_Call(ir_node * irn_mem, ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* catch_type);
+ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* catch_type);
 
 void eh_lower_Raise(ir_node *raise);
 
