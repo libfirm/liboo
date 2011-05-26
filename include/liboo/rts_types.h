@@ -28,6 +28,11 @@ struct _class_info_t {
 	class_info_t  **interfaces;
 };
 
+inline static char *get_string_const_chars(const string_const_t *s)
+{
+	return (char*)&s->data;
+}
+
 inline static uint16_t string_hash(const char* s)
 {
 	unsigned hash = 0;
