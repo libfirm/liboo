@@ -5,8 +5,8 @@
 #include <libfirm/firm.h>
 
 enum {
-	pn_InstanceOf_M   = pn_Generic_M,
-	pn_InstanceOf_res = pn_Generic_other,
+	pn_InstanceOf_M = 0,
+	pn_InstanceOf_res,
 	pn_InstanceOf_max
 };
 
@@ -21,8 +21,8 @@ void     set_InstanceOf_type(ir_node *node, ir_type *type);
 bool     is_InstanceOf(const ir_node *node);
 
 enum {
-	pn_Arraylength_M   = pn_Generic_M,
-	pn_Arraylength_res = pn_Generic_other,
+	pn_Arraylength_M = 0,
+	pn_Arraylength_res,
 	pn_Arraylength_max
 };
 
