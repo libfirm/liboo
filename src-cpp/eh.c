@@ -86,28 +86,35 @@ void eh_new_lpad(void)
 void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 {
 	assert (top->prev); //e.g., not the default handler
+	assert (top->cur_block && "Cannot add handler after an catch all was registered");
 
 	ir_node *saved_block = get_cur_block();
 	set_cur_block(top->cur_block);
 
-	ir_node *cur_mem     = get_store();
-	ir_node *instanceof  = new_InstanceOf(cur_mem, top->exception_object, catch_type);
-	cur_mem              = new_Proj(instanceof, mode_M, pn_InstanceOf_M);
-	ir_node *result      = new_Proj(instanceof, mode_Is, pn_InstanceOf_res);
-	ir_node *cmp         = new_Cmp(result, new_Const_long(mode_Is, 0), ir_relation_less_greater);
-	ir_node *cond        = new_Cond(cmp);
+	if (catch_type) {
+		ir_node *cur_mem     = get_store();
+		ir_node *instanceof  = new_InstanceOf(cur_mem, top->exception_object, catch_type);
+		cur_mem              = new_Proj(instanceof, mode_M, pn_InstanceOf_M);
+		ir_node *result      = new_Proj(instanceof, mode_Is, pn_InstanceOf_res);
+		ir_node *cmp         = new_Cmp(result, new_Const_long(mode_Is, 0), ir_relation_less_greater);
+		ir_node *cond        = new_Cond(cmp);
 
-	ir_node *proj_match  = new_Proj(cond, mode_X, pn_Cond_true);
-	add_immBlock_pred(catch_block, proj_match);
-	// will be matured elsewhere
+		ir_node *proj_match  = new_Proj(cond, mode_X, pn_Cond_true);
+		add_immBlock_pred(catch_block, proj_match);
+		// will be matured elsewhere
 
-	ir_node *proj_go_on  = new_Proj(cond, mode_X, pn_Cond_false);
-	ir_node *new_block   = new_immBlock();
-	add_immBlock_pred(new_block, proj_go_on);
-	mature_immBlock(new_block);
-	top->cur_block = new_block;
+		ir_node *proj_go_on  = new_Proj(cond, mode_X, pn_Cond_false);
+		ir_node *new_block   = new_immBlock();
+		add_immBlock_pred(new_block, proj_go_on);
+		mature_immBlock(new_block);
+		top->cur_block = new_block;
+		set_store(cur_mem);
+	} else {
+		ir_node *jmp = new_Jmp();
+		add_immBlock_pred(catch_block, jmp);
+		top->cur_block = NULL;
+	}
 
-	set_store(cur_mem);
 	set_cur_block(saved_block);
 }
 
@@ -142,18 +149,21 @@ void eh_pop_lpad(void)
 {
 	mature_immBlock(top->handler_header_block);
 
-	assert (top->used && "No exception is ever thrown");
+	//assert (top->used && "No exception is ever thrown");
 
 	lpad_t *prev         = top->prev;
 	assert (prev);
 
-	ir_node *saved_block = get_cur_block();
-	set_cur_block(top->cur_block);
+	if (top->cur_block) {
+		// the popped lpad didn't have a catch all handler and therefore is still "open".
+		ir_node *saved_block = get_cur_block();
+		set_cur_block(top->cur_block);
 
-	ir_node *jmp         = new_Jmp();
-	add_immBlock_pred(prev->handler_header_block, jmp);
+		ir_node *jmp         = new_Jmp();
+		add_immBlock_pred(prev->handler_header_block, jmp);
 
-	set_cur_block(saved_block);
+		set_cur_block(saved_block);
+	}
 
 	obstack_free(&lpads, top);
 	top = prev;
@@ -165,6 +175,8 @@ void eh_end_method(void)
 
 	if (top->used) {
 		mature_immBlock(top->handler_header_block);
+
+		assert (top->cur_block); // would fail if front end adds an catch all handler to the default handler
 
 		ir_node *saved_block = get_cur_block();
 		set_cur_block(top->cur_block);
