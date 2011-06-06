@@ -128,6 +128,7 @@ ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type*
 
 	ir_node *cur_mem      = get_store();
 	ir_node *call         = new_Call(cur_mem, irn_ptr, arity, in, type);
+	ir_set_throws_exception(call, 1);
 	ir_node *proj_except  = new_Proj(call, mode_X, pn_Call_X_except);
 	cur_mem               = new_Proj(call, mode_M, pn_Call_M);
 	set_store(cur_mem);

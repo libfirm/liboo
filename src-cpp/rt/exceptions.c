@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-extern void oo_rt_throw(void *exception_object);
+extern void firm_personality(void *exception_object);
 
 extern __thread void *__oo_rt_exception_object__;
 
@@ -23,11 +23,10 @@ static void oo_rt_unwind (void) {
 		unw_get_reg(&cursor, UNW_REG_IP, &ip);
 		unw_get_proc_info(&cursor, &pi);
 
-		if (pi.lsda != 0 && (void*)pi.handler == oo_rt_throw) {
+		if (pi.lsda != 0 && (void*)pi.handler == firm_personality) {
 			lsda_t *lsda = (lsda_t*) pi.lsda;
 			for (unsigned i = 0; i < lsda->n_entries; i++) {
 				if (ip == (unsigned)lsda->entries[i].ip) {
-					fprintf(stderr, "[UNWIND] resuming at 0x%lx...\n", lsda->entries[i].handler);
 					unw_set_reg(&cursor, UNW_REG_IP, (unw_word_t)lsda->entries[i].handler);
 					unw_resume(&cursor);
 				}
@@ -37,11 +36,12 @@ static void oo_rt_unwind (void) {
 }
 
 __attribute__ ((unused))
-void oo_rt_throw(void *exception_object)
+void firm_personality(void *exception_object)
 {
 	__oo_rt_exception_object__ = exception_object;
 
 	oo_rt_unwind();
 
+	fprintf(stderr, "UNCAUGHT EXCEPTION 0x%x\n", exception_object);
 	exit(-1);
 }
