@@ -427,7 +427,7 @@ void rtti_lower_InstanceOf(ir_node *instanceof)
 	ir_node  *cur_mem = get_InstanceOf_mem(instanceof);
 	ir_node  *res     = (*rtti_model.construct_instanceof)(objptr, type, irg, block, &cur_mem);
 
-	turn_into_tuple(instanceof, pn_InstanceOf_max);
+	turn_into_tuple(instanceof, pn_InstanceOf_max+1);
 	set_irn_n(instanceof, pn_InstanceOf_M, cur_mem);
 	set_irn_n(instanceof, pn_InstanceOf_res, res);
 }
