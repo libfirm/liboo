@@ -154,7 +154,7 @@ void dmemory_lower_Alloc(ir_node *node)
 		assert (0);
 	}
 
-	turn_into_tuple(node, pn_Alloc_max);
+	turn_into_tuple(node, pn_Alloc_max+1);
 	set_irn_n(node, pn_Alloc_M, cur_mem);
 	set_irn_n(node, pn_Alloc_res, res);
 }
@@ -167,7 +167,7 @@ void dmemory_lower_Arraylength(ir_node *arraylength)
 	ir_node  *cur_mem   = get_Arraylength_mem(arraylength);
 	ir_node  *len       = (*dmemory_model.get_arraylength)(array_ref, irg, block, &cur_mem);
 
-	turn_into_tuple(arraylength, pn_Arraylength_max);
+	turn_into_tuple(arraylength, pn_Arraylength_max+1);
 	set_irn_n(arraylength, pn_Arraylength_M, cur_mem);
 	set_irn_n(arraylength, pn_Arraylength_res, len);
 }
