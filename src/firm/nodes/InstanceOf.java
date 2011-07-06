@@ -3,7 +3,6 @@ package firm.nodes;
 import com.sun.jna.Pointer;
 
 import firm.Type;
-import firm.bindings.binding_firm_common.pn_generic;
 import firm.bindings.binding_oo_nodes;
 
 public class InstanceOf extends Node {
@@ -45,7 +44,7 @@ public class InstanceOf extends Node {
 		((OONodeVisitor)visitor).visit(this);
 	}
 	
-	public static final int pnM   = pn_generic.pn_Generic_M.ordinal();
-	public static final int pnRes = pn_generic.pn_Generic_other.ordinal();
-	public static final int pnMax = pnRes+1;
+	public static final int pnM   = 0;
+	public static final int pnRes = 1;
+	public static final int pnMax = 2;
 }
