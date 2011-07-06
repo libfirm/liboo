@@ -9,11 +9,53 @@ public class binding_oo {
 		Native.register("oo");
 	}
 
+	public static enum ir_relation {
+		ir_relation_false(0),
+		ir_relation_equal((1 << 0)),
+		ir_relation_less((1 << 1)),
+		ir_relation_greater((1 << 2)),
+		ir_relation_unordered((1 << 3)),
+		ir_relation_less_equal((ir_relation.ir_relation_equal.val | ir_relation.ir_relation_less.val)),
+		ir_relation_greater_equal((ir_relation.ir_relation_equal.val | ir_relation.ir_relation_greater.val)),
+		ir_relation_less_greater((ir_relation.ir_relation_less.val | ir_relation.ir_relation_greater.val)),
+		ir_relation_less_equal_greater(((ir_relation.ir_relation_equal.val | ir_relation.ir_relation_less.val) | ir_relation.ir_relation_greater.val)),
+		ir_relation_unordered_equal((ir_relation.ir_relation_unordered.val | ir_relation.ir_relation_equal.val)),
+		ir_relation_unordered_less((ir_relation.ir_relation_unordered.val | ir_relation.ir_relation_less.val)),
+		ir_relation_unordered_less_equal(((ir_relation.ir_relation_unordered.val | ir_relation.ir_relation_less.val) | ir_relation.ir_relation_equal.val)),
+		ir_relation_unordered_greater((ir_relation.ir_relation_unordered.val | ir_relation.ir_relation_greater.val)),
+		ir_relation_unordered_greater_equal(((ir_relation.ir_relation_unordered.val | ir_relation.ir_relation_greater.val) | ir_relation.ir_relation_equal.val)),
+		ir_relation_unordered_less_greater(((ir_relation.ir_relation_unordered.val | ir_relation.ir_relation_less.val) | ir_relation.ir_relation_greater.val)),
+		ir_relation_true((((ir_relation.ir_relation_equal.val | ir_relation.ir_relation_less.val) | ir_relation.ir_relation_greater.val) | ir_relation.ir_relation_unordered.val));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_relation(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_relation() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_relation getEnum(int val) {
+			for (ir_relation entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum ir_cons_flags {
 		cons_none(0),
 		cons_volatile((1 << 0)),
 		cons_unaligned((1 << 1)),
-		cons_floats((1 << 2));
+		cons_floats((1 << 2)),
+		cons_throws_exception((1 << 3));
 		public final int val;
 
 		private static class C {
@@ -230,35 +272,6 @@ public class binding_oo {
 		}
 	}
 
-	public static enum pn_generic {
-		pn_Generic_M(0),
-		pn_Generic_X_regular(1),
-		pn_Generic_X_except(2),
-		pn_Generic_other(3);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		pn_generic(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		pn_generic() {
-			this.val = C.next_val++;
-		}
-
-		public static pn_generic getEnum(int val) {
-			for (pn_generic entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum ir_value_classify_sign {
 		value_classified_unknown(0),
 		value_classified_positive(1),
@@ -280,6 +293,60 @@ public class binding_oo {
 
 		public static ir_value_classify_sign getEnum(int val) {
 			for (ir_value_classify_sign entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_volatility {
+		volatility_non_volatile(),
+		volatility_is_volatile();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_volatility(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_volatility() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_volatility getEnum(int val) {
+			for (ir_volatility entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_align {
+		align_is_aligned(0),
+		align_non_aligned();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_align(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_align() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_align getEnum(int val) {
+			for (ir_align entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -536,7 +603,9 @@ public class binding_oo {
 	public static enum ir_graph_state_t {
 		IR_GRAPH_STATE_KEEP_MUX((1 << 0)),
 		IR_GRAPH_STATE_ARCH_DEP((1 << 1)),
-		IR_GRAPH_STATE_BCONV_ALLOWED((1 << 2));
+		IR_GRAPH_STATE_BCONV_ALLOWED((1 << 2)),
+		IR_GRAPH_STATE_BAD_BLOCK((1 << 3)),
+		IR_GRAPH_STATE_NORMALISATION2((1 << 4));
 		public final int val;
 
 		private static class C {
@@ -614,60 +683,6 @@ public class binding_oo {
 
 		public static ir_linkage getEnum(int val) {
 			for (ir_linkage entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_volatility {
-		volatility_non_volatile(),
-		volatility_is_volatile();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_volatility(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_volatility() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_volatility getEnum(int val) {
-			for (ir_volatility entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_align {
-		align_non_aligned(),
-		align_is_aligned();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_align(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_align() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_align getEnum(int val) {
-			for (ir_align entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1216,12 +1231,68 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Add {
+		n_Add_left(),
+		n_Add_right(),
+		n_Add_max(n_Add.n_Add_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Add(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Add() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Add getEnum(int val) {
+			for (n_Add entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Alloc {
+		n_Alloc_mem(),
+		n_Alloc_count(),
+		n_Alloc_max(n_Alloc.n_Alloc_count.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Alloc(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Alloc() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Alloc getEnum(int val) {
+			for (n_Alloc entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Alloc {
-		pn_Alloc_M(pn_generic.pn_Generic_M.val),
-		pn_Alloc_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Alloc_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Alloc_res(pn_generic.pn_Generic_other.val),
-		pn_Alloc_max();
+		pn_Alloc_M(),
+		pn_Alloc_res(),
+		pn_Alloc_X_regular(),
+		pn_Alloc_X_except(),
+		pn_Alloc_max(pn_Alloc.pn_Alloc_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1246,12 +1317,98 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_And {
+		n_And_left(),
+		n_And_right(),
+		n_And_max(n_And.n_And_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_And(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_And() {
+			this.val = C.next_val++;
+		}
+
+		public static n_And getEnum(int val) {
+			for (n_And entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Borrow {
+		n_Borrow_left(),
+		n_Borrow_right(),
+		n_Borrow_max(n_Borrow.n_Borrow_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Borrow(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Borrow() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Borrow getEnum(int val) {
+			for (n_Borrow entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Bound {
+		n_Bound_mem(),
+		n_Bound_index(),
+		n_Bound_lower(),
+		n_Bound_upper(),
+		n_Bound_max(n_Bound.n_Bound_upper.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Bound(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Bound() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Bound getEnum(int val) {
+			for (n_Bound entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Bound {
-		pn_Bound_M(pn_generic.pn_Generic_M.val),
-		pn_Bound_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Bound_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Bound_res(pn_generic.pn_Generic_other.val),
-		pn_Bound_max();
+		pn_Bound_M(),
+		pn_Bound_res(),
+		pn_Bound_X_regular(),
+		pn_Bound_X_except(),
+		pn_Bound_max(pn_Bound.pn_Bound_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1276,10 +1433,37 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Builtin {
+		n_Builtin_mem(),
+		n_Builtin_max(n_Builtin.n_Builtin_mem.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Builtin(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Builtin() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Builtin getEnum(int val) {
+			for (n_Builtin entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Builtin {
-		pn_Builtin_M(pn_generic.pn_Generic_M.val),
-		pn_Builtin_1_result(pn_generic.pn_Generic_other.val),
-		pn_Builtin_max();
+		pn_Builtin_M(),
+		pn_Builtin_1_result(),
+		pn_Builtin_max(pn_Builtin.pn_Builtin_1_result.val);
 		public final int val;
 
 		private static class C {
@@ -1304,13 +1488,40 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Call {
+		n_Call_mem(),
+		n_Call_ptr(),
+		n_Call_max(n_Call.n_Call_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Call(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Call() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Call getEnum(int val) {
+			for (n_Call entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Call {
-		pn_Call_M(pn_generic.pn_Generic_M.val),
-		pn_Call_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Call_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Call_T_result(pn_generic.pn_Generic_other.val),
-		pn_Call_P_value_res_base(),
-		pn_Call_max();
+		pn_Call_M(),
+		pn_Call_T_result(),
+		pn_Call_X_regular(),
+		pn_Call_X_except(),
+		pn_Call_max(pn_Call.pn_Call_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1335,41 +1546,109 @@ public class binding_oo {
 		}
 	}
 
-	public static enum pn_Cmp {
-		pn_Cmp_False(0),
-		pn_Cmp_Eq(1),
-		pn_Cmp_Lt(2),
-		pn_Cmp_Le((pn_Cmp.pn_Cmp_Eq.val | pn_Cmp.pn_Cmp_Lt.val)),
-		pn_Cmp_Gt(4),
-		pn_Cmp_Ge((pn_Cmp.pn_Cmp_Eq.val | pn_Cmp.pn_Cmp_Gt.val)),
-		pn_Cmp_Lg((pn_Cmp.pn_Cmp_Lt.val | pn_Cmp.pn_Cmp_Gt.val)),
-		pn_Cmp_Leg(((pn_Cmp.pn_Cmp_Lt.val | pn_Cmp.pn_Cmp_Eq.val) | pn_Cmp.pn_Cmp_Gt.val)),
-		pn_Cmp_Uo(8),
-		pn_Cmp_Ue((pn_Cmp.pn_Cmp_Uo.val | pn_Cmp.pn_Cmp_Eq.val)),
-		pn_Cmp_Ul((pn_Cmp.pn_Cmp_Uo.val | pn_Cmp.pn_Cmp_Lt.val)),
-		pn_Cmp_Ule(((pn_Cmp.pn_Cmp_Uo.val | pn_Cmp.pn_Cmp_Lt.val) | pn_Cmp.pn_Cmp_Eq.val)),
-		pn_Cmp_Ug((pn_Cmp.pn_Cmp_Uo.val | pn_Cmp.pn_Cmp_Gt.val)),
-		pn_Cmp_Uge(((pn_Cmp.pn_Cmp_Uo.val | pn_Cmp.pn_Cmp_Gt.val) | pn_Cmp.pn_Cmp_Eq.val)),
-		pn_Cmp_Ne(((pn_Cmp.pn_Cmp_Uo.val | pn_Cmp.pn_Cmp_Lt.val) | pn_Cmp.pn_Cmp_Gt.val)),
-		pn_Cmp_True(15),
-		pn_Cmp_max();
+	public static enum n_Carry {
+		n_Carry_left(),
+		n_Carry_right(),
+		n_Carry_max(n_Carry.n_Carry_right.val);
 		public final int val;
 
 		private static class C {
 			static int next_val;
 		}
 
-		pn_Cmp(int val) {
+		n_Carry(int val) {
 			this.val = val;
 			C.next_val = val + 1;
 		}
 
-		pn_Cmp() {
+		n_Carry() {
 			this.val = C.next_val++;
 		}
 
-		public static pn_Cmp getEnum(int val) {
-			for (pn_Cmp entry : values()) {
+		public static n_Carry getEnum(int val) {
+			for (n_Carry entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Cast {
+		n_Cast_op(),
+		n_Cast_max(n_Cast.n_Cast_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Cast(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Cast() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Cast getEnum(int val) {
+			for (n_Cast entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Cmp {
+		n_Cmp_left(),
+		n_Cmp_right(),
+		n_Cmp_max(n_Cmp.n_Cmp_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Cmp(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Cmp() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Cmp getEnum(int val) {
+			for (n_Cmp entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Cond {
+		n_Cond_selector(),
+		n_Cond_max(n_Cond.n_Cond_selector.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Cond(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Cond() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Cond getEnum(int val) {
+			for (n_Cond entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1380,7 +1659,7 @@ public class binding_oo {
 	public static enum pn_Cond {
 		pn_Cond_false(),
 		pn_Cond_true(),
-		pn_Cond_max();
+		pn_Cond_max(pn_Cond.pn_Cond_true.val);
 		public final int val;
 
 		private static class C {
@@ -1405,11 +1684,95 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Confirm {
+		n_Confirm_value(),
+		n_Confirm_bound(),
+		n_Confirm_max(n_Confirm.n_Confirm_bound.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Confirm(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Confirm() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Confirm getEnum(int val) {
+			for (n_Confirm entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Conv {
+		n_Conv_op(),
+		n_Conv_max(n_Conv.n_Conv_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Conv(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Conv() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Conv getEnum(int val) {
+			for (n_Conv entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_CopyB {
+		n_CopyB_mem(),
+		n_CopyB_dst(),
+		n_CopyB_src(),
+		n_CopyB_max(n_CopyB.n_CopyB_src.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_CopyB(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_CopyB() {
+			this.val = C.next_val++;
+		}
+
+		public static n_CopyB getEnum(int val) {
+			for (n_CopyB entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_CopyB {
-		pn_CopyB_M(pn_generic.pn_Generic_M.val),
-		pn_CopyB_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_CopyB_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_CopyB_max();
+		pn_CopyB_M(),
+		pn_CopyB_X_regular(),
+		pn_CopyB_X_except(),
+		pn_CopyB_max(pn_CopyB.pn_CopyB_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1434,12 +1797,41 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Div {
+		n_Div_mem(),
+		n_Div_left(),
+		n_Div_right(),
+		n_Div_max(n_Div.n_Div_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Div(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Div() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Div getEnum(int val) {
+			for (n_Div entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Div {
-		pn_Div_M(pn_generic.pn_Generic_M.val),
-		pn_Div_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Div_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Div_res(pn_generic.pn_Generic_other.val),
-		pn_Div_max();
+		pn_Div_M(),
+		pn_Div_res(),
+		pn_Div_X_regular(),
+		pn_Div_X_except(),
+		pn_Div_max(pn_Div.pn_Div_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1464,30 +1856,138 @@ public class binding_oo {
 		}
 	}
 
-	public static enum pn_DivMod {
-		pn_DivMod_M(pn_generic.pn_Generic_M.val),
-		pn_DivMod_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_DivMod_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_DivMod_res_div(pn_generic.pn_Generic_other.val),
-		pn_DivMod_res_mod(),
-		pn_DivMod_max();
+	public static enum n_Eor {
+		n_Eor_left(),
+		n_Eor_right(),
+		n_Eor_max(n_Eor.n_Eor_right.val);
 		public final int val;
 
 		private static class C {
 			static int next_val;
 		}
 
-		pn_DivMod(int val) {
+		n_Eor(int val) {
 			this.val = val;
 			C.next_val = val + 1;
 		}
 
-		pn_DivMod() {
+		n_Eor() {
 			this.val = C.next_val++;
 		}
 
-		public static pn_DivMod getEnum(int val) {
-			for (pn_DivMod entry : values()) {
+		public static n_Eor getEnum(int val) {
+			for (n_Eor entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Free {
+		n_Free_mem(),
+		n_Free_ptr(),
+		n_Free_size(),
+		n_Free_max(n_Free.n_Free_size.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Free(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Free() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Free getEnum(int val) {
+			for (n_Free entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_IJmp {
+		n_IJmp_target(),
+		n_IJmp_max(n_IJmp.n_IJmp_target.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_IJmp(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_IJmp() {
+			this.val = C.next_val++;
+		}
+
+		public static n_IJmp getEnum(int val) {
+			for (n_IJmp entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Id {
+		n_Id_pred(),
+		n_Id_max(n_Id.n_Id_pred.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Id(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Id() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Id getEnum(int val) {
+			for (n_Id entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_InstOf {
+		n_InstOf_store(),
+		n_InstOf_obj(),
+		n_InstOf_max(n_InstOf.n_InstOf_obj.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_InstOf(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_InstOf() {
+			this.val = C.next_val++;
+		}
+
+		public static n_InstOf getEnum(int val) {
+			for (n_InstOf entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1496,11 +1996,11 @@ public class binding_oo {
 	}
 
 	public static enum pn_InstOf {
-		pn_InstOf_M(pn_generic.pn_Generic_M.val),
-		pn_InstOf_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_InstOf_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_InstOf_res(pn_generic.pn_Generic_other.val),
-		pn_InstOf_max();
+		pn_InstOf_M(),
+		pn_InstOf_res(),
+		pn_InstOf_X_regular(),
+		pn_InstOf_X_except(),
+		pn_InstOf_max(pn_InstOf.pn_InstOf_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1525,12 +2025,40 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Load {
+		n_Load_mem(),
+		n_Load_ptr(),
+		n_Load_max(n_Load.n_Load_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Load(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Load() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Load getEnum(int val) {
+			for (n_Load entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Load {
-		pn_Load_M(pn_generic.pn_Generic_M.val),
-		pn_Load_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Load_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Load_res(pn_generic.pn_Generic_other.val),
-		pn_Load_max();
+		pn_Load_M(),
+		pn_Load_res(),
+		pn_Load_X_regular(),
+		pn_Load_X_except(),
+		pn_Load_max(pn_Load.pn_Load_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1555,12 +2083,68 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Minus {
+		n_Minus_op(),
+		n_Minus_max(n_Minus.n_Minus_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Minus(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Minus() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Minus getEnum(int val) {
+			for (n_Minus entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Mod {
+		n_Mod_mem(),
+		n_Mod_left(),
+		n_Mod_right(),
+		n_Mod_max(n_Mod.n_Mod_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Mod(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Mod() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Mod getEnum(int val) {
+			for (n_Mod entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Mod {
-		pn_Mod_M(pn_generic.pn_Generic_M.val),
-		pn_Mod_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Mod_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Mod_res(pn_generic.pn_Generic_other.val),
-		pn_Mod_max();
+		pn_Mod_M(),
+		pn_Mod_res(),
+		pn_Mod_X_regular(),
+		pn_Mod_X_except(),
+		pn_Mod_max(pn_Mod.pn_Mod_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1585,29 +2169,221 @@ public class binding_oo {
 		}
 	}
 
-	public static enum pn_Quot {
-		pn_Quot_M(pn_generic.pn_Generic_M.val),
-		pn_Quot_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Quot_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Quot_res(pn_generic.pn_Generic_other.val),
-		pn_Quot_max();
+	public static enum n_Mul {
+		n_Mul_left(),
+		n_Mul_right(),
+		n_Mul_max(n_Mul.n_Mul_right.val);
 		public final int val;
 
 		private static class C {
 			static int next_val;
 		}
 
-		pn_Quot(int val) {
+		n_Mul(int val) {
 			this.val = val;
 			C.next_val = val + 1;
 		}
 
-		pn_Quot() {
+		n_Mul() {
 			this.val = C.next_val++;
 		}
 
-		public static pn_Quot getEnum(int val) {
-			for (pn_Quot entry : values()) {
+		public static n_Mul getEnum(int val) {
+			for (n_Mul entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Mulh {
+		n_Mulh_left(),
+		n_Mulh_right(),
+		n_Mulh_max(n_Mulh.n_Mulh_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Mulh(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Mulh() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Mulh getEnum(int val) {
+			for (n_Mulh entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Mux {
+		n_Mux_sel(),
+		n_Mux_false(),
+		n_Mux_true(),
+		n_Mux_max(n_Mux.n_Mux_true.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Mux(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Mux() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Mux getEnum(int val) {
+			for (n_Mux entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Not {
+		n_Not_op(),
+		n_Not_max(n_Not.n_Not_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Not(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Not() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Not getEnum(int val) {
+			for (n_Not entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Or {
+		n_Or_left(),
+		n_Or_right(),
+		n_Or_max(n_Or.n_Or_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Or(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Or() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Or getEnum(int val) {
+			for (n_Or entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Pin {
+		n_Pin_op(),
+		n_Pin_max(n_Pin.n_Pin_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Pin(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Pin() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Pin getEnum(int val) {
+			for (n_Pin entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Proj {
+		n_Proj_pred(),
+		n_Proj_max(n_Proj.n_Proj_pred.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Proj(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Proj() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Proj getEnum(int val) {
+			for (n_Proj entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Raise {
+		n_Raise_mem(),
+		n_Raise_exo_ptr(),
+		n_Raise_max(n_Raise.n_Raise_exo_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Raise(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Raise() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Raise getEnum(int val) {
+			for (n_Raise entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1616,9 +2392,9 @@ public class binding_oo {
 	}
 
 	public static enum pn_Raise {
-		pn_Raise_M(pn_generic.pn_Generic_M.val),
-		pn_Raise_X(pn_generic.pn_Generic_X_regular.val),
-		pn_Raise_max();
+		pn_Raise_M(),
+		pn_Raise_X(),
+		pn_Raise_max(pn_Raise.pn_Raise_X.val);
 		public final int val;
 
 		private static class C {
@@ -1643,13 +2419,179 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Return {
+		n_Return_mem(),
+		n_Return_max(n_Return.n_Return_mem.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Return(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Return() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Return getEnum(int val) {
+			for (n_Return entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Rotl {
+		n_Rotl_left(),
+		n_Rotl_right(),
+		n_Rotl_max(n_Rotl.n_Rotl_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Rotl(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Rotl() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Rotl getEnum(int val) {
+			for (n_Rotl entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Sel {
+		n_Sel_mem(),
+		n_Sel_ptr(),
+		n_Sel_max(n_Sel.n_Sel_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Sel(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Sel() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Sel getEnum(int val) {
+			for (n_Sel entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Shl {
+		n_Shl_left(),
+		n_Shl_right(),
+		n_Shl_max(n_Shl.n_Shl_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Shl(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Shl() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Shl getEnum(int val) {
+			for (n_Shl entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Shr {
+		n_Shr_left(),
+		n_Shr_right(),
+		n_Shr_max(n_Shr.n_Shr_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Shr(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Shr() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Shr getEnum(int val) {
+			for (n_Shr entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Shrs {
+		n_Shrs_left(),
+		n_Shrs_right(),
+		n_Shrs_max(n_Shrs.n_Shrs_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Shrs(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Shrs() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Shrs getEnum(int val) {
+			for (n_Shrs entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Start {
 		pn_Start_X_initial_exec(),
 		pn_Start_M(),
 		pn_Start_P_frame_base(),
-		pn_Start_P_tls(),
 		pn_Start_T_args(),
-		pn_Start_max();
+		pn_Start_max(pn_Start.pn_Start_T_args.val);
 		public final int val;
 
 		private static class C {
@@ -1674,11 +2616,40 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Store {
+		n_Store_mem(),
+		n_Store_ptr(),
+		n_Store_value(),
+		n_Store_max(n_Store.n_Store_value.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Store(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Store() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Store getEnum(int val) {
+			for (n_Store entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum pn_Store {
-		pn_Store_M(pn_generic.pn_Generic_M.val),
-		pn_Store_X_regular(pn_generic.pn_Generic_X_regular.val),
-		pn_Store_X_except(pn_generic.pn_Generic_X_except.val),
-		pn_Store_max();
+		pn_Store_M(),
+		pn_Store_X_regular(),
+		pn_Store_X_except(),
+		pn_Store_max(pn_Store.pn_Store_X_except.val);
 		public final int val;
 
 		private static class C {
@@ -1696,6 +2667,34 @@ public class binding_oo {
 
 		public static pn_Store getEnum(int val) {
 			for (pn_Store entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Sub {
+		n_Sub_left(),
+		n_Sub_right(),
+		n_Sub_max(n_Sub.n_Sub_right.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Sub(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Sub() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Sub getEnum(int val) {
+			for (n_Sub entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1993,7 +2992,6 @@ public class binding_oo {
 		iro_CopyB(),
 		iro_Deleted(),
 		iro_Div(),
-		iro_DivMod(),
 		iro_Dummy(),
 		iro_End(),
 		iro_Eor(),
@@ -2014,7 +3012,6 @@ public class binding_oo {
 		iro_Phi(),
 		iro_Pin(),
 		iro_Proj(),
-		iro_Quot(),
 		iro_Raise(),
 		iro_Return(),
 		iro_Rotl(),
@@ -2046,8 +3043,7 @@ public class binding_oo {
 		beo_IncSP(),
 		beo_Start(),
 		beo_FrameAddr(),
-		beo_Barrier(),
-		beo_Last(ir_opcode.beo_Barrier.val),
+		beo_Last(ir_opcode.beo_FrameAddr.val),
 		iro_MaxOpcode();
 		public final int val;
 
@@ -2124,7 +3120,8 @@ public class binding_oo {
 		irop_flag_machine((1 << 13)),
 		irop_flag_machine_op((1 << 14)),
 		irop_flag_cse_neutral((1 << 15)),
-		irop_flag_user((1 << 16));
+		irop_flag_unknown_jump((1 << 16)),
+		irop_flag_user((1 << 17));
 		public final int val;
 
 		private static class C {
@@ -3177,6 +4174,10 @@ public class binding_oo {
 
 	public static native void oo_set_class_vtable_entity(Pointer classtype, Pointer vtable);
 
+	public static native int oo_get_class_vtable_size(Pointer classtype);
+
+	public static native void oo_set_class_vtable_size(Pointer classtype, int vtable_size);
+
 	public static native Pointer oo_get_class_vptr_entity(Pointer classtype);
 
 	public static native void oo_set_class_vptr_entity(Pointer classtype, Pointer vptr);
@@ -3188,6 +4189,18 @@ public class binding_oo {
 	public static native boolean oo_get_class_is_interface(Pointer classtype);
 
 	public static native void oo_set_class_is_interface(Pointer classtype, boolean is_interface);
+
+	public static native boolean oo_get_class_is_abstract(Pointer classtype);
+
+	public static native void oo_set_class_is_abstract(Pointer classtype, boolean is_abstract);
+
+	public static native boolean oo_get_class_is_final(Pointer classtype);
+
+	public static native void oo_set_class_is_final(Pointer classtype, boolean is_final);
+
+	public static native boolean oo_get_class_is_extern(Pointer classtype);
+
+	public static native void oo_set_class_is_extern(Pointer classtype, boolean is_extern);
 
 	public static native Pointer oo_get_type_link(Pointer type);
 
@@ -3205,6 +4218,14 @@ public class binding_oo {
 
 	public static native void oo_set_method_is_abstract(Pointer method, boolean is_abstract);
 
+	public static native boolean oo_get_method_is_final(Pointer method);
+
+	public static native void oo_set_method_is_final(Pointer method, boolean is_final);
+
+	public static native boolean oo_get_method_is_inherited(Pointer method);
+
+	public static native void oo_set_method_is_inherited(Pointer method, boolean is_inherited);
+
 	public static native /* ddispatch_binding */int oo_get_entity_binding(Pointer entity);
 
 	public static native void oo_set_entity_binding(Pointer entity, /* ddispatch_binding */int binding);
@@ -3212,4 +4233,10 @@ public class binding_oo {
 	public static native Pointer oo_get_entity_link(Pointer entity);
 
 	public static native void oo_set_entity_link(Pointer entity, Pointer link);
+
+	public static native Pointer oo_get_class_superclass(Pointer klass);
+
+	public static native Pointer oo_get_entity_overwritten_superclass_entity(Pointer entity);
+
+	public static native void oo_copy_entity_info(Pointer src, Pointer dest);
 }
