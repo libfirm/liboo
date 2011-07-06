@@ -46,6 +46,7 @@
 	</target>
 
 	<target name="build" depends="init">
+		<depend destdir="${build}" srcdir="${src}" cache="${build}/depends" closure="yes"/>
 		<javac destdir="${build}" source="1.5" target="1.5" debug="on" includeantruntime="false">
 			<src path="${src}"/>
 			<classpath refid="project.classpath"/>
