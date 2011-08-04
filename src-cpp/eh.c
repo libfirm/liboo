@@ -38,6 +38,20 @@ ir_node *eh_get_exception_object(void)
 	return ex_obj;
 }
 
+static void store_exception_object(ir_node *exo_ptr)
+{
+	symconst_symbol ex_sym;
+	ex_sym.entity_p = exception_object_entity;
+
+	ir_node *cur_mem  = get_store();
+
+	ir_node *ex_symc  = new_SymConst(mode_P, ex_sym, symconst_addr_ent);
+	ir_node *ex_store = new_Store(cur_mem, ex_symc, exo_ptr, cons_none);
+	cur_mem           = new_Proj(ex_store, mode_M, pn_Store_M);
+
+	set_store(cur_mem);
+}
+
 void eh_init(void)
 {
 	obstack_init(&lpads);
@@ -95,9 +109,8 @@ void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 		ir_node *cur_mem     = get_store();
 		ir_node *instanceof  = new_InstanceOf(cur_mem, top->exception_object, catch_type);
 		cur_mem              = new_Proj(instanceof, mode_M, pn_InstanceOf_M);
-		ir_node *result      = new_Proj(instanceof, mode_Is, pn_InstanceOf_res);
-		ir_node *cmp         = new_Cmp(result, new_Const_long(mode_Is, 0), ir_relation_less_greater);
-		ir_node *cond        = new_Cond(cmp);
+		ir_node *result      = new_Proj(instanceof, mode_b, pn_InstanceOf_res);
+		ir_node *cond        = new_Cond(result);
 
 		ir_node *proj_match  = new_Proj(cond, mode_X, pn_Cond_true);
 		add_immBlock_pred(catch_block, proj_match);
@@ -144,6 +157,17 @@ ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type*
 	top->used = true;
 
 	return call;
+}
+
+void eh_throw(ir_node *exo_ptr)
+{
+	store_exception_object(exo_ptr);
+
+	ir_node *throw = new_Jmp();
+
+	add_immBlock_pred(top->handler_header_block, throw);
+	top->used = true;
+	set_cur_block(NULL);
 }
 
 void eh_pop_lpad(void)

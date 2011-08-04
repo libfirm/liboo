@@ -509,10 +509,6 @@ void oo_lower(void)
 	for (int i = 0; i < n_irgs; ++i) {
 		ir_graph *irg = get_irp_irg(i);
 		irg_walk_graph(irg, NULL, lower_node, NULL);
-
-		/* do local opts in order to remove the Tuples that were created
-		 * during InstanceOf lowering */
-		local_optimize_graph(irg);
 	}
 
 	class_walk_super2sub(lower_type, NULL, NULL);
