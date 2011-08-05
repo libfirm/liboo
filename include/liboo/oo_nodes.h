@@ -7,7 +7,7 @@
 enum {
 	pn_InstanceOf_M   = 0,
 	pn_InstanceOf_res = 1,
-	pn_InstanceOf_max = pn_InstanceOf_res
+	pn_InstanceOf_max = 1
 };
 
 ir_node *new_r_InstanceOf(ir_node *block, ir_node *mem, ir_node *objptr, ir_type *classtype);
@@ -23,7 +23,7 @@ bool     is_InstanceOf(const ir_node *node);
 enum {
 	pn_Arraylength_M   = 0,
 	pn_Arraylength_res = 1,
-	pn_Arraylength_max = pn_Arraylength_res
+	pn_Arraylength_max = 1
 };
 
 ir_node *new_r_Arraylength(ir_node *block, ir_node *mem, ir_node* arrayref);
