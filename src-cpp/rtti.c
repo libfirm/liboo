@@ -443,3 +443,43 @@ void rtti_set_instanceof_constructor(construct_instanceof_t func)
 	assert (func);
 	rtti_model.construct_instanceof = func;
 }
+
+ir_node *rtti_construct_instanceof_with_null_check(ir_node *objptr, ir_type *classtype)
+{
+	assert(classtype);
+
+	ir_node *nullptr     = new_Const_long(mode_P, 0);
+	ir_node *null_check  = new_Cmp(objptr, nullptr, ir_relation_less_greater);
+	ir_node *null_cond   = new_Cond(null_check);
+
+	ir_node *block_after = new_immBlock();
+
+	ir_node *proj_null   = new_Proj(null_cond, mode_X, pn_Cond_false);
+	ir_node *proj_ref    = new_Proj(null_cond, mode_X, pn_Cond_true);
+
+	ir_node *block_null  = new_immBlock();
+	add_immBlock_pred(block_null, proj_null);
+	mature_immBlock(block_null);
+	set_cur_block(block_null);
+	ir_node *b_false     = new_Const(tarval_b_false);
+	add_immBlock_pred(block_after, new_Jmp());
+
+	ir_node *block_ref   = new_immBlock();
+	add_immBlock_pred(block_ref, proj_ref);
+	mature_immBlock(block_ref);
+	set_cur_block(block_ref);
+
+	ir_node *cur_mem     = get_store();
+	ir_node *instanceof  = new_InstanceOf(cur_mem, objptr, classtype);
+	ir_node *res_b       = new_Proj(instanceof, mode_b, pn_InstanceOf_res);
+	         cur_mem     = new_Proj(instanceof, mode_M, pn_InstanceOf_M);
+	set_store(cur_mem);
+
+	add_immBlock_pred(block_after, new_Jmp());
+	mature_immBlock(block_after);
+	set_cur_block(block_after);
+	ir_node *in[2]      = {b_false, res_b};
+	ir_node *phi        = new_Phi(2, in, mode_b);
+
+	return phi;
+}
