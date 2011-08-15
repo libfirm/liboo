@@ -45,5 +45,5 @@ $(BUILDDIR)/%.o: %.c
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 clean:
-	rm -rf $(OBJECTS) $(GOAL) $(GOAL_RT) $(DEPS)
+	rm -rf $(OBJECTS) $(GOAL) $(GOAL_RT) $(DEPS) $(DEPS_RT)
 
