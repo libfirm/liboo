@@ -26,7 +26,7 @@ static void oo_rt_unwind (void) {
 		unw_get_reg(&cursor, UNW_REG_IP, &ip);
 		unw_get_proc_info(&cursor, &pi);
 
-		if (pi.lsda != 0 && (void*)pi.handler == firm_personality) {
+		if (pi.lsda != 0 && (void (*)(void*))pi.handler == firm_personality) {
 			lsda_t *lsda = (lsda_t*) pi.lsda;
 			for (unsigned i = 0; i < lsda->n_entries; i++) {
 				if (ip == (unsigned)lsda->entries[i].ip) {
@@ -45,6 +45,6 @@ void firm_personality(void *exception_object)
 
 	oo_rt_unwind();
 
-	fprintf(stderr, "UNCAUGHT EXCEPTION 0x%x\n", exception_object);
+	fprintf(stderr, "UNCAUGHT EXCEPTION 0x%p\n", exception_object);
 	exit(-1);
 }
