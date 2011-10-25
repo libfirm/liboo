@@ -1,6 +1,9 @@
 
 #define UNW_LOCAL_ONLY
+/* Workaround for buggy glibcs. */
+#define _BSD_SOURCE
 #include <libunwind.h>
+#undef _BSD_SOURCE
 
 #include "liboo/rts_types.h"
 #include <stdlib.h>
