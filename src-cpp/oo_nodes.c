@@ -66,7 +66,7 @@ static const ir_op_ops oo_nodes_op_ops = {
 	NULL,
 	NULL,
 	NULL,
-	dump_node,
+	(dump_node_func) dump_node,
 	NULL,
 	NULL
 };
