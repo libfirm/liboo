@@ -262,7 +262,8 @@ void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 
 	assert (is_Class_type(klass));
 	ir_entity        *ci = oo_get_class_rtti_entity(klass);
-	assert (ci && "RTTI entity not set. Please create and set such an entity yourself. A primitive pointer type is fine");
+	if (NULL == ci)
+		return;
 
 	ident            *cname_id = get_class_ident(klass);
 	ir_type          *ci_type = new_type_struct(id_mangle_dot(cname_id, new_id_from_str("class$")));
