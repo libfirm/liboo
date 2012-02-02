@@ -62,11 +62,11 @@ $(RUNTIME_BUILDDIR)/shared/%.o: %.c
 
 $(RUNTIME_BUILDDIR)/static/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 clean:
 	rm -rf $(OBJECTS) $(GOAL) $(GOAL_RT_SHARED) $(GOAL_RT_STATIC) $(DEPS) $(DEPS_RT) $(OBJECTS_RT_SHARED) $(OBJECTS_RT_STATIC)
