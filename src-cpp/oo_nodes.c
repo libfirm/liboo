@@ -21,9 +21,9 @@ typedef struct {
 	ir_type *classtype;
 } op_InstanceOf_attr_t;
 
-static void dump_node(FILE *f, ir_node *irn, dump_reason_t reason)
+static void dump_node(FILE *f, const ir_node *irn, dump_reason_t reason)
 {
-	assert (is_InstanceOf(irn) || is_Arraylength(irn));
+	assert(is_InstanceOf(irn) || is_Arraylength(irn));
 	switch (reason) {
 	case dump_node_opcode_txt:
 		fputs(get_op_name(get_irn_op(irn)), f);
@@ -33,14 +33,16 @@ static void dump_node(FILE *f, ir_node *irn, dump_reason_t reason)
 	case dump_node_nodeattr_txt: {
 		if (! is_InstanceOf(irn)) break;
 
-		op_InstanceOf_attr_t *attr = (op_InstanceOf_attr_t*) get_irn_generic_attr(irn);
+		const op_InstanceOf_attr_t *attr
+			= (const op_InstanceOf_attr_t*) get_irn_generic_attr_const(irn);
 		fprintf(f, "%s ", get_class_name(attr->classtype));
 		break;
 	}
 	case dump_node_info_txt: {
 		if (! is_InstanceOf(irn)) break;
 
-		op_InstanceOf_attr_t *attr = (op_InstanceOf_attr_t*) get_irn_generic_attr(irn);
+		const op_InstanceOf_attr_t *attr
+			= (const op_InstanceOf_attr_t*) get_irn_generic_attr_const(irn);
 		fprintf(f, "type: %s ", get_class_name(attr->classtype));
 		break;
 	}
@@ -66,7 +68,7 @@ static const ir_op_ops oo_nodes_op_ops = {
 	NULL,
 	NULL,
 	NULL,
-	(dump_node_func) dump_node,
+	dump_node,
 	NULL,
 	NULL
 };
