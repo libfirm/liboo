@@ -381,7 +381,7 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 
 void rtti_init()
 {
-	mode_uint16_t  = new_ir_mode("US", irms_int_number, 16, 0, irma_twos_complement, 16);
+	mode_uint16_t  = new_int_mode("US", irma_twos_complement, 16, 0, 16);
 	type_uint16_t  = new_type_primitive(mode_uint16_t);
 	type_reference = new_type_primitive(mode_P);
 	type_int       = new_type_primitive(mode_Is);
