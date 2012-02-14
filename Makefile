@@ -9,6 +9,12 @@ AR ?= ar
 
 guessed_target := $(shell $(CC) -dumpmachine)
 target         ?= $(guessed_target)
+ifeq ($(findstring x86_64, $(target)), x86_64)
+	# Compile the runtime part of liboo in 32-bit mode
+	M32=-m32
+else
+	M32=
+endif
 
 BUILDDIR=build
 RUNTIME_BUILDDIR=$(BUILDDIR)/$(target)
@@ -50,7 +56,7 @@ $(GOAL): $(OBJECTS)
 
 $(GOAL_RT_SHARED): $(OBJECTS_RT_SHARED)
 	@echo '===> LD $@'
-	$(Q)$(CC) -shared $(PIC_FLAGS) -o $@ $^ $(LFLAGS)
+	$(Q)$(CC) $(M32) -shared $(PIC_FLAGS) -o $@ $^ $(LFLAGS)
 
 $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 	@echo '===> AR $@'
@@ -58,11 +64,11 @@ $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 
 $(RUNTIME_BUILDDIR)/shared/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(M32) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 $(RUNTIME_BUILDDIR)/static/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(M32) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $@'
