@@ -6,14 +6,20 @@ INSTALL ?= install
 DLLEXT ?= .so
 CC ?= gcc
 AR ?= ar
+CFLAGS ?= -O0 -g3
 
 guessed_target := $(shell $(CC) -dumpmachine)
 target         ?= $(guessed_target)
+
 ifeq ($(findstring x86_64, $(target)), x86_64)
-	# Compile the runtime part of liboo in 32-bit mode
-	M32=-m32
-else
-	M32=
+	# compile library normally but runtime in 32bit mode
+	RT_CFLAGS += -m32
+	RT_LFLAGS += -m32
+endif
+ifeq ($(findstring darwin11, $(target)), darwin11)
+	# compile library normally but runtime in 32bit mode
+	RT_CFLAGS += -m32
+	RT_LFLAGS += -m32
 endif
 
 BUILDDIR=build
@@ -22,7 +28,7 @@ GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS)
-CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -O0 -g3 -std=c99 -pedantic
+CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
@@ -56,7 +62,7 @@ $(GOAL): $(OBJECTS)
 
 $(GOAL_RT_SHARED): $(OBJECTS_RT_SHARED)
 	@echo '===> LD $@'
-	$(Q)$(CC) $(M32) -shared $(PIC_FLAGS) -o $@ $^ $(LFLAGS)
+	$(Q)$(CC) -shared $(RT_LFLAGS) $(PIC_FLAGS) -o $@ $^ $(LFLAGS)
 
 $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 	@echo '===> AR $@'
@@ -64,11 +70,11 @@ $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 
 $(RUNTIME_BUILDDIR)/shared/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(M32) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 $(RUNTIME_BUILDDIR)/static/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(M32) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $@'
