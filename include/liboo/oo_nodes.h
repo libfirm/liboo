@@ -4,11 +4,11 @@
 #include <stdbool.h>
 #include <libfirm/firm.h>
 
-enum {
+typedef enum {
 	pn_InstanceOf_M   = 0,
 	pn_InstanceOf_res = 1,
 	pn_InstanceOf_max = pn_InstanceOf_res
-};
+} pn_InstanceOf;
 
 ir_node *new_r_InstanceOf(ir_node *block, ir_node *mem, ir_node *objptr, ir_type *classtype);
 ir_node *new_InstanceOf(ir_node *mem, ir_node *objptr, ir_type *classtype);
@@ -20,11 +20,11 @@ ir_type *get_InstanceOf_type(const ir_node *node);
 void     set_InstanceOf_type(ir_node *node, ir_type *type);
 bool     is_InstanceOf(const ir_node *node);
 
-enum {
+typedef enum {
 	pn_Arraylength_M   = 0,
 	pn_Arraylength_res = 1,
 	pn_Arraylength_max = pn_Arraylength_res
-};
+} pn_Arraylength;
 
 ir_node *new_r_Arraylength(ir_node *block, ir_node *mem, ir_node* arrayref);
 ir_node *new_Arraylength(ir_node *mem, ir_node* arrayref);

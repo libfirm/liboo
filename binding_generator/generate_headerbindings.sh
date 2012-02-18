@@ -2,7 +2,7 @@
 #
 # You need a new version cparser (with jna backend) and firm headers
 
-. config
+. ./config
 
 for i in oo oo_nodes ; do
 	RES="../src/firm/bindings/binding_$i.java"
