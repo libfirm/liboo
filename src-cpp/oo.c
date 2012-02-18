@@ -6,7 +6,6 @@
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
 #include "liboo/oo_nodes.h"
-#include "liboo/eh.h"
 #include "adt/obst.h"
 #include "adt/error.h"
 
@@ -461,8 +460,6 @@ static void lower_node(ir_node *node, void *env)
 		dmemory_lower_Arraylength(node);
 	} else if (is_InstanceOf(node)) {
 		rtti_lower_InstanceOf(node);
-	} else if (is_Raise(node)) {
-		eh_lower_Raise(node);
 	}
 }
 
@@ -489,13 +486,11 @@ void oo_init(void)
 	ddispatch_init();
 	dmemory_init();
 	rtti_init();
-	eh_init();
 }
 
 void oo_deinit(void)
 {
 	rtti_deinit();
-	eh_deinit();
 	obstack_free(&oo_info_obst, NULL);
 }
 
