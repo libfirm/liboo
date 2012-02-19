@@ -1,6 +1,5 @@
 #include "../adt/error.h"
-
-extern void oo_rt_abstract_method_error(void);
+#include "rt.h"
 
 void oo_rt_abstract_method_error(void)
 {

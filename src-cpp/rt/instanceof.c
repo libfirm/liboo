@@ -1,11 +1,7 @@
-
-#include "liboo/rts_types.h"
-#include "../adt/error.h"
 #include <stdbool.h>
+#include "../adt/error.h"
+#include "rt.h"
 
-extern bool oo_rt_instanceof(class_info_t *objclass, class_info_t *refclass);
-
-__attribute__ ((unused))
 bool oo_rt_instanceof(class_info_t *objclass, class_info_t *refclass)
 {
 	if (objclass == refclass)

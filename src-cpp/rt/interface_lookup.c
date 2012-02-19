@@ -1,11 +1,8 @@
-
+#include <stdbool.h>
 #include "liboo/rts_types.h"
 #include "../adt/error.h"
-#include <stdbool.h>
+#include "rt.h"
 
-extern void *oo_rt_lookup_interface_method(class_info_t *klass, string_const_t *method_name);
-
-__attribute__ ((unused))
 void *oo_rt_lookup_interface_method(class_info_t *klass, string_const_t *method_name)
 {
 	for (int i = 0; i < klass->n_methods; i++) {
