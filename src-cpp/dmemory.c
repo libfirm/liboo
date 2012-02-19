@@ -113,10 +113,8 @@ void dmemory_init(void)
 	set_method_res_type(calloc_type, 0, type_reference);
 	set_method_additional_properties(calloc_type, mtp_property_malloc);
 
-	ir_type *glob           = get_glob_type();
-	ident   *calloc_id      = new_id_from_str("calloc");
-	calloc_entity = new_entity(glob, calloc_id, calloc_type);
-	set_entity_visibility(calloc_entity, ir_visibility_external);
+	ident *calloc_id = new_id_from_str("calloc");
+	calloc_entity = create_compilerlib_entity(calloc_id, calloc_type);
 
 	ir_type *arraylength_type = new_type_method(1, 1);
 	set_method_param_type(arraylength_type, 0, type_reference);

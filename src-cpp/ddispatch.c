@@ -104,8 +104,8 @@ void ddispatch_init(void)
 	set_method_param_type(default_li_type, 1, type_reference);
 	set_method_res_type(default_li_type, 0, type_reference);
 	ident *default_li_ident = new_id_from_str("oo_rt_lookup_interface_method");
-	default_lookup_interface_entity = new_entity(get_glob_type(), default_li_ident, default_li_type);
-	set_entity_visibility(default_lookup_interface_entity, ir_visibility_external);
+	default_lookup_interface_entity
+		= create_compilerlib_entity(default_li_ident, default_li_type);
 }
 
 void ddispatch_setup_vtable(ir_type *klass)
@@ -187,7 +187,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 				} else if (! oo_get_method_is_abstract(member)) {
 					sym.entity_p = member;
 				} else {
-					sym.entity_p = new_entity(get_glob_type(), ddispatch_model.abstract_method_ident, get_entity_type(member));
+					ident     *id     = ddispatch_model.abstract_method_ident;
+					ir_entity *entity = create_compilerlib_entity(id, get_entity_type(member));
+					sym.entity_p = entity;
 				}
 				ir_node *symconst_node = new_r_SymConst(const_code, mode_reference, sym, symconst_addr_ent);
 				ir_initializer_t *val = create_initializer_const(symconst_node);

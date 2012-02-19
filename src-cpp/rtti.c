@@ -395,8 +395,7 @@ void rtti_init()
 	set_method_param_type(default_io_type, 1, type_reference);
 	set_method_res_type(default_io_type, 0, type_int);
 	ident *default_io_ident = new_id_from_str("oo_rt_instanceof");
-	default_instanceof_entity = new_entity(get_glob_type(), default_io_ident, default_io_type);
-	set_entity_visibility(default_instanceof_entity, ir_visibility_external);
+	default_instanceof_entity = create_compilerlib_entity(default_io_ident, default_io_type);
 
 	cpset_init(&string_constant_pool, scp_hash_function, scp_cmp_function);
 }
