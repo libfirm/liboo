@@ -9,21 +9,27 @@ AR ?= ar
 CFLAGS ?= -O0 -g3
 
 guessed_target := $(shell $(CC) -dumpmachine)
-target         ?= $(guessed_target)
+TARGET         ?= $(guessed_target)
 
-ifeq ($(findstring x86_64, $(target)), x86_64)
+ifeq ($(findstring x86_64, $(TARGET)), x86_64)
 	# compile library normally but runtime in 32bit mode
 	RT_CFLAGS += -m32
 	RT_LFLAGS += -m32
 endif
-ifeq ($(findstring darwin11, $(target)), darwin11)
+ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 	# compile library normally but runtime in 32bit mode
 	RT_CFLAGS += -m32
 	RT_LFLAGS += -m32
+endif
+ifeq ($(TARGET), i686-invasic-octopos)
+	OCTOPOS_BASE=../octopos-app
+	GCC_INCLUDE:=$(shell $(CC) --print-file-name=include)
+	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -D__OCTOPOS__
+	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/sections.x $(OCTOPOS_BASE)/liboctopos.a
 endif
 
 BUILDDIR=build
-RUNTIME_BUILDDIR=$(BUILDDIR)/$(target)
+RUNTIME_BUILDDIR=$(BUILDDIR)/$(TARGET)
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
