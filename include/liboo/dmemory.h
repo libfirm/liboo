@@ -3,17 +3,19 @@
 
 #include <libfirm/firm.h>
 
-typedef ir_node* (*alloc_object_t)    (ir_type *type, ir_graph *irg, ir_node *block, ir_node **mem);
-typedef ir_node* (*alloc_array_t)     (ir_type *eltype, ir_node *count, ir_graph *irg, ir_node *block, ir_node **mem);
-typedef ir_node* (*get_arraylength_t) (ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem);
+typedef ir_node* (*alloc_object_t)    (dbg_info *dbgi, ir_node *block, ir_node **mem, ir_type *type);
+typedef ir_node* (*alloc_array_t)     (dbg_info *dbgi, ir_node *block, ir_node *count, ir_node **mem, ir_type *eltype);
+typedef ir_node* (*alloc_heap_t)      (dbg_info *dbgi, ir_node *block, ir_node *size, ir_node **mem, ir_type *eltype);
+typedef ir_node* (*get_arraylength_t) (dbg_info *dbgi, ir_node *block, ir_node *objptr, ir_node **mem);
 
-ir_node *dmemory_default_alloc_object(ir_type *type, ir_graph *irg, ir_node *block, ir_node **mem);
-ir_node *dmemory_default_alloc_array(ir_type *eltype, ir_node *count, ir_graph *irg, ir_node *block, ir_node **mem);
-ir_node *dmemory_default_get_arraylength(ir_node* objptr, ir_graph *irg, ir_node *block, ir_node **mem);
+ir_node *dmemory_default_alloc_object(dbg_info *dbgi, ir_node *block, ir_node **mem, ir_type *type);
+ir_node *dmemory_default_alloc_array(dbg_info *dbgi, ir_node *block, ir_node *count, ir_node **mem, ir_type *eltype);
+ir_node *dmemory_default_alloc_heap(dbg_info *dbgi, ir_node *block, ir_node *count, ir_node **mem, ir_type *type);
+ir_node *dmemory_default_get_arraylength(dbg_info *dbgi, ir_node *block, ir_node *objptr, ir_node **mem);
 
-void     dmemory_init(void);
-void     dmemory_lower_Alloc(ir_node* alloc);
-void     dmemory_lower_Arraylength(ir_node* arraylength);
-void     dmemory_set_allocation_methods(alloc_object_t ao_func, alloc_array_t aa_func, get_arraylength_t ga_func);
+void dmemory_init(void);
+void dmemory_lower_Alloc(ir_node* alloc);
+void dmemory_lower_Arraylength(ir_node* arraylength);
+void dmemory_set_allocation_methods(alloc_object_t ao_func, alloc_array_t aa_func, alloc_heap_t ah_func, get_arraylength_t ga_func);
 
 #endif

@@ -268,13 +268,14 @@ void ddispatch_lower_Call(ir_node* call)
 	set_Call_mem(call, cur_mem);
 }
 
-void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem)
+void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *objptr, ir_node **mem, ir_type* klass)
 {
+	ir_graph *irg = get_irn_irg(block);
 	assert(is_Class_type(klass));
 
 	ir_node   *cur_mem         = *mem;
 	ir_entity *vptr_entity     = oo_get_class_vptr_entity(klass);
-	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node   *vptr            = new_rd_Sel(dbgi, block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
 	ir_node   *vptr_target     = NULL;
 	ir_entity *vtable_entity   = oo_get_class_vtable_entity(klass);
@@ -283,12 +284,12 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 		sym.entity_p = vtable_entity;
 		ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
 		ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference));
-		vptr_target                = new_r_Add(block, vtable_symconst, const_offset, mode_reference);
+		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset, mode_reference);
 	} else {
 		vptr_target                = new_r_Const_long(irg, mode_P, 0);
 	}
 
-	ir_node   *vptr_store      = new_r_Store(block, cur_mem, vptr, vptr_target, cons_none);
+	ir_node   *vptr_store      = new_rd_Store(dbgi, block, cur_mem, vptr, vptr_target, cons_none);
 	cur_mem                    = new_r_Proj(vptr_store, mode_M, pn_Store_M);
 
 	*mem = cur_mem;
