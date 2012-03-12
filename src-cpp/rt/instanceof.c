@@ -2,7 +2,8 @@
 #include "../adt/error.h"
 #include "rt.h"
 
-bool oo_rt_instanceof(class_info_t *objclass, class_info_t *refclass)
+bool oo_rt_instanceof(const class_info_t *objclass,
+                      const class_info_t *refclass)
 {
 	if (objclass == refclass)
 		return true;

@@ -3,7 +3,7 @@
 #include "../adt/error.h"
 #include "rt.h"
 
-void *oo_rt_lookup_interface_method(class_info_t *klass, string_const_t *method_name)
+void *oo_rt_lookup_interface_method(const class_info_t *klass, const string_const_t *method_name)
 {
 	for (int i = 0; i < klass->n_methods; i++) {
 		if (string_const_equals(klass->methods[i].name, method_name)) {
