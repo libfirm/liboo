@@ -12,7 +12,7 @@ bool oo_rt_instanceof(const class_info_t *objclass,
 		return true;
 
 	if (objclass->n_interfaces > 0) {
-		for (int i = 0; i < objclass->n_interfaces; i++) {
+		for (uint32_t i = 0; i < objclass->n_interfaces; i++) {
 			class_info_t *ci = objclass->interfaces[i];
 			if (oo_rt_instanceof(ci, refclass))
 				return true;

@@ -289,7 +289,7 @@ void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *obj
 		vptr_target                = new_r_Const_long(irg, mode_P, 0);
 	}
 
-	ir_node   *vptr_store      = new_rd_Store(dbgi, block, cur_mem, vptr, vptr_target, cons_none);
+	ir_node   *vptr_store      = new_rd_Store(dbgi, block, cur_mem, vptr, vptr_target, cons_floats);
 	cur_mem                    = new_r_Proj(vptr_store, mode_M, pn_Store_M);
 
 	*mem = cur_mem;

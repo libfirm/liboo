@@ -5,6 +5,7 @@
 
 #include <assert.h>
 #include "liboo/ddispatch.h"
+#include "liboo/oo.h"
 #include "adt/error.h"
 
 struct dmemory_model_t {
@@ -16,6 +17,13 @@ struct dmemory_model_t {
 
 static ir_entity *calloc_entity;
 static ir_mode   *default_arraylength_mode;
+
+static ir_node *new_r_symconst(ir_graph *irg, ir_entity *entity)
+{
+	symconst_symbol sym;
+	sym.entity_p = entity;
+	return new_r_SymConst(irg, mode_P, sym, symconst_addr_ent);
+}
 
 ir_node *dmemory_default_alloc_heap(dbg_info *dbgi, ir_node *block,
                                     ir_node *count, ir_node **mem,
@@ -31,10 +39,7 @@ ir_node *dmemory_default_alloc_heap(dbg_info *dbgi, ir_node *block,
 		size = new_r_Mul(block, count_u, size, mode_Iu);
 	}
 
-	symconst_symbol calloc_sym;
-	calloc_sym.entity_p = calloc_entity;
-	ir_node *callee = new_r_SymConst(irg, mode_P, calloc_sym, symconst_addr_ent);
-
+	ir_node *callee    = new_r_symconst(irg, calloc_entity);
 	ir_node *one       = new_r_Const_long(irg, mode_Iu, 1);
 	ir_node *in[2]     = { one, size };
 	ir_type *call_type = get_entity_type(calloc_entity);
@@ -73,10 +78,7 @@ ir_node *dmemory_default_alloc_array(dbg_info *dbgi, ir_node *block,
 	ir_node *size         = new_r_Mul(block, add1, elsizev, mode_Iu);
 	unsigned addr_delta   = add_size * element_size;
 
-	symconst_symbol calloc_sym;
-	calloc_sym.entity_p   = calloc_entity;
-	ir_node *callee       = new_r_SymConst(irg, mode_P, calloc_sym, symconst_addr_ent);
-
+	ir_node *callee       = new_r_symconst(irg, calloc_entity);
 	ir_node *one          = new_r_Const_long(irg, mode_Iu, 1);
 	ir_node *in[2]        = { one, size };
 	ir_type *call_type    = get_entity_type(calloc_entity);
