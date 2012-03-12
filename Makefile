@@ -34,12 +34,12 @@ GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS)
-CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
 #CFLAGS += -Wunreachable-code -Wlogical-op
-LFLAGS = 
+LFLAGS +=
 PIC_FLAGS = -fpic
 SOURCES = $(wildcard src-cpp/*.c) $(wildcard src-cpp/adt/*.c)
 SOURCES_RT = $(wildcard src-cpp/rt/*.c)
