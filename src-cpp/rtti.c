@@ -132,6 +132,7 @@ static void init_rtti_firm_types(void)
 	/* assert(get_type_size_bytes(method_info) == sizeof(method_info_t)); */
 
 	method_info_array = new_type_array(1, method_info);
+	set_array_lower_bound_int(method_info_array, 0, 0);
 	set_array_variable_size(method_info_array, 1);
 
 	id = new_id_from_str("string_const$");
@@ -139,6 +140,7 @@ static void init_rtti_firm_types(void)
 	id = new_id_from_str("hash");
 	string_const_hash = new_entity(string_const, id, type_uint32_t);
 	ir_type *type_char_array = new_type_array(1, type_char);
+	set_array_lower_bound_int(type_char_array, 0, 0);
 	set_array_variable_size(type_char_array, 1);
 	id = new_id_from_str("data");
 	string_const_data = new_entity(string_const, id, type_char_array);
@@ -147,6 +149,7 @@ static void init_rtti_firm_types(void)
 	/* assert(get_type_size_bytes(string_const) == sizeof(string_const_t)); */
 
 	reference_array = new_type_array(1, type_reference);
+	set_array_lower_bound_int(reference_array, 0, 0);
 	set_array_variable_size(reference_array, 1);
 
 	ir_type *default_io_type = new_type_method(2, 1);
