@@ -22,10 +22,10 @@ ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 	RT_LFLAGS += -m32
 endif
 ifeq ($(TARGET), i686-invasic-octopos)
-	OCTOPOS_BASE=../octopos-app
+	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/default
 	GCC_INCLUDE:=$(shell $(CC) --print-file-name=include)
 	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -D__OCTOPOS__
-	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/sections.x $(OCTOPOS_BASE)/liboctopos.a
+	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
 
 BUILDDIR=build
