@@ -10,6 +10,7 @@ CFLAGS ?= -O0 -g3
 
 guessed_target := $(shell $(CC) -dumpmachine)
 TARGET         ?= $(guessed_target)
+TARGET_CC      ?= $(TARGET)-gcc
 
 ifeq ($(findstring x86_64, $(TARGET)), x86_64)
 	# compile library normally but runtime in 32bit mode
@@ -67,24 +68,24 @@ $(GOAL): $(OBJECTS)
 
 $(GOAL_RT_SHARED): $(OBJECTS_RT_SHARED)
 	@echo '===> LD $@'
-	$(Q)$(CC) -shared $(RT_LFLAGS) $(PIC_FLAGS) -o $@ $^ $(LFLAGS)
+	$(Q)$(TARGET_CC) -shared $(RT_LFLAGS) $(PIC_FLAGS) -o $@ $^ $(LFLAGS)
 
 $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 	@echo '===> AR $@'
 	$(Q)$(AR) -cru $@ $^
 
 $(RUNTIME_BUILDDIR)/shared/%.o: %.c
-	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
+	@echo '===> TARGET_CC $@'
+	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
 
 $(RUNTIME_BUILDDIR)/static/%.o: %.c
-	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) -MMD -c -o $@ $<
+	@echo '===> TARGET_CC $@'
+	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) -MMD -c -o $@ $<
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $@'
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
 
 clean:
-	rm -rf $(OBJECTS) $(OBJECTS_RT_SHARED) $(OBJECTS_RT_STATIC) $(GOAL) $(GOAL_RT_STATIC) $(GOAL_RT_SHARED) $(DEPS) $(DEPS_RT)
+	rm -rf $(OBJECTS) $(OBJECTS_RT_SHARED) $(OBJECTS_RT_STATIC) $(GOAL) $(GOAL_RT_STATIC) $(GOAL_RT_SHARED) $(DEPS) $(DEPS_RT) $(RUNTIME_BUILDDIR)
 

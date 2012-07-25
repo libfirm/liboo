@@ -34,15 +34,28 @@
 		</echo>
 	</target>
 
-	<target name="clean">
+	<target name="clean" depends="clean-default, clean-target">
 		<delete dir="${build}" failonerror="false"/>
+	</target>
+	<target name="clean-default" unless="TARGET">
 		<exec executable="${make.exe}" failonerror="false" dir="${basedir}">
 			<arg value="clean"/>
 		</exec>
 	</target>
+	<target name="clean-target" if="TARGET">
+		<exec executable="${make.exe}" failonerror="false" dir="${basedir}">
+			<arg line="TARGET=${TARGET} clean"/>
+		</exec>
+	</target>
 
-	<target name="c-build" depends="c-build-init">
+	<target name="c-build" depends="c-build-default, c-build-target"/>
+	<target name="c-build-default" depends="c-build-init" unless="TARGET">
 		<exec executable="${make.exe}" failonerror="true" dir="${basedir}"/>
+	</target>
+	<target name="c-build-target" depends="c-build-init" if="TARGET">
+		<exec executable="${make.exe}" failonerror="true" dir="${basedir}">
+			<arg value="TARGET=${TARGET}"/>
+		</exec>
 	</target>
 
 	<target name="build" depends="init">
@@ -65,5 +78,4 @@
 			<fileset dir="${build}" includes="${jar}"/>
 		</copy>
 	</target>
-	
 </project>
