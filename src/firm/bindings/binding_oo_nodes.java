@@ -473,41 +473,28 @@ public class binding_oo_nodes {
 		}
 	}
 
-	public static enum ir_graph_state_t {
-		IR_GRAPH_STATE_ARCH_DEP((1 << 0)),
-		IR_GRAPH_STATE_MODEB_LOWERED((1 << 1)),
-		IR_GRAPH_STATE_NORMALISATION2((1 << 2)),
-		IR_GRAPH_STATE_IMPLICIT_BITFIELD_MASKING((1 << 3)),
-		IR_GRAPH_STATE_OPTIMIZE_UNREACHABLE_CODE((1 << 4)),
-		IR_GRAPH_STATE_NO_CRITICAL_EDGES((1 << 5)),
-		IR_GRAPH_STATE_NO_BADS((1 << 6)),
-		IR_GRAPH_STATE_NO_UNREACHABLE_CODE((1 << 7)),
-		IR_GRAPH_STATE_ONE_RETURN((1 << 8)),
-		IR_GRAPH_STATE_CONSISTENT_DOMINANCE((1 << 9)),
-		IR_GRAPH_STATE_CONSISTENT_POSTDOMINANCE((1 << 10)),
-		IR_GRAPH_STATE_CONSISTENT_OUT_EDGES((1 << 11)),
-		IR_GRAPH_STATE_CONSISTENT_OUTS((1 << 12)),
-		IR_GRAPH_STATE_CONSISTENT_LOOPINFO((1 << 13)),
-		IR_GRAPH_STATE_CONSISTENT_ENTITY_USAGE((1 << 14)),
-		IR_GRAPH_STATE_VALID_EXTENDED_BLOCKS((1 << 15)),
-		IR_GRAPH_STATE_MANY_RETURNS((1 << 16));
+	public static enum ir_graph_constraints_t {
+		IR_GRAPH_CONSTRAINT_ARCH_DEP((1 << 0)),
+		IR_GRAPH_CONSTRAINT_MODEB_LOWERED((1 << 1)),
+		IR_GRAPH_CONSTRAINT_NORMALISATION2((1 << 2)),
+		IR_GRAPH_CONSTRAINT_OPTIMIZE_UNREACHABLE_CODE((1 << 4));
 		public final int val;
 
 		private static class C {
 			static int next_val;
 		}
 
-		ir_graph_state_t(int val) {
+		ir_graph_constraints_t(int val) {
 			this.val = val;
 			C.next_val = val + 1;
 		}
 
-		ir_graph_state_t() {
+		ir_graph_constraints_t() {
 			this.val = C.next_val++;
 		}
 
-		public static ir_graph_state_t getEnum(int val) {
-			for (ir_graph_state_t entry : values()) {
+		public static ir_graph_constraints_t getEnum(int val) {
+			for (ir_graph_constraints_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -515,27 +502,40 @@ public class binding_oo_nodes {
 		}
 	}
 
-	public static enum idtype_t {
-		P_ALL(),
-		P_PID(),
-		P_PGID();
+	public static enum ir_graph_properties_t {
+		IR_GRAPH_PROPERTIES_NONE(0),
+		IR_GRAPH_PROPERTY_NO_CRITICAL_EDGES((1 << 0)),
+		IR_GRAPH_PROPERTY_NO_BADS((1 << 1)),
+		IR_GRAPH_PROPERTY_NO_TUPLES((1 << 2)),
+		IR_GRAPH_PROPERTY_NO_UNREACHABLE_CODE((1 << 3)),
+		IR_GRAPH_PROPERTY_ONE_RETURN((1 << 4)),
+		IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE((1 << 5)),
+		IR_GRAPH_PROPERTY_CONSISTENT_POSTDOMINANCE((1 << 6)),
+		IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE_FRONTIERS((1 << 7)),
+		IR_GRAPH_PROPERTY_CONSISTENT_OUT_EDGES((1 << 8)),
+		IR_GRAPH_PROPERTY_CONSISTENT_OUTS((1 << 9)),
+		IR_GRAPH_PROPERTY_CONSISTENT_LOOPINFO((1 << 10)),
+		IR_GRAPH_PROPERTY_CONSISTENT_ENTITY_USAGE((1 << 11)),
+		IR_GRAPH_PROPERTY_MANY_RETURNS((1 << 12)),
+		IR_GRAPH_PROPERTIES_CONTROL_FLOW(((((((ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_CRITICAL_EDGES.val | ir_graph_properties_t.IR_GRAPH_PROPERTY_ONE_RETURN.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_UNREACHABLE_CODE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_LOOPINFO.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_POSTDOMINANCE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE_FRONTIERS.val)),
+		IR_GRAPH_PROPERTIES_ALL(((((((ir_graph_properties_t.IR_GRAPH_PROPERTIES_CONTROL_FLOW.val | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_BADS.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_TUPLES.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_OUT_EDGES.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_OUTS.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_ENTITY_USAGE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_MANY_RETURNS.val));
 		public final int val;
 
 		private static class C {
 			static int next_val;
 		}
 
-		idtype_t(int val) {
+		ir_graph_properties_t(int val) {
 			this.val = val;
 			C.next_val = val + 1;
 		}
 
-		idtype_t() {
+		ir_graph_properties_t() {
 			this.val = C.next_val++;
 		}
 
-		public static idtype_t getEnum(int val) {
-			for (idtype_t entry : values()) {
+		public static ir_graph_properties_t getEnum(int val) {
+			for (ir_graph_properties_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -544,9 +544,8 @@ public class binding_oo_nodes {
 	}
 
 	public static enum ir_visibility {
-		ir_visibility_default(),
-		ir_visibility_local(),
 		ir_visibility_external(),
+		ir_visibility_local(),
 		ir_visibility_private();
 		public final int val;
 
@@ -578,7 +577,8 @@ public class binding_oo_nodes {
 		IR_LINKAGE_WEAK((1 << 1)),
 		IR_LINKAGE_GARBAGE_COLLECT((1 << 2)),
 		IR_LINKAGE_MERGE((1 << 3)),
-		IR_LINKAGE_HIDDEN_USER((1 << 4));
+		IR_LINKAGE_HIDDEN_USER((1 << 4)),
+		IR_LINKAGE_NO_CODEGEN((1 << 5));
 		public final int val;
 
 		private static class C {
@@ -847,41 +847,6 @@ public class binding_oo_nodes {
 		}
 	}
 
-	public static enum trverify_error_codes {
-		no_error(0),
-		error_ent_not_cont(),
-		error_null_mem(),
-		error_const_on_wrong_irg(),
-		error_existent_entity_without_irg(),
-		error_wrong_ent_overwrites(),
-		error_inherited_ent_without_const(),
-		error_glob_ent_allocation(),
-		error_ent_const_mode(),
-		error_ent_wrong_owner();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		trverify_error_codes(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		trverify_error_codes() {
-			this.val = C.next_val++;
-		}
-
-		public static trverify_error_codes getEnum(int val) {
-			for (trverify_error_codes entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum ir_type_state {
 		layout_undefined(),
 		layout_fixed();
@@ -962,6 +927,35 @@ public class binding_oo_nodes {
 
 		public static calling_convention getEnum(int val) {
 			for (calling_convention entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum __codecvt_result {
+		__codecvt_ok(),
+		__codecvt_partial(),
+		__codecvt_error(),
+		__codecvt_noconv();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		__codecvt_result(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		__codecvt_result() {
+			this.val = C.next_val++;
+		}
+
+		public static __codecvt_result getEnum(int val) {
+			for (__codecvt_result entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -2674,6 +2668,52 @@ public class binding_oo_nodes {
 		}
 	}
 
+	public static enum dwarf_source_language {
+		DW_LANG_C89(0x0001),
+		DW_LANG_C(0x0002),
+		DW_LANG_Ada83(0x0003),
+		DW_LANG_C_plus_plus(0x0004),
+		DW_LANG_Cobol74(0x0005),
+		DW_LANG_Cobol85(0x0006),
+		DW_LANG_Fortran77(0x0007),
+		DW_LANG_Fortran90(0x0008),
+		DW_LANG_Pascal83(0x0009),
+		DW_LANG_Modula2(0x000a),
+		DW_LANG_Java(0x000b),
+		DW_LANG_C99(0x000c),
+		DW_LANG_Ada95(0x000d),
+		DW_LANG_Fortran95(0x000e),
+		DW_LANG_PLI(0x000f),
+		DW_LANG_ObjC(0x0010),
+		DW_LANG_ObjC_plus_plus(0x0011),
+		DW_LANG_UPC(0x0012),
+		DW_LANG_D(0x0013),
+		DW_LANG_Python(0x0014),
+		DW_LANG_Go(0x0016);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		dwarf_source_language(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		dwarf_source_language() {
+			this.val = C.next_val++;
+		}
+
+		public static dwarf_source_language getEnum(int val) {
+			for (dwarf_source_language entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum irp_callgraph_state {
 		irp_callgraph_none(),
 		irp_callgraph_consistent(),
@@ -2787,8 +2827,6 @@ public class binding_oo_nodes {
 		k_ir_op(),
 		k_tarval(),
 		k_ir_loop(),
-		k_ir_compound_graph_path(),
-		k_ir_extblk(),
 		k_ir_prog(),
 		k_ir_graph_pass(),
 		k_ir_prog_pass(),
@@ -2954,21 +2992,18 @@ public class binding_oo_nodes {
 
 	public static enum irop_flags {
 		irop_flag_none(0),
-		irop_flag_labeled((1 << 0)),
-		irop_flag_commutative((1 << 1)),
-		irop_flag_cfopcode((1 << 2)),
-		irop_flag_fragile((1 << 3)),
-		irop_flag_forking((1 << 4)),
-		irop_flag_highlevel((1 << 5)),
-		irop_flag_constlike((1 << 6)),
-		irop_flag_always_opt((1 << 7)),
-		irop_flag_keep((1 << 8)),
-		irop_flag_start_block((1 << 9)),
-		irop_flag_uses_memory((1 << 10)),
-		irop_flag_dump_noblock((1 << 11)),
-		irop_flag_dump_noinput((1 << 12)),
-		irop_flag_cse_neutral((1 << 13)),
-		irop_flag_unknown_jump((1 << 14));
+		irop_flag_commutative((1 << 0)),
+		irop_flag_cfopcode((1 << 1)),
+		irop_flag_fragile((1 << 2)),
+		irop_flag_forking((1 << 3)),
+		irop_flag_highlevel((1 << 4)),
+		irop_flag_constlike((1 << 5)),
+		irop_flag_keep((1 << 6)),
+		irop_flag_start_block((1 << 7)),
+		irop_flag_uses_memory((1 << 8)),
+		irop_flag_dump_noblock((1 << 9)),
+		irop_flag_cse_neutral((1 << 10)),
+		irop_flag_unknown_jump((1 << 11));
 		public final int val;
 
 		private static class C {
@@ -3201,7 +3236,6 @@ public class binding_oo_nodes {
 		FIRMSTAT_COUNT_DELETED(0x00000010),
 		FIRMSTAT_COUNT_SELS(0x00000020),
 		FIRMSTAT_COUNT_CONSTS(0x00000040),
-		FIRMSTAT_COUNT_EXTBB(0x00000080),
 		FIRMSTAT_CSV_OUTPUT(0x10000000);
 		public final int val;
 
@@ -3446,7 +3480,6 @@ public class binding_oo_nodes {
 
 	public static enum ir_dump_flags_t {
 		ir_dump_flag_blocks_as_subgraphs((1 << 0)),
-		ir_dump_flag_group_extbb((1 << 1)),
 		ir_dump_flag_with_typegraph((1 << 2)),
 		ir_dump_flag_disable_edge_labels((1 << 3)),
 		ir_dump_flag_consts_local((1 << 4)),

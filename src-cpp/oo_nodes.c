@@ -1,5 +1,6 @@
 #include "config.h"
 #include "liboo/oo_nodes.h"
+#include <libfirm/irop.h>
 
 #include <stdio.h>
 #include <assert.h>
@@ -21,7 +22,7 @@ typedef struct {
 	ir_type *classtype;
 } op_InstanceOf_attr_t;
 
-static void dump_node(FILE *f, const ir_node *irn, dump_reason_t reason)
+static void dump_oo_node(FILE *f, const ir_node *irn, dump_reason_t reason)
 {
 	assert(is_InstanceOf(irn) || is_Arraylength(irn));
 	switch (reason) {
@@ -50,28 +51,6 @@ static void dump_node(FILE *f, const ir_node *irn, dump_reason_t reason)
 		break;
 	}
 }
-
-/* XXX: might be needed to define a function that extracts the type from an InstanceOf node's attributes
- * -> get_irn_attr_type */
-static const ir_op_ops oo_nodes_op_ops = {
-	firm_default_hash,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	dump_node,
-	NULL,
-	NULL
-};
 
 ir_node *new_InstanceOf(ir_node *mem, ir_node *objptr, ir_type *classtype)
 {
@@ -190,8 +169,10 @@ bool is_Arraylength(const ir_node *node)
 void oo_nodes_init()
 {
 	unsigned opcode = get_next_ir_opcode();
-	op_InstanceOf  = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(op_InstanceOf_attr_t), &oo_nodes_op_ops);
+	op_InstanceOf = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(op_InstanceOf_attr_t));
+	get_op_ops(op_InstanceOf)->dump_node = dump_oo_node;
 
 	opcode = get_next_ir_opcode();
-	op_Arraylength = new_ir_op(opcode, "Arraylength", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, 0, &oo_nodes_op_ops);
+	op_Arraylength = new_ir_op(opcode, "Arraylength", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, 0);
+	get_op_ops(op_Arraylength)->dump_node = dump_oo_node;
 }
