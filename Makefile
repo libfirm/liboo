@@ -28,12 +28,23 @@ ifeq ($(TARGET), i686-invasic-octopos)
 	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -D__OCTOPOS__
 	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
+ifeq ($(TARGET), sparc-invasic-octopos)
+	OCTOPOS_BASE=../octopos-app/releases/current/leon/softfloat
+	GCC_INCLUDE:=$(shell $(CC) --print-file-name=include)
+	RT_CFLAGS += -msoft-float -fno-stack-protector -nostdinc -I $(OCTOPOS_BASE)/include -isystem $(GCC_INCLUDE) -D__OCTOPOS__
+	RT_LFLAGS += -msoft-float -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
+endif
 
 BUILDDIR=build
 RUNTIME_BUILDDIR=$(BUILDDIR)/$(TARGET)
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
+# sparc-elf-gcc does not support shared libraries
+ifeq ($(TARGET), sparc-invasic-octopos)
+	GOAL =
+	GOAL_RT_SHARED =
+endif
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS)
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
