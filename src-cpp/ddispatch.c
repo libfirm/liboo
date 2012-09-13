@@ -225,6 +225,10 @@ void ddispatch_lower_Call(ir_node* call)
 	if (binding == bind_unknown)
 		panic("method %s has no binding specified", get_entity_name(method_entity));
 
+	/* If the call has been explicitly marked as statically bound, then obey. */
+	if (oo_get_call_is_statically_bound(call))
+		binding = bind_static;
+
 	ir_graph  *irg           = get_irn_irg(call);
 	ir_node   *block         = get_nodes_block(call);
 	ir_node   *cur_mem       = get_Call_mem(call);

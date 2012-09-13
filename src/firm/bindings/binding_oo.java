@@ -4041,6 +4041,10 @@ public class binding_oo {
 
 	public static native void oo_set_entity_link(Pointer entity, Pointer link);
 
+	public static native void oo_set_call_is_statically_bound(Pointer call, boolean bind_statically);
+
+	public static native boolean oo_get_call_is_statically_bound(Pointer call);
+
 	public static native Pointer oo_get_class_superclass(Pointer klass);
 
 	public static native Pointer oo_get_entity_overwritten_superclass_entity(Pointer entity);

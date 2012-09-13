@@ -50,6 +50,9 @@ void  oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding);
 void *oo_get_entity_link(ir_entity *entity);
 void  oo_set_entity_link(ir_entity *entity, void* link);
 
+void  oo_set_call_is_statically_bound(ir_node *call, bool bind_statically);
+bool  oo_get_call_is_statically_bound(ir_node *call);
+
 ir_type   *oo_get_class_superclass(ir_type *klass);
 ir_entity *oo_get_entity_overwritten_superclass_entity(ir_entity *entity);
 

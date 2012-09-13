@@ -7,6 +7,7 @@
 #include "liboo/dmemory.h"
 #include "liboo/oo_nodes.h"
 #include "adt/obst.h"
+#include "libfirm/adt/pmap.h"
 #include "adt/error.h"
 
 typedef enum {
@@ -21,6 +22,7 @@ typedef enum {
 	k_oo_BAD = k_ir_max+1,
 	k_oo_type_info,
 	k_oo_entity_info,
+	k_oo_node_info,
 } oo_info_kind;
 
 typedef struct {
@@ -42,7 +44,13 @@ typedef struct {
 	void             *link;
 } oo_entity_info;
 
-static struct obstack oo_info_obst;
+typedef struct {
+	oo_info_kind kind;
+	bool         bind_statically;
+} oo_node_info;
+
+static struct obstack  oo_info_obst;
+static pmap           *oo_node_info_map = NULL;
 
 static oo_type_info *get_type_info(ir_type *type)
 {
@@ -71,6 +79,21 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 		assert (ei->kind == k_oo_entity_info);
 	}
 	return ei;
+}
+
+static oo_node_info *get_node_info(ir_node *node)
+{
+	oo_node_info *ni = pmap_get(oo_node_info, oo_node_info_map, node);
+	if (ni == NULL) {
+		ni = (oo_node_info*) obstack_alloc(&oo_info_obst, sizeof(oo_node_info));
+		memset(ni, 0, sizeof(*ni));
+		ni->kind = k_oo_node_info;
+		ni->bind_statically = false;
+		pmap_insert(oo_node_info_map, node, ni);
+	} else {
+		assert (ni->kind == k_oo_node_info);
+	}
+	return ni;
 }
 
 ir_entity *oo_get_class_vtable_entity(ir_type *classtype)
@@ -376,6 +399,28 @@ void oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding)
 	ei->binding = binding;
 }
 
+void oo_set_call_is_statically_bound(ir_node *call, bool bind_statically)
+{
+	assert (is_Call(call));
+	oo_node_info *ni = get_node_info(call);
+	ni->bind_statically = bind_statically;
+}
+
+bool oo_get_call_is_statically_bound(ir_node *call)
+{
+	assert (is_Call(call));
+
+	/* Shortcut to avoid creating a node_info for each call we see.
+	 * Nearly all calls are bound just like their referenced method
+	 * entity specifies, and just very few (like super.method() in
+	 * Java) must be handled specially. */
+	if (! pmap_contains(oo_node_info_map, call))
+		return false;
+
+	oo_node_info *ni = get_node_info(call);
+	return ni->bind_statically;
+}
+
 void *oo_get_entity_link(ir_entity *entity)
 {
 	oo_entity_info *ei = get_entity_info(entity);
@@ -482,6 +527,7 @@ static void lower_type(ir_type *type, void *env)
 void oo_init(void)
 {
 	obstack_init(&oo_info_obst);
+	oo_node_info_map = pmap_create();
 	oo_nodes_init();
 	ddispatch_init();
 	dmemory_init();
@@ -492,6 +538,7 @@ void oo_deinit(void)
 {
 	rtti_deinit();
 	obstack_free(&oo_info_obst, NULL);
+	pmap_destroy(oo_node_info_map);
 }
 
 void oo_lower(void)
