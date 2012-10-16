@@ -14,6 +14,7 @@
 
 static ir_type   *class_info;
 static ir_entity *class_info_name;
+static ir_entity *class_info_uid;
 static ir_entity *class_info_size;
 static ir_entity *class_info_superclass;
 static ir_entity *class_info_n_methods;
@@ -103,6 +104,8 @@ static void init_rtti_firm_types(void)
 
 	id = new_id_from_str("name");
 	class_info_name = new_entity(class_info, id, type_reference);
+	id = new_id_from_str("uid");
+	class_info_uid = new_entity(class_info, id, type_uint32_t);
 	id = new_id_from_str("size");
 	class_info_size = new_entity(class_info, id, type_size_t);
 	id = new_id_from_str("superclass");
@@ -308,6 +311,11 @@ void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 	ir_entity        *tname_ent  = rtti_emit_string_const(get_id_str(tname_id));
 	ir_initializer_t *tname_init = new_initializer_reference(tname_ent);
 	set_initializer_compound_value(initializer, i++, tname_init);
+
+	uint32_t          uid        = oo_get_class_uid(klass);
+	ir_type          *uid_type   = get_entity_type(class_info_uid);
+	ir_initializer_t *uid_init   = new_initializer_long(uid, uid_type);
+	set_initializer_compound_value(initializer, i++, uid_init);
 
 	ir_graph *const_code_irg = get_const_code_irg();
 	symconst_symbol sym;

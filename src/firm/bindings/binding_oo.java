@@ -3058,7 +3058,6 @@ public class binding_oo {
 	}
 
 	public static enum ir_mode_arithmetic {
-		irma_uninitialized(0),
 		irma_none(1),
 		irma_twos_complement(2),
 		irma_ieee754(256),
@@ -3194,7 +3193,6 @@ public class binding_oo {
 		hook_tail_rec(),
 		hook_strength_red(),
 		hook_dead_node_elim(),
-		hook_dead_node_elim_subst(),
 		hook_if_conversion(),
 		hook_func_call(),
 		hook_arch_dep_replace_mul_with_shifts(),
@@ -3977,6 +3975,10 @@ public class binding_oo {
 
 	public static native void oo_lower();
 
+	public static native int oo_get_class_uid(Pointer classtype);
+
+	public static native void oo_set_class_uid(Pointer classtype, int uid);
+
 	public static native Pointer oo_get_class_vtable_entity(Pointer classtype);
 
 	public static native void oo_set_class_vtable_entity(Pointer classtype, Pointer vtable);
@@ -4032,6 +4034,10 @@ public class binding_oo {
 	public static native boolean oo_get_method_is_inherited(Pointer method);
 
 	public static native void oo_set_method_is_inherited(Pointer method, boolean is_inherited);
+
+	public static native boolean oo_get_field_is_transient(Pointer field);
+
+	public static native void oo_set_field_is_transient(Pointer field, boolean is_transient);
 
 	public static native /* ddispatch_binding */int oo_get_entity_binding(Pointer entity);
 

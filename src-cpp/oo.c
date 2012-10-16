@@ -15,7 +15,8 @@ typedef enum {
 	oo_is_final     = 1 << 1,
 	oo_is_interface = 1 << 2,
 	oo_is_inherited = 1 << 3,
-	oo_is_extern    = 1 << 4
+	oo_is_extern    = 1 << 4,
+	oo_is_transient = 1 << 5
 } oo_info_flags;
 
 typedef enum {
@@ -27,6 +28,7 @@ typedef enum {
 
 typedef struct {
 	oo_info_kind  kind;
+	unsigned      uid;
 	ir_entity    *vptr;
 	ir_entity    *rtti;
 	ir_entity    *vtable;
@@ -94,6 +96,19 @@ static oo_node_info *get_node_info(ir_node *node)
 		assert (ni->kind == k_oo_node_info);
 	}
 	return ni;
+}
+
+unsigned oo_get_class_uid(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->uid;
+}
+void oo_set_class_uid(ir_type *classtype, unsigned uid)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->uid = uid;
 }
 
 ir_entity *oo_get_class_vtable_entity(ir_type *classtype)
@@ -386,6 +401,22 @@ void oo_set_method_is_inherited(ir_entity *method, bool is_inherited)
 #ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
 	set_entity_peculiarity(method, is_inherited ? peculiarity_inherited : peculiarity_existent);
 #endif
+}
+
+bool oo_get_field_is_transient(ir_entity *field)
+{
+	assert (! is_method_entity(field));
+	oo_entity_info *ei = get_entity_info(field);
+	return ei->flags & oo_is_transient;
+}
+void oo_set_field_is_transient(ir_entity *field, bool is_transient)
+{
+	assert (! is_method_entity(field));
+	oo_entity_info *ei = get_entity_info(field);
+	if (is_transient)
+		ei->flags |= oo_is_transient;
+	else
+		ei->flags &= ~oo_is_transient;
 }
 
 ddispatch_binding oo_get_entity_binding(ir_entity *entity)

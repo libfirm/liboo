@@ -24,6 +24,7 @@ typedef struct {
 
 struct class_info_t {
 	string_const_t       *name;
+	uint32_t              uid;
 	size_t                size;
 	struct class_info_t  *superclass;
 	uint32_t              n_methods;

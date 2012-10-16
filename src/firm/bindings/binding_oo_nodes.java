@@ -3058,7 +3058,6 @@ public class binding_oo_nodes {
 	}
 
 	public static enum ir_mode_arithmetic {
-		irma_uninitialized(0),
 		irma_none(1),
 		irma_twos_complement(2),
 		irma_ieee754(256),
@@ -3194,7 +3193,6 @@ public class binding_oo_nodes {
 		hook_tail_rec(),
 		hook_strength_red(),
 		hook_dead_node_elim(),
-		hook_dead_node_elim_subst(),
 		hook_if_conversion(),
 		hook_func_call(),
 		hook_arch_dep_replace_mul_with_shifts(),
