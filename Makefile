@@ -24,13 +24,13 @@ ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 endif
 ifeq ($(TARGET), i686-invasic-octopos)
 	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/default
-	GCC_INCLUDE:=$(shell $(CC) --print-file-name=include)
+	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
 	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -D__OCTOPOS__
 	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
 ifeq ($(TARGET), sparc-invasic-octopos)
 	OCTOPOS_BASE=../octopos-app/releases/current/leon/softfloat
-	GCC_INCLUDE:=$(shell $(CC) --print-file-name=include)
+	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
 	RT_CFLAGS += -msoft-float -fno-stack-protector -nostdinc -I $(OCTOPOS_BASE)/include -isystem $(GCC_INCLUDE) -D__OCTOPOS__
 	RT_LFLAGS += -msoft-float -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
