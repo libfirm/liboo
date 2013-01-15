@@ -170,9 +170,9 @@ void oo_nodes_init()
 {
 	unsigned opcode = get_next_ir_opcode();
 	op_InstanceOf = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(op_InstanceOf_attr_t));
-	get_op_ops(op_InstanceOf)->dump_node = dump_oo_node;
+	set_op_dump(op_InstanceOf, dump_oo_node);
 
 	opcode = get_next_ir_opcode();
 	op_Arraylength = new_ir_op(opcode, "Arraylength", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, 0);
-	get_op_ops(op_Arraylength)->dump_node = dump_oo_node;
+	set_op_dump(op_Arraylength, dump_oo_node);
 }

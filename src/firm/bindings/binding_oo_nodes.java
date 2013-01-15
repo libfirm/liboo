@@ -138,19 +138,22 @@ public class binding_oo_nodes {
 	}
 
 	public static enum mtp_additional_properties {
-		mtp_no_property(0x00000000),
-		mtp_property_const(0x00000001),
-		mtp_property_pure(0x00000002),
-		mtp_property_noreturn(0x00000004),
-		mtp_property_nothrow(0x00000008),
-		mtp_property_naked(0x00000010),
-		mtp_property_malloc(0x00000020),
-		mtp_property_returns_twice(0x00000040),
-		mtp_property_intrinsic(0x00000080),
-		mtp_property_runtime(0x00000100),
-		mtp_property_private(0x00000200),
-		mtp_property_has_loop(0x00000400),
-		mtp_property_inherited((1 << 31));
+		mtp_no_property(0),
+		mtp_property_const((1 << 0)),
+		mtp_property_pure((1 << 1)),
+		mtp_property_noreturn((1 << 2)),
+		mtp_property_nothrow((1 << 3)),
+		mtp_property_naked((1 << 4)),
+		mtp_property_malloc((1 << 5)),
+		mtp_property_returns_twice((1 << 6)),
+		mtp_property_intrinsic((1 << 7)),
+		mtp_property_runtime((1 << 8)),
+		mtp_property_private((1 << 9)),
+		mtp_property_has_loop((1 << 10)),
+		mtp_property_always_inline((1 << 11)),
+		mtp_property_noinline((1 << 12)),
+		mtp_property_inline_recommended((1 << 13)),
+		mtp_temporary((1 << 14));
 		public final int val;
 
 		private static class C {
@@ -347,195 +350,6 @@ public class binding_oo_nodes {
 
 		public static ir_align getEnum(int val) {
 			for (ir_align entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum irg_phase_state {
-		phase_building(),
-		phase_high(),
-		phase_low(),
-		phase_backend();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		irg_phase_state(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		irg_phase_state() {
-			this.val = C.next_val++;
-		}
-
-		public static irg_phase_state getEnum(int val) {
-			for (irg_phase_state entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum irg_callee_info_state {
-		irg_callee_info_none(),
-		irg_callee_info_consistent(),
-		irg_callee_info_inconsistent();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		irg_callee_info_state(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		irg_callee_info_state() {
-			this.val = C.next_val++;
-		}
-
-		public static irg_callee_info_state getEnum(int val) {
-			for (irg_callee_info_state entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum irg_inline_property {
-		irg_inline_any(),
-		irg_inline_forbidden(),
-		irg_inline_recomended(),
-		irg_inline_forced(),
-		irg_inline_forced_no_body();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		irg_inline_property(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		irg_inline_property() {
-			this.val = C.next_val++;
-		}
-
-		public static irg_inline_property getEnum(int val) {
-			for (irg_inline_property entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_resources_t {
-		IR_RESOURCE_NONE(0),
-		IR_RESOURCE_BLOCK_VISITED((1 << 0)),
-		IR_RESOURCE_BLOCK_MARK((1 << 1)),
-		IR_RESOURCE_IRN_VISITED((1 << 2)),
-		IR_RESOURCE_IRN_LINK((1 << 3)),
-		IR_RESOURCE_LOOP_LINK((1 << 4)),
-		IR_RESOURCE_PHI_LIST((1 << 5));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_resources_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_resources_t() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_resources_t getEnum(int val) {
-			for (ir_resources_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_graph_constraints_t {
-		IR_GRAPH_CONSTRAINT_ARCH_DEP((1 << 0)),
-		IR_GRAPH_CONSTRAINT_MODEB_LOWERED((1 << 1)),
-		IR_GRAPH_CONSTRAINT_NORMALISATION2((1 << 2)),
-		IR_GRAPH_CONSTRAINT_OPTIMIZE_UNREACHABLE_CODE((1 << 4));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_graph_constraints_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_graph_constraints_t() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_graph_constraints_t getEnum(int val) {
-			for (ir_graph_constraints_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_graph_properties_t {
-		IR_GRAPH_PROPERTIES_NONE(0),
-		IR_GRAPH_PROPERTY_NO_CRITICAL_EDGES((1 << 0)),
-		IR_GRAPH_PROPERTY_NO_BADS((1 << 1)),
-		IR_GRAPH_PROPERTY_NO_TUPLES((1 << 2)),
-		IR_GRAPH_PROPERTY_NO_UNREACHABLE_CODE((1 << 3)),
-		IR_GRAPH_PROPERTY_ONE_RETURN((1 << 4)),
-		IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE((1 << 5)),
-		IR_GRAPH_PROPERTY_CONSISTENT_POSTDOMINANCE((1 << 6)),
-		IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE_FRONTIERS((1 << 7)),
-		IR_GRAPH_PROPERTY_CONSISTENT_OUT_EDGES((1 << 8)),
-		IR_GRAPH_PROPERTY_CONSISTENT_OUTS((1 << 9)),
-		IR_GRAPH_PROPERTY_CONSISTENT_LOOPINFO((1 << 10)),
-		IR_GRAPH_PROPERTY_CONSISTENT_ENTITY_USAGE((1 << 11)),
-		IR_GRAPH_PROPERTY_MANY_RETURNS((1 << 12)),
-		IR_GRAPH_PROPERTIES_CONTROL_FLOW(((((((ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_CRITICAL_EDGES.val | ir_graph_properties_t.IR_GRAPH_PROPERTY_ONE_RETURN.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_UNREACHABLE_CODE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_LOOPINFO.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_POSTDOMINANCE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE_FRONTIERS.val)),
-		IR_GRAPH_PROPERTIES_ALL(((((((ir_graph_properties_t.IR_GRAPH_PROPERTIES_CONTROL_FLOW.val | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_BADS.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_TUPLES.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_OUT_EDGES.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_OUTS.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_ENTITY_USAGE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_MANY_RETURNS.val));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_graph_properties_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_graph_properties_t() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_graph_properties_t getEnum(int val) {
-			for (ir_graph_properties_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -818,35 +632,6 @@ public class binding_oo_nodes {
 		}
 	}
 
-	public static enum ir_class_cast_state {
-		ir_class_casts_any(0),
-		ir_class_casts_transitive(1),
-		ir_class_casts_normalized(2),
-		ir_class_casts_state_max();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_class_cast_state(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_class_cast_state() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_class_cast_state getEnum(int val) {
-			for (ir_class_cast_state entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum ir_type_state {
 		layout_undefined(),
 		layout_fixed();
@@ -997,9 +782,9 @@ public class binding_oo_nodes {
 
 	public static enum arch_dep_opts_t {
 		arch_dep_none(0),
-		arch_dep_mul_to_shift(1),
-		arch_dep_div_by_const(2),
-		arch_dep_mod_by_const(4);
+		arch_dep_mul_to_shift((1 << 0)),
+		arch_dep_div_by_const((1 << 1)),
+		arch_dep_mod_by_const((1 << 2));
 		public final int val;
 
 		private static class C {
@@ -1192,94 +977,6 @@ public class binding_oo_nodes {
 		}
 	}
 
-	public static enum n_Borrow {
-		n_Borrow_left(),
-		n_Borrow_right(),
-		n_Borrow_max(n_Borrow.n_Borrow_right.val);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		n_Borrow(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		n_Borrow() {
-			this.val = C.next_val++;
-		}
-
-		public static n_Borrow getEnum(int val) {
-			for (n_Borrow entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum n_Bound {
-		n_Bound_mem(),
-		n_Bound_index(),
-		n_Bound_lower(),
-		n_Bound_upper(),
-		n_Bound_max(n_Bound.n_Bound_upper.val);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		n_Bound(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		n_Bound() {
-			this.val = C.next_val++;
-		}
-
-		public static n_Bound getEnum(int val) {
-			for (n_Bound entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum pn_Bound {
-		pn_Bound_M(),
-		pn_Bound_res(),
-		pn_Bound_X_regular(),
-		pn_Bound_X_except(),
-		pn_Bound_max(pn_Bound.pn_Bound_X_except.val);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		pn_Bound(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		pn_Bound() {
-			this.val = C.next_val++;
-		}
-
-		public static pn_Bound getEnum(int val) {
-			for (pn_Bound entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum n_Builtin {
 		n_Builtin_mem(),
 		n_Builtin_max(n_Builtin.n_Builtin_mem.val);
@@ -1385,61 +1082,6 @@ public class binding_oo_nodes {
 
 		public static pn_Call getEnum(int val) {
 			for (pn_Call entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum n_Carry {
-		n_Carry_left(),
-		n_Carry_right(),
-		n_Carry_max(n_Carry.n_Carry_right.val);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		n_Carry(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		n_Carry() {
-			this.val = C.next_val++;
-		}
-
-		public static n_Carry getEnum(int val) {
-			for (n_Carry entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum n_Cast {
-		n_Cast_op(),
-		n_Cast_max(n_Cast.n_Cast_op.val);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		n_Cast(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		n_Cast() {
-			this.val = C.next_val++;
-		}
-
-		public static n_Cast getEnum(int val) {
-			for (n_Cast entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -2865,12 +2507,8 @@ public class binding_oo_nodes {
 		iro_And(),
 		iro_Bad(),
 		iro_Block(),
-		iro_Borrow(),
-		iro_Bound(),
 		iro_Builtin(),
 		iro_Call(),
-		iro_Carry(),
-		iro_Cast(),
 		iro_Cmp(),
 		iro_Cond(),
 		iro_Confirm(),
@@ -3087,316 +2725,6 @@ public class binding_oo_nodes {
 		}
 	}
 
-	public static enum hook_opt_kind {
-		HOOK_OPT_DEAD_BLOCK(),
-		HOOK_OPT_STG(),
-		HOOK_OPT_IFSIM(),
-		HOOK_OPT_CONST_EVAL(),
-		HOOK_OPT_ALGSIM(),
-		HOOK_OPT_PHI(),
-		HOOK_OPT_SYNC(),
-		HOOK_OPT_WAW(),
-		HOOK_OPT_WAR(),
-		HOOK_OPT_RAW(),
-		HOOK_OPT_RAR(),
-		HOOK_OPT_RC(),
-		HOOK_OPT_TUPLE(),
-		HOOK_OPT_ID(),
-		HOOK_OPT_CSE(),
-		HOOK_OPT_STRENGTH_RED(),
-		HOOK_OPT_ARCH_DEP(),
-		HOOK_OPT_REASSOC(),
-		HOOK_OPT_POLY_CALL(),
-		HOOK_OPT_IF_CONV(),
-		HOOK_OPT_FUNC_CALL(),
-		HOOK_OPT_CONFIRM(),
-		HOOK_OPT_CONFIRM_C(),
-		HOOK_OPT_CONFIRM_E(),
-		HOOK_OPT_EXC_REM(),
-		HOOK_OPT_NORMALIZE(),
-		HOOK_LOWERED(),
-		HOOK_BACKEND(),
-		HOOK_OPT_LAST();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		hook_opt_kind(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		hook_opt_kind() {
-			this.val = C.next_val++;
-		}
-
-		public static hook_opt_kind getEnum(int val) {
-			for (hook_opt_kind entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum if_result_t {
-		IF_RESULT_SUCCESS(0),
-		IF_RESULT_SIDE_EFFECT(1),
-		IF_RESULT_SIDE_EFFECT_PHI(2),
-		IF_RESULT_TOO_DEEP(3),
-		IF_RESULT_BAD_CF(4),
-		IF_RESULT_DENIED(5),
-		IF_RESULT_LAST();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		if_result_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		if_result_t() {
-			this.val = C.next_val++;
-		}
-
-		public static if_result_t getEnum(int val) {
-			for (if_result_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum hook_type_t {
-		hook_new_ir_op(),
-		hook_free_ir_op(),
-		hook_new_node(),
-		hook_set_irn_n(),
-		hook_replace(),
-		hook_turn_into_id(),
-		hook_normalize(),
-		hook_new_graph(),
-		hook_free_graph(),
-		hook_irg_walk(),
-		hook_irg_walk_blkwise(),
-		hook_irg_block_walk(),
-		hook_merge_nodes(),
-		hook_reassociate(),
-		hook_lower(),
-		hook_inline(),
-		hook_tail_rec(),
-		hook_strength_red(),
-		hook_dead_node_elim(),
-		hook_if_conversion(),
-		hook_func_call(),
-		hook_arch_dep_replace_mul_with_shifts(),
-		hook_arch_dep_replace_division_by_const(),
-		hook_new_mode(),
-		hook_new_entity(),
-		hook_new_type(),
-		hook_node_info(),
-		hook_last();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		hook_type_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		hook_type_t() {
-			this.val = C.next_val++;
-		}
-
-		public static hook_type_t getEnum(int val) {
-			for (hook_type_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum firmstat_options_t {
-		FIRMSTAT_ENABLED(0x00000001),
-		FIRMSTAT_PATTERN_ENABLED(0x00000002),
-		FIRMSTAT_COUNT_STRONG_OP(0x00000004),
-		FIRMSTAT_COUNT_DAG(0x00000008),
-		FIRMSTAT_COUNT_DELETED(0x00000010),
-		FIRMSTAT_COUNT_SELS(0x00000020),
-		FIRMSTAT_COUNT_CONSTS(0x00000040),
-		FIRMSTAT_CSV_OUTPUT(0x10000000);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		firmstat_options_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		firmstat_options_t() {
-			this.val = C.next_val++;
-		}
-
-		public static firmstat_options_t getEnum(int val) {
-			for (firmstat_options_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum firmstat_optimizations_t {
-		FS_OPT_NEUTRAL_0(hook_opt_kind.HOOK_OPT_LAST.val),
-		FS_OPT_NEUTRAL_1(),
-		FS_OPT_ADD_A_A(),
-		FS_OPT_ADD_A_MINUS_B(),
-		FS_OPT_ADD_SUB(),
-		FS_OPT_ADD_MUL_A_X_A(),
-		FS_OPT_SUB_0_A(),
-		FS_OPT_MINUS_SUB(),
-		FS_OPT_SUB_MINUS(),
-		FS_OPT_SUB_MUL_A_X_A(),
-		FS_OPT_SUB_SUB_X_Y_Z(),
-		FS_OPT_SUB_C_NOT_X(),
-		FS_OPT_SUB_TO_ADD(),
-		FS_OPT_SUB_TO_NOT(),
-		FS_OPT_SUB_TO_CONV(),
-		FS_OPT_MUL_MINUS(),
-		FS_OPT_MUL_MINUS_1(),
-		FS_OPT_MINUS_MUL_C(),
-		FS_OPT_MUL_MINUS_MINUS(),
-		FS_OPT_OR(),
-		FS_OPT_AND(),
-		FS_OPT_TO_EOR(),
-		FS_OPT_EOR_A_A(),
-		FS_OPT_EOR_A_B_A(),
-		FS_OPT_EOR_TO_NOT_BOOL(),
-		FS_OPT_EOR_TO_NOT(),
-		FS_OPT_NOT_CMP(),
-		FS_OPT_OR_SHFT_TO_ROTL(),
-		FS_OPT_REASSOC_SHIFT(),
-		FS_OPT_SHIFT_AND(),
-		FS_OPT_SHIFT_OR(),
-		FS_OPT_SHIFT_EOR(),
-		FS_OPT_CONV(),
-		FS_OPT_CAST(),
-		FS_OPT_MIN_MAX_EQ(),
-		FS_OPT_MUX_COMBINE(),
-		FS_OPT_MUX_CONV(),
-		FS_OPT_MUX_BOOL(),
-		FS_OPT_MUX_NOT_BOOL(),
-		FS_OPT_MUX_OR_BOOL(),
-		FS_OPT_MUX_ORNOT_BOOL(),
-		FS_OPT_MUX_AND_BOOL(),
-		FS_OPT_MUX_ANDNOT_BOOL(),
-		FS_OPT_MUX_C(),
-		FS_OPT_MUX_EQ(),
-		FS_OPT_MUX_TRANSFORM(),
-		FS_OPT_MUX_TO_MIN(),
-		FS_OPT_MUX_TO_MAX(),
-		FS_OPT_MUX_TO_BITOP(),
-		FS_OPT_IDEM_UNARY(),
-		FS_OPT_MINUS_NOT(),
-		FS_OPT_NOT_MINUS_1(),
-		FS_OPT_NOT_PLUS_1(),
-		FS_OPT_ADD_X_NOT_X(),
-		FS_OPT_FP_INV_MUL(),
-		FS_OPT_CONST_PHI(),
-		FS_OPT_PREDICATE(),
-		FS_OPT_DEMORGAN(),
-		FS_OPT_CMP_OP_OP(),
-		FS_OPT_CMP_OP_C(),
-		FS_OPT_CMP_CONV_CONV(),
-		FS_OPT_CMP_CONV(),
-		FS_OPT_CMP_TO_BOOL(),
-		FS_OPT_CMP_CNST_MAGN(),
-		FS_OPT_CMP_SHF_TO_AND(),
-		FS_OPT_CMP_MOD_TO_AND(),
-		FS_OPT_NOP(),
-		FS_OPT_GVN_FOLLOWER(),
-		FS_OPT_GVN_FULLY(),
-		FS_OPT_GVN_PARTLY(),
-		FS_OPT_COMBO_CONST(),
-		FS_OPT_COMBO_CF(),
-		FS_OPT_COMBO_FOLLOWER(),
-		FS_OPT_COMBO_CONGRUENT(),
-		FS_OPT_JUMPTHREADING(),
-		FS_OPT_RTS_ABS(),
-		FS_OPT_RTS_ALLOCA(),
-		FS_OPT_RTS_SQRT(),
-		FS_OPT_RTS_CBRT(),
-		FS_OPT_RTS_POW(),
-		FS_OPT_RTS_EXP(),
-		FS_OPT_RTS_LOG(),
-		FS_OPT_RTS_SIN(),
-		FS_OPT_RTS_COS(),
-		FS_OPT_RTS_TAN(),
-		FS_OPT_RTS_ASIN(),
-		FS_OPT_RTS_ACOS(),
-		FS_OPT_RTS_ATAN(),
-		FS_OPT_RTS_SINH(),
-		FS_OPT_RTS_COSH(),
-		FS_OPT_RTS_TANH(),
-		FS_OPT_RTS_SYMMETRIC(),
-		FS_OPT_RTS_STRCMP(),
-		FS_OPT_RTS_STRNCMP(),
-		FS_OPT_RTS_STRCPY(),
-		FS_OPT_RTS_STRLEN(),
-		FS_OPT_RTS_MEMCPY(),
-		FS_OPT_RTS_MEMPCPY(),
-		FS_OPT_RTS_MEMMOVE(),
-		FS_OPT_RTS_MEMSET(),
-		FS_OPT_RTS_MEMCMP(),
-		FS_BE_IA32_LEA(),
-		FS_BE_IA32_LOAD_LEA(),
-		FS_BE_IA32_STORE_LEA(),
-		FS_BE_IA32_AM_S(),
-		FS_BE_IA32_AM_D(),
-		FS_BE_IA32_CJMP(),
-		FS_BE_IA32_2ADDRCPY(),
-		FS_BE_IA32_SPILL2ST(),
-		FS_BE_IA32_RELOAD2LD(),
-		FS_BE_IA32_SUB2NEGADD(),
-		FS_BE_IA32_LEA2ADD(),
-		FS_OPT_MAX();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		firmstat_optimizations_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		firmstat_optimizations_t() {
-			this.val = C.next_val++;
-		}
-
-		public static firmstat_optimizations_t getEnum(int val) {
-			for (firmstat_optimizations_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum range_types {
 		VRP_UNDEFINED(),
 		VRP_RANGE(),
@@ -3572,6 +2900,139 @@ public class binding_oo_nodes {
 
 		public static firm_verification_t getEnum(int val) {
 			for (firm_verification_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum irg_callee_info_state {
+		irg_callee_info_none(),
+		irg_callee_info_consistent(),
+		irg_callee_info_inconsistent();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		irg_callee_info_state(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		irg_callee_info_state() {
+			this.val = C.next_val++;
+		}
+
+		public static irg_callee_info_state getEnum(int val) {
+			for (irg_callee_info_state entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_resources_t {
+		IR_RESOURCE_NONE(0),
+		IR_RESOURCE_BLOCK_VISITED((1 << 0)),
+		IR_RESOURCE_BLOCK_MARK((1 << 1)),
+		IR_RESOURCE_IRN_VISITED((1 << 2)),
+		IR_RESOURCE_IRN_LINK((1 << 3)),
+		IR_RESOURCE_LOOP_LINK((1 << 4)),
+		IR_RESOURCE_PHI_LIST((1 << 5));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_resources_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_resources_t() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_resources_t getEnum(int val) {
+			for (ir_resources_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_graph_constraints_t {
+		IR_GRAPH_CONSTRAINT_ARCH_DEP((1 << 0)),
+		IR_GRAPH_CONSTRAINT_MODEB_LOWERED((1 << 1)),
+		IR_GRAPH_CONSTRAINT_NORMALISATION2((1 << 2)),
+		IR_GRAPH_CONSTRAINT_OPTIMIZE_UNREACHABLE_CODE((1 << 3)),
+		IR_GRAPH_CONSTRAINT_CONSTRUCTION((1 << 4)),
+		IR_GRAPH_CONSTRAINT_TARGET_LOWERED((1 << 5)),
+		IR_GRAPH_CONSTRAINT_BACKEND((1 << 6));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_graph_constraints_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_graph_constraints_t() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_graph_constraints_t getEnum(int val) {
+			for (ir_graph_constraints_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_graph_properties_t {
+		IR_GRAPH_PROPERTIES_NONE(0),
+		IR_GRAPH_PROPERTY_NO_CRITICAL_EDGES((1 << 0)),
+		IR_GRAPH_PROPERTY_NO_BADS((1 << 1)),
+		IR_GRAPH_PROPERTY_NO_TUPLES((1 << 2)),
+		IR_GRAPH_PROPERTY_NO_UNREACHABLE_CODE((1 << 3)),
+		IR_GRAPH_PROPERTY_ONE_RETURN((1 << 4)),
+		IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE((1 << 5)),
+		IR_GRAPH_PROPERTY_CONSISTENT_POSTDOMINANCE((1 << 6)),
+		IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE_FRONTIERS((1 << 7)),
+		IR_GRAPH_PROPERTY_CONSISTENT_OUT_EDGES((1 << 8)),
+		IR_GRAPH_PROPERTY_CONSISTENT_OUTS((1 << 9)),
+		IR_GRAPH_PROPERTY_CONSISTENT_LOOPINFO((1 << 10)),
+		IR_GRAPH_PROPERTY_CONSISTENT_ENTITY_USAGE((1 << 11)),
+		IR_GRAPH_PROPERTY_MANY_RETURNS((1 << 12)),
+		IR_GRAPH_PROPERTIES_CONTROL_FLOW(((((((ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_CRITICAL_EDGES.val | ir_graph_properties_t.IR_GRAPH_PROPERTY_ONE_RETURN.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_UNREACHABLE_CODE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_LOOPINFO.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_POSTDOMINANCE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_DOMINANCE_FRONTIERS.val)),
+		IR_GRAPH_PROPERTIES_ALL(((((((ir_graph_properties_t.IR_GRAPH_PROPERTIES_CONTROL_FLOW.val | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_BADS.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_NO_TUPLES.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_OUT_EDGES.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_OUTS.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_CONSISTENT_ENTITY_USAGE.val) | ir_graph_properties_t.IR_GRAPH_PROPERTY_MANY_RETURNS.val));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_graph_properties_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_graph_properties_t() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_graph_properties_t getEnum(int val) {
+			for (ir_graph_properties_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}

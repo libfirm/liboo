@@ -7,6 +7,7 @@
 #include "liboo/ddispatch.h"
 #include "liboo/oo.h"
 #include "adt/error.h"
+#include "adt/util.h"
 
 struct dmemory_model_t {
 	alloc_object_t    alloc_object;
@@ -174,9 +175,14 @@ void dmemory_lower_Alloc(ir_node *node)
 		res = (*dmemory_model.alloc_heap)(dbgi, block, count, &cur_mem, type);
 	}
 
-	turn_into_tuple(node, pn_Alloc_max+1);
-	set_irn_n(node, pn_Alloc_M, cur_mem);
-	set_irn_n(node, pn_Alloc_res, res);
+	if (ir_throws_exception(node))
+		panic("can't handle exception throwing Alloc yet");
+
+	ir_node *in[pn_Alloc_res+1] = {
+		[pn_Alloc_M]   = cur_mem,
+		[pn_Alloc_res] = res
+	};
+	turn_into_tuple(node, ARRAY_SIZE(in), in);
 }
 
 void dmemory_lower_Arraylength(ir_node *arraylength)
@@ -187,9 +193,11 @@ void dmemory_lower_Arraylength(ir_node *arraylength)
 	ir_node  *cur_mem   = get_Arraylength_mem(arraylength);
 	ir_node  *len       = (*dmemory_model.get_arraylength)(dbgi, array_ref, block, &cur_mem);
 
-	turn_into_tuple(arraylength, pn_Arraylength_max+1);
-	set_irn_n(arraylength, pn_Arraylength_M, cur_mem);
-	set_irn_n(arraylength, pn_Arraylength_res, len);
+	ir_node *in[pn_Arraylength_max+1] = {
+		[pn_Arraylength_M]   = cur_mem,
+		[pn_Arraylength_res] = len
+	};
+	turn_into_tuple(arraylength, ARRAY_SIZE(in), in);
 }
 
 void dmemory_set_allocation_methods(alloc_object_t ao_func,

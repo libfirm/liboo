@@ -11,6 +11,7 @@
 #include "adt/error.h"
 #include "adt/cpset.h"
 #include "adt/obst.h"
+#include "adt/util.h"
 
 static ir_type   *class_info;
 static ir_entity *class_info_name;
@@ -476,9 +477,11 @@ void rtti_lower_InstanceOf(ir_node *instanceof)
 	ir_node  *cur_mem = get_InstanceOf_mem(instanceof);
 	ir_node  *res     = construct_instanceof(objptr, type, irg, block, &cur_mem);
 
-	turn_into_tuple(instanceof, pn_InstanceOf_max+1);
-	set_irn_n(instanceof, pn_InstanceOf_M, cur_mem);
-	set_irn_n(instanceof, pn_InstanceOf_res, res);
+	ir_node *in[pn_InstanceOf_max+1] = {
+		[pn_InstanceOf_M]   = cur_mem,
+		[pn_InstanceOf_res] = res,
+	};
+	turn_into_tuple(instanceof, ARRAY_SIZE(in), in);
 }
 
 void rtti_set_runtime_typeinfo_constructor(construct_runtime_typeinfo_t func)
