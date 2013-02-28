@@ -51,14 +51,14 @@ public final class OO {
 	public static void setMethodAbstract(Entity entity, boolean isAbstract) {
 		binding_oo.oo_set_method_is_abstract(entity.ptr, isAbstract);
 	}
-	
+
 	/**
 	 * @return true if the given field is transient
 	 */
 	public static boolean getFieldIsTransient(Entity entity) {
 		return binding_oo.oo_get_field_is_transient(entity.ptr);
 	}
-	
+
 	/**
 	 * lets you mark a method as transient
 	 */
@@ -88,14 +88,14 @@ public final class OO {
 	public static int getClassUID(ClassType classType) {
 		return binding_oo.oo_get_class_uid(classType.ptr);
 	}
-	
+
 	/**
 	 * Sets the the unique compile time type id for the given class type.
 	 */
 	public static void setClassUID(ClassType classType, int uid) {
 		binding_oo.oo_set_class_uid(classType.ptr, uid);
 	}
-	
+
 	/**
 	 * @return the previously set vtable entity for the given class type.
 	 */
@@ -105,7 +105,7 @@ public final class OO {
 			return null;
 		return new Entity(vtable);
 	}
-	
+
 	/**
 	 * lets you specify the entity containing classType's vtable.
 	 * Use an entity with a primitive pointer type, and set the ld name.
@@ -115,7 +115,7 @@ public final class OO {
 	}
 
 	/**
-	 * lets you specify the entity that represents the pointer to the vtable in an instance 
+	 * lets you specify the entity that represents the pointer to the vtable in an instance
 	 */
 	public static void setClassVPtrEntity(ClassType classType, Entity entity) {
 		binding_oo.oo_set_class_vptr_entity(classType.ptr, entity.ptr);
