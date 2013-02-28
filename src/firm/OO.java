@@ -122,6 +122,16 @@ public final class OO {
 	}
 
 	/**
+	 * returns VPTr entity of a class
+	 */
+	public static Entity getClassVPtrEntity(ClassType classType) {
+		Pointer res = binding_oo.oo_get_class_vptr_entity(classType.ptr);
+		if (res == null)
+			return null;
+		return new Entity(res);
+	}
+
+	/**
 	 * lets you specify the entity that represents the run-time type info data.
 	 * Use an entity with a primitive pointer type, and set the ld name.
 	 */
