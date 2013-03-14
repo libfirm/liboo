@@ -169,10 +169,10 @@ bool is_Arraylength(const ir_node *node)
 void oo_nodes_init()
 {
 	unsigned opcode = get_next_ir_opcode();
-	op_InstanceOf = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, sizeof(op_InstanceOf_attr_t));
+	op_InstanceOf = new_ir_op(opcode, "InstanceOf", op_pin_state_floats, irop_flag_uses_memory, oparity_any, -1, sizeof(op_InstanceOf_attr_t));
 	set_op_dump(op_InstanceOf, dump_oo_node);
 
 	opcode = get_next_ir_opcode();
-	op_Arraylength = new_ir_op(opcode, "Arraylength", op_pin_state_floats, irop_flag_uses_memory, oparity_unary, 0, 0);
+	op_Arraylength = new_ir_op(opcode, "Arraylength", op_pin_state_floats, irop_flag_uses_memory, oparity_any, -1, 0);
 	set_op_dump(op_Arraylength, dump_oo_node);
 }
