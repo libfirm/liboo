@@ -155,18 +155,28 @@ void dmemory_lower_Alloc(ir_node *node)
 {
 	assert(is_Alloc(node));
 
-	if (get_Alloc_where(node) != heap_alloc)
-		return;
-
-	dbg_info *dbgi    = get_irn_dbg_info(node);
-	ir_type  *type    = get_Alloc_type(node);
-	ir_node  *count   = get_Alloc_count(node);
-	ir_node  *res     = NULL;
-	ir_node  *cur_mem = get_Alloc_mem(node);
-	ir_node  *block   = get_nodes_block(node);
+	dbg_info       *dbgi    = get_irn_dbg_info(node);
+	ir_type        *type    = get_Alloc_type(node);
+	ir_node        *count   = get_Alloc_count(node);
+	ir_node        *res     = NULL;
+	ir_node        *cur_mem = get_Alloc_mem(node);
+	ir_node        *block   = get_nodes_block(node);
+	ir_where_alloc  where   = get_Alloc_where(node);
 
 	if (is_Class_type(type)) {
-		res = (*dmemory_model.alloc_object)(dbgi, block, &cur_mem, type);
+		if (where == heap_alloc) {
+			res = (*dmemory_model.alloc_object)(dbgi, block, &cur_mem, type);
+		} else {
+			/* Prevent CSE. */
+			ir_graph *irg       = get_irn_irg(node);
+			ir_node  *dummy_mem = new_r_Dummy(irg, mode_M);
+			set_Alloc_mem(node, dummy_mem);
+
+			ir_node *new_alloc = new_rd_Alloc(dbgi, block, cur_mem, count, type, where);
+			cur_mem = get_Alloc_mem(new_alloc);
+			res     = new_r_Proj(new_alloc, mode_P, pn_Alloc_res);
+		}
+
 		ddispatch_prepare_new_instance(dbgi, block, res, &cur_mem, type);
 	} else if (is_Array_type(type)) {
 		ir_type *eltype  = get_array_element_type(type);
