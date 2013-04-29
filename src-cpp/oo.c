@@ -5,10 +5,11 @@
 #include <assert.h>
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
-#include "liboo/oo_nodes.h"
+#include "liboo/nodes.h"
 #include "adt/obst.h"
 #include "libfirm/adt/pmap.h"
 #include "adt/error.h"
+#include "gen_irnode.h"
 
 typedef enum {
 	oo_is_abstract  = 1 << 0,
@@ -559,7 +560,7 @@ void oo_init(void)
 {
 	obstack_init(&oo_info_obst);
 	oo_node_info_map = pmap_create();
-	oo_nodes_init();
+	oo_init_opcodes();
 	ddispatch_init();
 	dmemory_init();
 	rtti_init();

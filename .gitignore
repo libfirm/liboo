@@ -1,5 +1,9 @@
 /build
 /classes
 /lib
-config.mak
-binding_generator/config
+/config.mak
+/binding_generator/config
+/include/liboo/nodes.h
+/src-cpp/gen_irnode.c
+/src-cpp/gen_irnode.h
+*.pyc

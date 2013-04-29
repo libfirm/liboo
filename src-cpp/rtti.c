@@ -3,7 +3,7 @@
 #include "liboo/rtti.h"
 #include "liboo/oo.h"
 #include "liboo/rts_types.h"
-#include "liboo/oo_nodes.h"
+#include "liboo/nodes.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -470,7 +470,7 @@ void rtti_construct_runtime_typeinfo(ir_type *klass)
 
 void rtti_lower_InstanceOf(ir_node *instanceof)
 {
-	ir_node  *objptr  = get_InstanceOf_objptr(instanceof);
+	ir_node  *objptr  = get_InstanceOf_ptr(instanceof);
 	ir_type  *type    = get_InstanceOf_type(instanceof);
 	ir_node  *block   = get_nodes_block(instanceof);
 	ir_graph *irg     = get_irn_irg(instanceof);

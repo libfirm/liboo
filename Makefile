@@ -55,6 +55,7 @@ LFLAGS +=
 PIC_FLAGS = -fpic
 SOURCES = $(wildcard src-cpp/*.c) $(wildcard src-cpp/adt/*.c)
 SOURCES_RT = $(wildcard src-cpp/rt/*.c)
+SOURCES := $(filter-out src-cpp/gen_%.c, $(SOURCES)) src-cpp/gen_irnode.c
 OBJECTS = $(addprefix $(BUILDDIR)/, $(addsuffix .o, $(basename $(SOURCES))))
 OBJECTS_RT_SHARED = $(addprefix $(RUNTIME_BUILDDIR)/shared/, $(addsuffix .o, $(basename $(SOURCES_RT))))
 OBJECTS_RT_STATIC = $(addprefix $(RUNTIME_BUILDDIR)/static/, $(addsuffix .o, $(basename $(SOURCES_RT))))
@@ -72,6 +73,21 @@ runtime: $(GOAL_RT_SHARED) $(GOAL_RT_STATIC)
 UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/rt $(BUILDDIR)/src-cpp/adt $(RUNTIME_BUILDDIR)/shared/src-cpp/rt $(RUNTIME_BUILDDIR)/static/src-cpp/rt)
 
 -include $(DEPS)
+
+SPEC_GENERATED_HEADERS := include/liboo/nodes.h src-cpp/gen_irnode.h
+IR_SPEC_GENERATOR := spec/gen_ir.py
+IR_SPEC_GENERATOR_DEPS := $(IR_SPEC_GENERATOR) spec/spec_util.py spec/filters.py
+SPECFILE := spec/oo_nodes_spec.py
+
+$(SOURCES): $(SPEC_GENERATED_HEADERS)
+
+include/liboo/% : spec/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
+	@echo GEN $@
+	$(Q)$(IR_SPEC_GENERATOR) $(SPECFILE) $< > $@
+
+src-cpp/% : spec/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
+	@echo GEN $@
+	$(Q)$(IR_SPEC_GENERATOR) $(SPECFILE) $< > $@
 
 $(GOAL): $(OBJECTS)
 	@echo '===> LD $@'
