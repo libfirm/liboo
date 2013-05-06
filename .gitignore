@@ -2,7 +2,7 @@
 /classes
 /lib
 /config.mak
-/binding_generator/config
+/spec/config
 /include/liboo/nodes.h
 /src-cpp/gen_irnode.c
 /src-cpp/gen_irnode.h

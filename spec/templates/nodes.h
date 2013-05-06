@@ -4,6 +4,7 @@
 
 {% if spec.external -%}
 {% set FIRM_API="" %}
+#include <libfirm/firm_types.h>
 {%- else -%}
 #include "firm_types.h"
 

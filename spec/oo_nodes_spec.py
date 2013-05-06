@@ -2,6 +2,8 @@ from spec_util import abstract, op
 
 name = "oo"
 external = "liboo"
+java_binding = "firm.bindings.binding_nodes"
+java_package = "firm.oo.nodes"
 
 @op
 class InstanceOf:

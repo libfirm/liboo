@@ -4,6 +4,7 @@ import com.sun.jna.Pointer;
 
 import firm.bindings.binding_oo;
 import firm.nodes.Node;
+import firm.oo.nodes.Nodes;
 
 /**
  * Object-Orientation helper library API
@@ -21,6 +22,7 @@ public final class OO {
 	public static void init() {
 		assert initialized == false; /* we may only use 1 OO object at once... */
 		binding_oo.oo_init();
+		Nodes.init();
 		initialized = true;
 	}
 

@@ -146,14 +146,12 @@ public class binding_oo {
 		mtp_property_naked((1 << 4)),
 		mtp_property_malloc((1 << 5)),
 		mtp_property_returns_twice((1 << 6)),
-		mtp_property_intrinsic((1 << 7)),
-		mtp_property_runtime((1 << 8)),
-		mtp_property_private((1 << 9)),
-		mtp_property_has_loop((1 << 10)),
-		mtp_property_always_inline((1 << 11)),
-		mtp_property_noinline((1 << 12)),
-		mtp_property_inline_recommended((1 << 13)),
-		mtp_temporary((1 << 14));
+		mtp_property_private((1 << 7)),
+		mtp_property_has_loop((1 << 8)),
+		mtp_property_always_inline((1 << 9)),
+		mtp_property_noinline((1 << 10)),
+		mtp_property_inline_recommended((1 << 11)),
+		mtp_temporary((1 << 12));
 		public final int val;
 
 		private static class C {
@@ -250,7 +248,9 @@ public class binding_oo {
 		ir_bk_inport(),
 		ir_bk_outport(),
 		ir_bk_inner_trampoline(),
-		ir_bk_last(ir_builtin_kind.ir_bk_inner_trampoline.val);
+		ir_bk_saturating_increment(),
+		ir_bk_compare_swap(),
+		ir_bk_last(ir_builtin_kind.ir_bk_compare_swap.val);
 		public final int val;
 
 		private static class C {
@@ -829,6 +829,467 @@ public class binding_oo {
 
 		public static ikind getEnum(int val) {
 			for (ikind entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum osr_flags {
+		osr_flag_none(0),
+		osr_flag_lftr_with_ov_check(1),
+		osr_flag_ignore_x86_shift(2),
+		osr_flag_keep_reg_pressure(4);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		osr_flags(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		osr_flags() {
+			this.val = C.next_val++;
+		}
+
+		public static osr_flags getEnum(int val) {
+			for (osr_flags entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum asm_constraint_flags_t {
+		ASM_CONSTRAINT_FLAG_NONE(0),
+		ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER((1 << 0)),
+		ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP((1 << 1)),
+		ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE((1 << 2)),
+		ASM_CONSTRAINT_FLAG_NO_SUPPORT((1 << 3)),
+		ASM_CONSTRAINT_FLAG_MODIFIER_WRITE((1 << 4)),
+		ASM_CONSTRAINT_FLAG_MODIFIER_NO_WRITE((1 << 5)),
+		ASM_CONSTRAINT_FLAG_MODIFIER_READ((1 << 6)),
+		ASM_CONSTRAINT_FLAG_MODIFIER_NO_READ((1 << 7)),
+		ASM_CONSTRAINT_FLAG_MODIFIER_EARLYCLOBBER((1 << 8)),
+		ASM_CONSTRAINT_FLAG_MODIFIER_COMMUTATIVE((1 << 9)),
+		ASM_CONSTRAINT_FLAG_INVALID((1 << 10));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		asm_constraint_flags_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		asm_constraint_flags_t() {
+			this.val = C.next_val++;
+		}
+
+		public static asm_constraint_flags_t getEnum(int val) {
+			for (asm_constraint_flags_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum dwarf_source_language {
+		DW_LANG_C89(0x0001),
+		DW_LANG_C(0x0002),
+		DW_LANG_Ada83(0x0003),
+		DW_LANG_C_plus_plus(0x0004),
+		DW_LANG_Cobol74(0x0005),
+		DW_LANG_Cobol85(0x0006),
+		DW_LANG_Fortran77(0x0007),
+		DW_LANG_Fortran90(0x0008),
+		DW_LANG_Pascal83(0x0009),
+		DW_LANG_Modula2(0x000a),
+		DW_LANG_Java(0x000b),
+		DW_LANG_C99(0x000c),
+		DW_LANG_Ada95(0x000d),
+		DW_LANG_Fortran95(0x000e),
+		DW_LANG_PLI(0x000f),
+		DW_LANG_ObjC(0x0010),
+		DW_LANG_ObjC_plus_plus(0x0011),
+		DW_LANG_UPC(0x0012),
+		DW_LANG_D(0x0013),
+		DW_LANG_Python(0x0014),
+		DW_LANG_Go(0x0016);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		dwarf_source_language(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		dwarf_source_language() {
+			this.val = C.next_val++;
+		}
+
+		public static dwarf_source_language getEnum(int val) {
+			for (dwarf_source_language entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum irp_callgraph_state {
+		irp_callgraph_none(),
+		irp_callgraph_consistent(),
+		irp_callgraph_inconsistent(),
+		irp_callgraph_and_calltree_consistent();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		irp_callgraph_state(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		irp_callgraph_state() {
+			this.val = C.next_val++;
+		}
+
+		public static irp_callgraph_state getEnum(int val) {
+			for (irp_callgraph_state entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum loop_nesting_depth_state {
+		loop_nesting_depth_none(),
+		loop_nesting_depth_consistent(),
+		loop_nesting_depth_inconsistent();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		loop_nesting_depth_state(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		loop_nesting_depth_state() {
+			this.val = C.next_val++;
+		}
+
+		public static loop_nesting_depth_state getEnum(int val) {
+			for (loop_nesting_depth_state entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum dbg_action {
+		dbg_error(0),
+		dbg_opt_ssa(),
+		dbg_opt_auxnode(),
+		dbg_const_eval(),
+		dbg_opt_cse(),
+		dbg_straightening(),
+		dbg_if_simplification(),
+		dbg_algebraic_simplification(),
+		dbg_write_after_write(),
+		dbg_write_after_read(),
+		dbg_read_after_write(),
+		dbg_read_after_read(),
+		dbg_read_a_const(),
+		dbg_rem_poly_call(),
+		dbg_dead_code(),
+		dbg_opt_confirm(),
+		dbg_gvn_pre(),
+		dbg_combo(),
+		dbg_jumpthreading(),
+		dbg_backend(),
+		dbg_max();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		dbg_action(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		dbg_action() {
+			this.val = C.next_val++;
+		}
+
+		public static dbg_action getEnum(int val) {
+			for (dbg_action entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum firm_kind {
+		k_BAD(0),
+		k_entity(),
+		k_type(),
+		k_ir_graph(),
+		k_ir_node(),
+		k_ir_mode(),
+		k_ir_op(),
+		k_tarval(),
+		k_ir_loop(),
+		k_ir_prog(),
+		k_ir_graph_pass(),
+		k_ir_prog_pass(),
+		k_ir_graph_pass_mgr(),
+		k_ir_prog_pass_mgr(),
+		k_ir_max();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		firm_kind(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		firm_kind() {
+			this.val = C.next_val++;
+		}
+
+		public static firm_kind getEnum(int val) {
+			for (firm_kind entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum op_arity {
+		oparity_invalid(0),
+		oparity_binary(),
+		oparity_variable(),
+		oparity_dynamic(),
+		oparity_any();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		op_arity(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		op_arity() {
+			this.val = C.next_val++;
+		}
+
+		public static op_arity getEnum(int val) {
+			for (op_arity entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum irop_flags {
+		irop_flag_none(0),
+		irop_flag_commutative((1 << 0)),
+		irop_flag_cfopcode((1 << 1)),
+		irop_flag_fragile((1 << 2)),
+		irop_flag_forking((1 << 3)),
+		irop_flag_highlevel((1 << 4)),
+		irop_flag_constlike((1 << 5)),
+		irop_flag_keep((1 << 6)),
+		irop_flag_start_block((1 << 7)),
+		irop_flag_uses_memory((1 << 8)),
+		irop_flag_dump_noblock((1 << 9)),
+		irop_flag_cse_neutral((1 << 10)),
+		irop_flag_unknown_jump((1 << 11));
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		irop_flags(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		irop_flags() {
+			this.val = C.next_val++;
+		}
+
+		public static irop_flags getEnum(int val) {
+			for (irop_flags entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum dump_reason_t {
+		dump_node_opcode_txt(),
+		dump_node_mode_txt(),
+		dump_node_nodeattr_txt(),
+		dump_node_info_txt();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		dump_reason_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		dump_reason_t() {
+			this.val = C.next_val++;
+		}
+
+		public static dump_reason_t getEnum(int val) {
+			for (dump_reason_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_mode_arithmetic {
+		irma_none(1),
+		irma_twos_complement(2),
+		irma_ieee754(256),
+		irma_x86_extended_float(),
+		irma_last(ir_mode_arithmetic.irma_x86_extended_float.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_mode_arithmetic(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_mode_arithmetic() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_mode_arithmetic getEnum(int val) {
+			for (ir_mode_arithmetic entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum ir_opcode {
+		iro_ASM(),
+		iro_Add(),
+		iro_Alloc(),
+		iro_Anchor(),
+		iro_And(),
+		iro_Bad(),
+		iro_Block(),
+		iro_Builtin(),
+		iro_Call(),
+		iro_Cmp(),
+		iro_Cond(),
+		iro_Confirm(),
+		iro_Const(),
+		iro_Conv(),
+		iro_CopyB(),
+		iro_Deleted(),
+		iro_Div(),
+		iro_Dummy(),
+		iro_End(),
+		iro_Eor(),
+		iro_Free(),
+		iro_IJmp(),
+		iro_Id(),
+		iro_InstOf(),
+		iro_Jmp(),
+		iro_Load(),
+		iro_Minus(),
+		iro_Mod(),
+		iro_Mul(),
+		iro_Mulh(),
+		iro_Mux(),
+		iro_NoMem(),
+		iro_Not(),
+		iro_Or(),
+		iro_Phi(),
+		iro_Pin(),
+		iro_Proj(),
+		iro_Raise(),
+		iro_Return(),
+		iro_Rotl(),
+		iro_Sel(),
+		iro_Shl(),
+		iro_Shr(),
+		iro_Shrs(),
+		iro_Start(),
+		iro_Store(),
+		iro_Sub(),
+		iro_Switch(),
+		iro_SymConst(),
+		iro_Sync(),
+		iro_Tuple(),
+		iro_Unknown(),
+		iro_first(ir_opcode.iro_ASM.val),
+		iro_last(ir_opcode.iro_Unknown.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_opcode(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_opcode() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_opcode getEnum(int val) {
+			for (ir_opcode entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -2244,487 +2705,6 @@ public class binding_oo {
 		}
 	}
 
-	public static enum osr_flags {
-		osr_flag_none(0),
-		osr_flag_lftr_with_ov_check(1),
-		osr_flag_ignore_x86_shift(2),
-		osr_flag_keep_reg_pressure(4);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		osr_flags(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		osr_flags() {
-			this.val = C.next_val++;
-		}
-
-		public static osr_flags getEnum(int val) {
-			for (osr_flags entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum asm_constraint_flags_t {
-		ASM_CONSTRAINT_FLAG_NONE(0),
-		ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER((1 << 0)),
-		ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP((1 << 1)),
-		ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE((1 << 2)),
-		ASM_CONSTRAINT_FLAG_NO_SUPPORT((1 << 3)),
-		ASM_CONSTRAINT_FLAG_MODIFIER_WRITE((1 << 4)),
-		ASM_CONSTRAINT_FLAG_MODIFIER_NO_WRITE((1 << 5)),
-		ASM_CONSTRAINT_FLAG_MODIFIER_READ((1 << 6)),
-		ASM_CONSTRAINT_FLAG_MODIFIER_NO_READ((1 << 7)),
-		ASM_CONSTRAINT_FLAG_MODIFIER_EARLYCLOBBER((1 << 8)),
-		ASM_CONSTRAINT_FLAG_MODIFIER_COMMUTATIVE((1 << 9)),
-		ASM_CONSTRAINT_FLAG_INVALID((1 << 10));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		asm_constraint_flags_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		asm_constraint_flags_t() {
-			this.val = C.next_val++;
-		}
-
-		public static asm_constraint_flags_t getEnum(int val) {
-			for (asm_constraint_flags_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum dwarf_source_language {
-		DW_LANG_C89(0x0001),
-		DW_LANG_C(0x0002),
-		DW_LANG_Ada83(0x0003),
-		DW_LANG_C_plus_plus(0x0004),
-		DW_LANG_Cobol74(0x0005),
-		DW_LANG_Cobol85(0x0006),
-		DW_LANG_Fortran77(0x0007),
-		DW_LANG_Fortran90(0x0008),
-		DW_LANG_Pascal83(0x0009),
-		DW_LANG_Modula2(0x000a),
-		DW_LANG_Java(0x000b),
-		DW_LANG_C99(0x000c),
-		DW_LANG_Ada95(0x000d),
-		DW_LANG_Fortran95(0x000e),
-		DW_LANG_PLI(0x000f),
-		DW_LANG_ObjC(0x0010),
-		DW_LANG_ObjC_plus_plus(0x0011),
-		DW_LANG_UPC(0x0012),
-		DW_LANG_D(0x0013),
-		DW_LANG_Python(0x0014),
-		DW_LANG_Go(0x0016);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		dwarf_source_language(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		dwarf_source_language() {
-			this.val = C.next_val++;
-		}
-
-		public static dwarf_source_language getEnum(int val) {
-			for (dwarf_source_language entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum irp_callgraph_state {
-		irp_callgraph_none(),
-		irp_callgraph_consistent(),
-		irp_callgraph_inconsistent(),
-		irp_callgraph_and_calltree_consistent();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		irp_callgraph_state(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		irp_callgraph_state() {
-			this.val = C.next_val++;
-		}
-
-		public static irp_callgraph_state getEnum(int val) {
-			for (irp_callgraph_state entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum loop_nesting_depth_state {
-		loop_nesting_depth_none(),
-		loop_nesting_depth_consistent(),
-		loop_nesting_depth_inconsistent();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		loop_nesting_depth_state(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		loop_nesting_depth_state() {
-			this.val = C.next_val++;
-		}
-
-		public static loop_nesting_depth_state getEnum(int val) {
-			for (loop_nesting_depth_state entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum dbg_action {
-		dbg_error(0),
-		dbg_opt_ssa(),
-		dbg_opt_auxnode(),
-		dbg_const_eval(),
-		dbg_opt_cse(),
-		dbg_straightening(),
-		dbg_if_simplification(),
-		dbg_algebraic_simplification(),
-		dbg_write_after_write(),
-		dbg_write_after_read(),
-		dbg_read_after_write(),
-		dbg_read_after_read(),
-		dbg_read_a_const(),
-		dbg_rem_poly_call(),
-		dbg_dead_code(),
-		dbg_opt_confirm(),
-		dbg_gvn_pre(),
-		dbg_combo(),
-		dbg_jumpthreading(),
-		dbg_backend(),
-		dbg_max();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		dbg_action(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		dbg_action() {
-			this.val = C.next_val++;
-		}
-
-		public static dbg_action getEnum(int val) {
-			for (dbg_action entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum firm_kind {
-		k_BAD(0),
-		k_entity(),
-		k_type(),
-		k_ir_graph(),
-		k_ir_node(),
-		k_ir_mode(),
-		k_ir_op(),
-		k_tarval(),
-		k_ir_loop(),
-		k_ir_prog(),
-		k_ir_graph_pass(),
-		k_ir_prog_pass(),
-		k_ir_graph_pass_mgr(),
-		k_ir_prog_pass_mgr(),
-		k_ir_max();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		firm_kind(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		firm_kind() {
-			this.val = C.next_val++;
-		}
-
-		public static firm_kind getEnum(int val) {
-			for (firm_kind entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_opcode {
-		iro_ASM(),
-		iro_Add(),
-		iro_Alloc(),
-		iro_Anchor(),
-		iro_And(),
-		iro_Bad(),
-		iro_Block(),
-		iro_Builtin(),
-		iro_Call(),
-		iro_Cmp(),
-		iro_Cond(),
-		iro_Confirm(),
-		iro_Const(),
-		iro_Conv(),
-		iro_CopyB(),
-		iro_Deleted(),
-		iro_Div(),
-		iro_Dummy(),
-		iro_End(),
-		iro_Eor(),
-		iro_Free(),
-		iro_IJmp(),
-		iro_Id(),
-		iro_InstOf(),
-		iro_Jmp(),
-		iro_Load(),
-		iro_Minus(),
-		iro_Mod(),
-		iro_Mul(),
-		iro_Mulh(),
-		iro_Mux(),
-		iro_NoMem(),
-		iro_Not(),
-		iro_Or(),
-		iro_Phi(),
-		iro_Pin(),
-		iro_Proj(),
-		iro_Raise(),
-		iro_Return(),
-		iro_Rotl(),
-		iro_Sel(),
-		iro_Shl(),
-		iro_Shr(),
-		iro_Shrs(),
-		iro_Start(),
-		iro_Store(),
-		iro_Sub(),
-		iro_Switch(),
-		iro_SymConst(),
-		iro_Sync(),
-		iro_Tuple(),
-		iro_Unknown(),
-		iro_First(ir_opcode.iro_ASM.val),
-		iro_Last(ir_opcode.iro_Unknown.val),
-		beo_First(),
-		beo_Spill(ir_opcode.beo_First.val),
-		beo_Reload(),
-		beo_Perm(),
-		beo_MemPerm(),
-		beo_Copy(),
-		beo_Keep(),
-		beo_CopyKeep(),
-		beo_Call(),
-		beo_Return(),
-		beo_AddSP(),
-		beo_SubSP(),
-		beo_IncSP(),
-		beo_Start(),
-		beo_FrameAddr(),
-		beo_Last(ir_opcode.beo_FrameAddr.val),
-		iro_MaxOpcode();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_opcode(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_opcode() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_opcode getEnum(int val) {
-			for (ir_opcode entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum op_arity {
-		oparity_invalid(0),
-		oparity_unary(),
-		oparity_binary(),
-		oparity_trinary(),
-		oparity_zero(),
-		oparity_variable(),
-		oparity_dynamic(),
-		oparity_any();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		op_arity(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		op_arity() {
-			this.val = C.next_val++;
-		}
-
-		public static op_arity getEnum(int val) {
-			for (op_arity entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum irop_flags {
-		irop_flag_none(0),
-		irop_flag_commutative((1 << 0)),
-		irop_flag_cfopcode((1 << 1)),
-		irop_flag_fragile((1 << 2)),
-		irop_flag_forking((1 << 3)),
-		irop_flag_highlevel((1 << 4)),
-		irop_flag_constlike((1 << 5)),
-		irop_flag_keep((1 << 6)),
-		irop_flag_start_block((1 << 7)),
-		irop_flag_uses_memory((1 << 8)),
-		irop_flag_dump_noblock((1 << 9)),
-		irop_flag_cse_neutral((1 << 10)),
-		irop_flag_unknown_jump((1 << 11));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		irop_flags(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		irop_flags() {
-			this.val = C.next_val++;
-		}
-
-		public static irop_flags getEnum(int val) {
-			for (irop_flags entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum dump_reason_t {
-		dump_node_opcode_txt(),
-		dump_node_mode_txt(),
-		dump_node_nodeattr_txt(),
-		dump_node_info_txt();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		dump_reason_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		dump_reason_t() {
-			this.val = C.next_val++;
-		}
-
-		public static dump_reason_t getEnum(int val) {
-			for (dump_reason_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_mode_arithmetic {
-		irma_none(1),
-		irma_twos_complement(2),
-		irma_ieee754(256),
-		irma_x86_extended_float(),
-		irma_last(ir_mode_arithmetic.irma_x86_extended_float.val);
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_mode_arithmetic(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_mode_arithmetic() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_mode_arithmetic getEnum(int val) {
-			for (ir_mode_arithmetic entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum range_types {
 		VRP_UNDEFINED(),
 		VRP_RANGE(),
@@ -2763,22 +2743,6 @@ public class binding_oo {
 		dump_verbosity_entattrs(0x00000010),
 		dump_verbosity_entconsts(0x00000020),
 		dump_verbosity_accessStats(0x00000100),
-		dump_verbosity_noClassTypes(0x00001000),
-		dump_verbosity_noStructTypes(0x00002000),
-		dump_verbosity_noUnionTypes(0x00004000),
-		dump_verbosity_noArrayTypes(0x00008000),
-		dump_verbosity_noPointerTypes(0x00010000),
-		dump_verbosity_noMethodTypes(0x00020000),
-		dump_verbosity_noPrimitiveTypes(0x00040000),
-		dump_verbosity_noEnumerationTypes(0x00080000),
-		dump_verbosity_onlyClassTypes(0x000FE000),
-		dump_verbosity_onlyStructTypes(0x000FD000),
-		dump_verbosity_onlyUnionTypes(0x000FB000),
-		dump_verbosity_onlyArrayTypes(0x000F7000),
-		dump_verbosity_onlyPointerTypes(0x000EF000),
-		dump_verbosity_onlyMethodTypes(0x000DF000),
-		dump_verbosity_onlyPrimitiveTypes(0x000BF000),
-		dump_verbosity_onlyEnumerationTypes(0x0007F000),
 		dump_verbosity_max(0x4FF00FBE);
 		public final int val;
 
@@ -2849,11 +2813,11 @@ public class binding_oo {
 	}
 
 	public static enum ir_edge_kind_t {
-		EDGE_KIND_FIRST(),
-		EDGE_KIND_NORMAL(ir_edge_kind_t.EDGE_KIND_FIRST.val),
+		EDGE_KIND_NORMAL(),
+		EDGE_KIND_FIRST(ir_edge_kind_t.EDGE_KIND_NORMAL.val),
 		EDGE_KIND_BLOCK(),
 		EDGE_KIND_DEP(),
-		EDGE_KIND_LAST();
+		EDGE_KIND_LAST(ir_edge_kind_t.EDGE_KIND_DEP.val);
 		public final int val;
 
 		private static class C {
