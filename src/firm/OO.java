@@ -21,6 +21,7 @@ public final class OO {
 	public static void init() {
 		assert initialized == false; /* we may only use 1 OO object at once... */
 		binding_oo.oo_init();
+		initialized = true;
 	}
 
 	/**
