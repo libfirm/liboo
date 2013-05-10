@@ -10,100 +10,10 @@
 #include "adt/util.h"
 
 struct dmemory_model_t {
-	alloc_object_t    alloc_object;
-	alloc_array_t     alloc_array;
-	alloc_heap_t      alloc_heap;
 	get_arraylength_t get_arraylength;
 } dmemory_model;
 
-static ir_entity *calloc_entity;
-static ir_mode   *default_arraylength_mode;
-
-static ir_node *new_r_symconst(ir_graph *irg, ir_entity *entity)
-{
-	symconst_symbol sym;
-	sym.entity_p = entity;
-	return new_r_SymConst(irg, mode_P, sym, symconst_addr_ent);
-}
-
-ir_node *dmemory_default_alloc_heap(dbg_info *dbgi, ir_node *block,
-                                    ir_node *count, ir_node **mem,
-                                    ir_type *type)
-{
-	ir_graph *irg     = get_irn_irg(block);
-	ir_node  *cur_mem = *mem;
-	symconst_symbol type_sym;
-	type_sym.type_p = type;
-	ir_node  *size = new_r_SymConst(irg, mode_Iu, type_sym, symconst_type_size);
-	if (count != NULL) {
-		ir_node *count_u = new_r_Conv(block, count, mode_Iu);
-		size = new_r_Mul(block, count_u, size, mode_Iu);
-	}
-
-	ir_node *callee    = new_r_symconst(irg, calloc_entity);
-	ir_node *one       = new_r_Const_long(irg, mode_Iu, 1);
-	ir_node *in[2]     = { one, size };
-	ir_type *call_type = get_entity_type(calloc_entity);
-	ir_node *call      = new_rd_Call(dbgi, block, cur_mem, callee, 2, in, call_type);
-	cur_mem            = new_r_Proj(call, mode_M, pn_Call_M);
-	ir_node *ress      = new_r_Proj(call, mode_T, pn_Call_T_result);
-	ir_node *res       = new_r_Proj(ress, mode_P, 0);
-
-	*mem = cur_mem;
-	return res;
-}
-
-ir_node *dmemory_default_alloc_object(dbg_info *dbgi, ir_node *block,
-                                      ir_node **mem, ir_type *type)
-{
-	return dmemory_default_alloc_heap(dbgi, block, NULL, mem, type);
-}
-
-ir_node *dmemory_default_alloc_array(dbg_info *dbgi, ir_node *block,
-                                     ir_node *count, ir_node **mem,
-                                     ir_type *eltype)
-{
-	ir_node *cur_mem      = *mem;
-
-	ir_graph *irg         = get_irn_irg(block);
-	unsigned count_size   = get_mode_size_bytes(default_arraylength_mode);
-	unsigned element_size = is_Class_type(eltype) ? get_mode_size_bytes(mode_P) : get_type_size_bytes(eltype); // FIXME: some langs support arrays of structs.
-	/* increase element count so we have enough space for a counter
-	 * at the front */
-	unsigned add_size     = (element_size + (count_size-1)) / count_size;
-	ir_node *count_u      = new_r_Conv(block, count, mode_Iu);
-	ir_node *addv         = new_r_Const_long(irg, mode_Iu, add_size);
-	ir_node *add1         = new_r_Add(block, count_u, addv, mode_Iu);
-	ir_node *elsizev      = new_r_Const_long(irg, mode_Iu, element_size);
-
-	ir_node *size         = new_r_Mul(block, add1, elsizev, mode_Iu);
-	unsigned addr_delta   = add_size * element_size;
-
-	ir_node *callee       = new_r_symconst(irg, calloc_entity);
-	ir_node *one          = new_r_Const_long(irg, mode_Iu, 1);
-	ir_node *in[2]        = { one, size };
-	ir_type *call_type    = get_entity_type(calloc_entity);
-	ir_node *call         = new_rd_Call(dbgi, block, cur_mem, callee, 2, in, call_type);
-	cur_mem               = new_r_Proj(call, mode_M, pn_Call_M);
-	ir_node *ress         = new_r_Proj(call, mode_T, pn_Call_T_result);
-	ir_node *res          = new_r_Proj(ress, mode_P, 0);
-
-	/* write length of array */
-	ir_node *len_value    = new_r_Conv(block, count, default_arraylength_mode);
-
-	ir_node *len_delta    = new_r_Const_long(irg, mode_P, (int)addr_delta-4); //FIXME: replace magic num
-	ir_node *len_addr     = new_r_Add(block, res, len_delta, mode_P);
-	ir_node *store        = new_r_Store(block, cur_mem, len_addr, len_value, cons_none);
-	cur_mem               = new_r_Proj(store, mode_M, pn_Store_M);
-
-	if (addr_delta > 0) {
-		ir_node *delta = new_r_Const_long(irg, mode_P, (int)addr_delta);
-		res = new_rd_Add(dbgi, block, res, delta, mode_P);
-	}
-
-	*mem = cur_mem;
-	return res;
-}
+static ir_mode *default_arraylength_mode;
 
 ir_node *dmemory_default_get_arraylength(dbg_info *dbgi, ir_node *block,
                                          ir_node *objptr, ir_node **mem)
@@ -126,17 +36,6 @@ void dmemory_init(void)
 {
 	ir_type *type_reference = new_type_primitive(mode_P);
 	ir_type *type_int       = new_type_primitive(mode_Is);
-	ir_type *type_size_t    = new_type_primitive(mode_Iu);
-
-	ir_type *calloc_type    = new_type_method(2, 1);
-
-	set_method_param_type(calloc_type, 0, type_size_t);
-	set_method_param_type(calloc_type, 1, type_size_t);
-	set_method_res_type(calloc_type, 0, type_reference);
-	set_method_additional_properties(calloc_type, mtp_property_malloc);
-
-	ident *calloc_id = new_id_from_str("calloc");
-	calloc_entity = create_compilerlib_entity(calloc_id, calloc_type);
 
 	ir_type *arraylength_type = new_type_method(1, 1);
 	set_method_param_type(arraylength_type, 0, type_reference);
@@ -145,54 +44,7 @@ void dmemory_init(void)
 
 	default_arraylength_mode = mode_Is;
 
-	dmemory_model.alloc_object    = dmemory_default_alloc_object;
-	dmemory_model.alloc_array     = dmemory_default_alloc_array;
-	dmemory_model.alloc_heap      = dmemory_default_alloc_heap;
 	dmemory_model.get_arraylength = dmemory_default_get_arraylength;
-}
-
-void dmemory_lower_Alloc(ir_node *node)
-{
-	assert(is_Alloc(node));
-
-	dbg_info       *dbgi    = get_irn_dbg_info(node);
-	ir_type        *type    = get_Alloc_type(node);
-	ir_node        *count   = get_Alloc_count(node);
-	ir_node        *res     = NULL;
-	ir_node        *cur_mem = get_Alloc_mem(node);
-	ir_node        *block   = get_nodes_block(node);
-	ir_where_alloc  where   = get_Alloc_where(node);
-
-	if (is_Class_type(type)) {
-		if (where == heap_alloc) {
-			res = (*dmemory_model.alloc_object)(dbgi, block, &cur_mem, type);
-		} else {
-			/* Prevent CSE. */
-			ir_graph *irg       = get_irn_irg(node);
-			ir_node  *dummy_mem = new_r_Dummy(irg, mode_M);
-			set_Alloc_mem(node, dummy_mem);
-
-			ir_node *new_alloc = new_rd_Alloc(dbgi, block, cur_mem, count, type, where);
-			cur_mem = get_Alloc_mem(new_alloc);
-			res     = new_r_Proj(new_alloc, mode_P, pn_Alloc_res);
-		}
-
-		ddispatch_prepare_new_instance(dbgi, block, res, &cur_mem, type);
-	} else if (is_Array_type(type)) {
-		ir_type *eltype  = get_array_element_type(type);
-		res = (*dmemory_model.alloc_array)(dbgi, block, count, &cur_mem, eltype);
-	} else {
-		res = (*dmemory_model.alloc_heap)(dbgi, block, count, &cur_mem, type);
-	}
-
-	if (ir_throws_exception(node))
-		panic("can't handle exception throwing Alloc yet");
-
-	ir_node *in[pn_Alloc_res+1] = {
-		[pn_Alloc_M]   = cur_mem,
-		[pn_Alloc_res] = res
-	};
-	turn_into_tuple(node, ARRAY_SIZE(in), in);
 }
 
 void dmemory_lower_Arraylength(ir_node *arraylength)
@@ -210,18 +62,8 @@ void dmemory_lower_Arraylength(ir_node *arraylength)
 	turn_into_tuple(arraylength, ARRAY_SIZE(in), in);
 }
 
-void dmemory_set_allocation_methods(alloc_object_t ao_func,
-                                    alloc_array_t aa_func,
-                                    alloc_heap_t ah_func,
-                                    get_arraylength_t ga_func)
+void dmemory_set_allocation_methods(get_arraylength_t ga_func)
 {
-	assert(ao_func);
-	assert(aa_func);
-	assert(ah_func);
 	assert(ga_func);
-
-	dmemory_model.alloc_object    = ao_func;
-	dmemory_model.alloc_array     = aa_func;
-	dmemory_model.alloc_heap      = ah_func;
 	dmemory_model.get_arraylength = ga_func;
 }

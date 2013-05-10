@@ -529,9 +529,7 @@ static void construct_runtime_typeinfo_proxy(ir_type *klass, void *env)
 static void lower_node(ir_node *node, void *env)
 {
 	(void) env;
-	if (is_Alloc(node)) {
-		dmemory_lower_Alloc(node);
-	} else if (is_Call(node)) {
+	if (is_Call(node)) {
 		ddispatch_lower_Call(node);
 	} else if (is_Arraylength(node)) {
 		dmemory_lower_Arraylength(node);
