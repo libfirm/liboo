@@ -7,7 +7,8 @@ java_package = "firm.oo.nodes"
 
 @op
 class InstanceOf:
-	"""Check if an object is an instance of a specified type (or a subtype)"""
+	"""Check if an object is an instance of a specified type (or a subtype).
+	Passing a null pointer results in undefined behaviour."""
 	ins = [
 		("mem",   "memory dependency"),
 		("ptr",   "pointer to object"),
