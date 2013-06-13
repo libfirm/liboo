@@ -1,5 +1,5 @@
 #include "liboo/eh.h"
-#include "liboo/oo_nodes.h"
+#include "liboo/nodes.h"
 #include "adt/obst.h"
 
 #include <assert.h>
@@ -73,7 +73,7 @@ void eh_deinit(void)
 
 void eh_start_method(void)
 {
-	assert (get_irg_phase_state(get_current_ir_graph()) == phase_building);
+	assert (irg_is_constrained(get_current_ir_graph(), IR_GRAPH_CONSTRAINT_CONSTRUCTION));
 	assert (obstack_object_size(&lpads) == 0);
 	eh_new_lpad();
 }

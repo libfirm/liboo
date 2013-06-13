@@ -25,12 +25,17 @@
 static inline __attribute__((noreturn, format(printf, 1, 2)))
 void panic(const char *fmt, ...)
 {
-	fputs("Panic: ", stderr);
-
 	va_list ap;
 	va_start(ap, fmt);
+#ifdef __OCTOPOS__
+	puts("Panic: ");
+	vprintf(fmt, ap);
+	putchar('\n');
+#else
+	fputs("Panic: ", stderr);
 	vfprintf(stderr, fmt, ap);
 	fputc('\n', stderr);
+#endif
 	va_end(ap);
 
 	abort();
