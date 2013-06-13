@@ -16,6 +16,6 @@ ir_node *eh_get_exception_object(void);
 ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* catch_type);
 void     eh_throw(ir_node *exo_ptr);
 
-void eh_lower_Raise(ir_node *raise);
+void eh_lower_Raise(ir_node *raise, ir_node *proj);
 
 #endif

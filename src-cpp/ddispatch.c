@@ -104,8 +104,8 @@ void ddispatch_init(void)
 	set_method_param_type(default_li_type, 1, type_reference);
 	set_method_res_type(default_li_type, 0, type_reference);
 	ident *default_li_ident = new_id_from_str("oo_rt_lookup_interface_method");
-	default_lookup_interface_entity = new_entity(get_glob_type(), default_li_ident, default_li_type);
-	set_entity_visibility(default_lookup_interface_entity, ir_visibility_external);
+	default_lookup_interface_entity
+		= create_compilerlib_entity(default_li_ident, default_li_type);
 }
 
 void ddispatch_setup_vtable(ir_type *klass)
@@ -187,7 +187,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 				} else if (! oo_get_method_is_abstract(member)) {
 					sym.entity_p = member;
 				} else {
-					sym.entity_p = new_entity(get_glob_type(), ddispatch_model.abstract_method_ident, get_entity_type(member));
+					ident     *id     = ddispatch_model.abstract_method_ident;
+					ir_entity *entity = create_compilerlib_entity(id, get_entity_type(member));
+					sym.entity_p = entity;
 				}
 				ir_node *symconst_node = new_r_SymConst(const_code, mode_reference, sym, symconst_addr_ent);
 				ir_initializer_t *val = create_initializer_const(symconst_node);
@@ -222,6 +224,10 @@ void ddispatch_lower_Call(ir_node* call)
 	ddispatch_binding binding = oo_get_entity_binding(method_entity);
 	if (binding == bind_unknown)
 		panic("method %s has no binding specified", get_entity_name(method_entity));
+
+	/* If the call has been explicitly marked as statically bound, then obey. */
+	if (oo_get_call_is_statically_bound(call))
+		binding = bind_static;
 
 	ir_graph  *irg           = get_irn_irg(call);
 	ir_node   *block         = get_nodes_block(call);
@@ -266,13 +272,14 @@ void ddispatch_lower_Call(ir_node* call)
 	set_Call_mem(call, cur_mem);
 }
 
-void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *irg, ir_node *block, ir_node **mem)
+void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *objptr, ir_node **mem, ir_type* klass)
 {
+	ir_graph *irg = get_irn_irg(block);
 	assert(is_Class_type(klass));
 
 	ir_node   *cur_mem         = *mem;
 	ir_entity *vptr_entity     = oo_get_class_vptr_entity(klass);
-	ir_node   *vptr            = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node   *vptr            = new_rd_Sel(dbgi, block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
 	ir_node   *vptr_target     = NULL;
 	ir_entity *vtable_entity   = oo_get_class_vtable_entity(klass);
@@ -281,12 +288,12 @@ void ddispatch_prepare_new_instance(ir_type* klass, ir_node *objptr, ir_graph *i
 		sym.entity_p = vtable_entity;
 		ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
 		ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference));
-		vptr_target                = new_r_Add(block, vtable_symconst, const_offset, mode_reference);
+		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset, mode_reference);
 	} else {
 		vptr_target                = new_r_Const_long(irg, mode_P, 0);
 	}
 
-	ir_node   *vptr_store      = new_r_Store(block, cur_mem, vptr, vptr_target, cons_none);
+	ir_node   *vptr_store      = new_rd_Store(dbgi, block, cur_mem, vptr, vptr_target, cons_floats);
 	cur_mem                    = new_r_Proj(vptr_store, mode_M, pn_Store_M);
 
 	*mem = cur_mem;

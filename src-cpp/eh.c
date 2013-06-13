@@ -1,5 +1,5 @@
 #include "liboo/eh.h"
-#include "liboo/oo_nodes.h"
+#include "liboo/nodes.h"
 #include "adt/obst.h"
 
 #include <assert.h>
@@ -57,10 +57,11 @@ void eh_init(void)
 	obstack_init(&lpads);
 	ir_type *type_reference = new_type_primitive(mode_P);
 	exception_object_entity = new_entity(get_tls_type(), new_id_from_str("__oo_rt_exception_object__"), type_reference);
+	set_entity_initializer(exception_object_entity, get_initializer_null());
 
 	ir_type *throw_type = new_type_method(1, 0);
 	set_method_param_type(throw_type, 0, type_reference);
-	throw_entity = new_entity(get_glob_type(), new_id_from_str("oo_rt_throw"), throw_type);
+	throw_entity = new_entity(get_glob_type(), new_id_from_str("firm_personality"), throw_type);
 	set_entity_visibility(throw_entity, ir_visibility_external);
 
 	top = NULL;
@@ -73,7 +74,7 @@ void eh_deinit(void)
 
 void eh_start_method(void)
 {
-	assert (get_irg_phase_state(get_current_ir_graph()) == phase_building);
+	assert (irg_is_constrained(get_current_ir_graph(), IR_GRAPH_CONSTRAINT_CONSTRUCTION));
 	assert (obstack_object_size(&lpads) == 0);
 	eh_new_lpad();
 }
@@ -221,9 +222,9 @@ void eh_end_method(void)
 	top = NULL;
 }
 
-void eh_lower_Raise(ir_node *raise)
+void eh_lower_Raise(ir_node *raise, ir_node *proj)
 {
-	assert (is_Raise(raise));
+	assert (is_Raise(raise) && is_Proj(proj));
 
 	ir_node  *ex_obj  = get_Raise_exo_ptr(raise);
 	ir_node  *block   = get_nodes_block(raise);
@@ -236,6 +237,7 @@ void eh_lower_Raise(ir_node *raise)
 	ir_node  *in[1]   = { ex_obj };
 
 	ir_node  *throw   = new_r_Call(block, cur_mem, c_symc, 1, in, get_entity_type(throw_entity));
-
+	ir_set_throws_exception(throw, 1);
 	exchange(raise, throw);
+	set_Proj_proj(proj, pn_Call_X_except);
 }

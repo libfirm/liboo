@@ -5,27 +5,32 @@
 #include <assert.h>
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
-#include "liboo/oo_nodes.h"
+#include "liboo/nodes.h"
 #include "liboo/eh.h"
 #include "adt/obst.h"
+#include "libfirm/adt/pmap.h"
 #include "adt/error.h"
+#include "gen_irnode.h"
 
 typedef enum {
 	oo_is_abstract  = 1 << 0,
 	oo_is_final     = 1 << 1,
 	oo_is_interface = 1 << 2,
 	oo_is_inherited = 1 << 3,
-	oo_is_extern    = 1 << 4
+	oo_is_extern    = 1 << 4,
+	oo_is_transient = 1 << 5
 } oo_info_flags;
 
 typedef enum {
 	k_oo_BAD = k_ir_max+1,
 	k_oo_type_info,
 	k_oo_entity_info,
+	k_oo_node_info,
 } oo_info_kind;
 
 typedef struct {
 	oo_info_kind  kind;
+	unsigned      uid;
 	ir_entity    *vptr;
 	ir_entity    *rtti;
 	ir_entity    *vtable;
@@ -43,7 +48,13 @@ typedef struct {
 	void             *link;
 } oo_entity_info;
 
-static struct obstack oo_info_obst;
+typedef struct {
+	oo_info_kind kind;
+	bool         bind_statically;
+} oo_node_info;
+
+static struct obstack  oo_info_obst;
+static pmap           *oo_node_info_map = NULL;
 
 static oo_type_info *get_type_info(ir_type *type)
 {
@@ -72,6 +83,34 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 		assert (ei->kind == k_oo_entity_info);
 	}
 	return ei;
+}
+
+static oo_node_info *get_node_info(ir_node *node)
+{
+	oo_node_info *ni = pmap_get(oo_node_info, oo_node_info_map, node);
+	if (ni == NULL) {
+		ni = (oo_node_info*) obstack_alloc(&oo_info_obst, sizeof(oo_node_info));
+		memset(ni, 0, sizeof(*ni));
+		ni->kind = k_oo_node_info;
+		ni->bind_statically = false;
+		pmap_insert(oo_node_info_map, node, ni);
+	} else {
+		assert (ni->kind == k_oo_node_info);
+	}
+	return ni;
+}
+
+unsigned oo_get_class_uid(ir_type *classtype)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->uid;
+}
+void oo_set_class_uid(ir_type *classtype, unsigned uid)
+{
+	assert (is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->uid = uid;
 }
 
 ir_entity *oo_get_class_vtable_entity(ir_type *classtype)
@@ -366,6 +405,22 @@ void oo_set_method_is_inherited(ir_entity *method, bool is_inherited)
 #endif
 }
 
+bool oo_get_field_is_transient(ir_entity *field)
+{
+	assert (! is_method_entity(field));
+	oo_entity_info *ei = get_entity_info(field);
+	return ei->flags & oo_is_transient;
+}
+void oo_set_field_is_transient(ir_entity *field, bool is_transient)
+{
+	assert (! is_method_entity(field));
+	oo_entity_info *ei = get_entity_info(field);
+	if (is_transient)
+		ei->flags |= oo_is_transient;
+	else
+		ei->flags &= ~oo_is_transient;
+}
+
 ddispatch_binding oo_get_entity_binding(ir_entity *entity)
 {
 	oo_entity_info *ei = get_entity_info(entity);
@@ -375,6 +430,28 @@ void oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding)
 {
 	oo_entity_info *ei = get_entity_info(entity);
 	ei->binding = binding;
+}
+
+void oo_set_call_is_statically_bound(ir_node *call, bool bind_statically)
+{
+	assert (is_Call(call));
+	oo_node_info *ni = get_node_info(call);
+	ni->bind_statically = bind_statically;
+}
+
+bool oo_get_call_is_statically_bound(ir_node *call)
+{
+	assert (is_Call(call));
+
+	/* Shortcut to avoid creating a node_info for each call we see.
+	 * Nearly all calls are bound just like their referenced method
+	 * entity specifies, and just very few (like super.method() in
+	 * Java) must be handled specially. */
+	if (! pmap_contains(oo_node_info_map, call))
+		return false;
+
+	oo_node_info *ni = get_node_info(call);
+	return ni->bind_statically;
 }
 
 void *oo_get_entity_link(ir_entity *entity)
@@ -453,18 +530,15 @@ static void construct_runtime_typeinfo_proxy(ir_type *klass, void *env)
 static void lower_node(ir_node *node, void *env)
 {
 	(void) env;
-	if (is_Alloc(node)) {
-		dmemory_lower_Alloc(node);
-	} else if (is_Call(node)) {
+	if (is_Call(node)) {
 		ddispatch_lower_Call(node);
 	} else if (is_Arraylength(node)) {
 		dmemory_lower_Arraylength(node);
 	} else if (is_InstanceOf(node)) {
 		rtti_lower_InstanceOf(node);
+	} else if (is_Proj(node) && get_irn_mode(node) == mode_X && is_Raise(skip_Proj(node))) {
+		eh_lower_Raise(skip_Proj(node), node);
 	}
-	/*else if (is_Raise(node)) {
-		eh_lower_Raise(node);
-	}*/
 }
 
 static void lower_type(ir_type *type, void *env)
@@ -477,8 +551,16 @@ static void lower_type(ir_type *type, void *env)
 		int n_members = get_class_n_members(type);
 		for (int m = n_members-1; m >= 0; m--) {
 			ir_entity *entity = get_class_member(type, m);
-			if (is_method_entity(entity))
+			if (is_method_entity(entity)) {
 				set_entity_owner(entity, glob);
+				/* When changing the entity owner type, the overwrites
+				 * information becomes nonsensical and invalid. */
+				const size_t n_overwrites = get_entity_n_overwrites(entity);
+				for (size_t i = 0; i < n_overwrites; ++i) {
+					ir_entity *over = get_entity_overwrites(entity, 0);
+					remove_entity_overwrites(entity, over);
+				}
+			}
 		}
 	}
 }
@@ -486,7 +568,8 @@ static void lower_type(ir_type *type, void *env)
 void oo_init(void)
 {
 	obstack_init(&oo_info_obst);
-	oo_nodes_init();
+	oo_node_info_map = pmap_create();
+	oo_init_opcodes();
 	ddispatch_init();
 	dmemory_init();
 	rtti_init();
@@ -498,6 +581,7 @@ void oo_deinit(void)
 	rtti_deinit();
 	eh_deinit();
 	obstack_free(&oo_info_obst, NULL);
+	pmap_destroy(oo_node_info_map);
 }
 
 void oo_lower(void)

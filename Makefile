@@ -6,30 +6,60 @@ INSTALL ?= install
 DLLEXT ?= .so
 CC ?= gcc
 AR ?= ar
+CFLAGS ?= -O0 -g3
 
 guessed_target := $(shell $(CC) -dumpmachine)
-target         ?= $(guessed_target)
+TARGET         ?= $(guessed_target)
+TARGET_CC      ?= $(TARGET)-gcc
+
+ifeq ($(findstring x86_64, $(TARGET)), x86_64)
+	# compile library normally but runtime in 32bit mode
+	RT_CFLAGS += -m32
+	RT_LFLAGS += -m32
+endif
+ifeq ($(findstring darwin11, $(TARGET)), darwin11)
+	# compile library normally but runtime in 32bit mode
+	RT_CFLAGS += -m32
+	RT_LFLAGS += -m32
+endif
+ifeq ($(TARGET), i686-invasic-octopos)
+	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/default
+	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
+	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -D__OCTOPOS__
+	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
+endif
+ifeq ($(TARGET), sparc-invasic-octopos)
+	OCTOPOS_BASE=../octopos-app/releases/current/leon/softfloat
+	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
+	RT_CFLAGS += -msoft-float -fno-stack-protector -nostdinc -I $(OCTOPOS_BASE)/include -isystem $(GCC_INCLUDE) -D__OCTOPOS__
+	RT_LFLAGS += -msoft-float -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
+endif
 
 BUILDDIR=build
-RUNTIME_BUILDDIR=$(BUILDDIR)/$(target)
+RUNTIME_BUILDDIR=$(BUILDDIR)/$(TARGET)
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
+# sparc-elf-gcc does not support shared libraries
+ifeq ($(TARGET), sparc-invasic-octopos)
+	GOAL =
+	GOAL_RT_SHARED =
+endif
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS) $(LIBUNWIND_CPPFLAGS)
-CFLAGS = -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -O0 -g3 -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
 #CFLAGS += -Wunreachable-code -Wlogical-op
-LFLAGS = 
+LFLAGS +=
 PIC_FLAGS = -fpic
 SOURCES = $(wildcard src-cpp/*.c) $(wildcard src-cpp/adt/*.c)
 SOURCES_RT = $(wildcard src-cpp/rt/*.c)
-DEPS = $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $(SOURCES))))
-DEPS_RT = $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $(SOURCES_RT))))
+SOURCES := $(filter-out src-cpp/gen_%.c, $(SOURCES)) src-cpp/gen_irnode.c
 OBJECTS = $(addprefix $(BUILDDIR)/, $(addsuffix .o, $(basename $(SOURCES))))
 OBJECTS_RT_SHARED = $(addprefix $(RUNTIME_BUILDDIR)/shared/, $(addsuffix .o, $(basename $(SOURCES_RT))))
 OBJECTS_RT_STATIC = $(addprefix $(RUNTIME_BUILDDIR)/static/, $(addsuffix .o, $(basename $(SOURCES_RT))))
+DEPS = $(OBJECTS:%.o=%.d) $(OBJECTS_RT_SHARED:%.o=%.d) $(OBJECTS_RT_STATIC:%.o=%.d)
 
 Q ?= @
 
@@ -42,7 +72,22 @@ runtime: $(GOAL_RT_SHARED) $(GOAL_RT_STATIC)
 # Make sure our build-directories are created
 UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/rt $(BUILDDIR)/src-cpp/adt $(RUNTIME_BUILDDIR)/shared/src-cpp/rt $(RUNTIME_BUILDDIR)/static/src-cpp/rt)
 
--include $(DEPS) $(DEPS_RT)
+-include $(DEPS)
+
+SPEC_GENERATED_HEADERS := include/liboo/nodes.h src-cpp/gen_irnode.h
+IR_SPEC_GENERATOR := spec/gen_ir.py
+IR_SPEC_GENERATOR_DEPS := $(IR_SPEC_GENERATOR) spec/spec_util.py spec/filters.py
+SPECFILE := spec/oo_nodes_spec.py
+
+$(SOURCES): $(SPEC_GENERATED_HEADERS)
+
+include/liboo/% : spec/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
+	@echo GEN $@
+	$(Q)$(IR_SPEC_GENERATOR) $(SPECFILE) $< > $@
+
+src-cpp/% : spec/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
+	@echo GEN $@
+	$(Q)$(IR_SPEC_GENERATOR) $(SPECFILE) $< > $@
 
 $(GOAL): $(OBJECTS)
 	@echo '===> LD $@'
@@ -50,24 +95,24 @@ $(GOAL): $(OBJECTS)
 
 $(GOAL_RT_SHARED): $(OBJECTS_RT_SHARED)
 	@echo '===> LD $@'
-	$(Q)$(CC) -shared $(PIC_FLAGS) -o $@ $^ $(LFLAGS) $(LIBUNWIND_LFLAGS)
+	$(Q)$(TARGET_CC) -shared $(RT_LFLAGS) $(PIC_FLAGS) -o $@ $^ $(LFLAGS) $(LIBUNWIND_LFLAGS)
 
 $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 	@echo '===> AR $@'
 	$(Q)$(AR) -cru $@ $^
 
 $(RUNTIME_BUILDDIR)/shared/%.o: %.c
-	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	@echo '===> TARGET_CC $@'
+	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
 
 $(RUNTIME_BUILDDIR)/static/%.o: %.c
-	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	@echo '===> TARGET_CC $@'
+	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) -MMD -c -o $@ $<
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MD -MF $(addprefix $(BUILDDIR)/, $(addsuffix .d, $(basename $<))) -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
 
 clean:
-	rm -rf $(OBJECTS) $(GOAL) $(GOAL_RT_SHARED) $(GOAL_RT_STATIC) $(DEPS) $(DEPS_RT) $(OBJECTS_RT_SHARED) $(OBJECTS_RT_STATIC)
+	rm -rf $(OBJECTS) $(OBJECTS_RT_SHARED) $(OBJECTS_RT_STATIC) $(GOAL) $(GOAL_RT_STATIC) $(GOAL_RT_SHARED) $(DEPS) $(DEPS_RT) $(RUNTIME_BUILDDIR) $(SPEC_GENERATED_HEADERS)
 
