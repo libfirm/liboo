@@ -53,7 +53,7 @@ void dmemory_lower_Arraylength(ir_node *arraylength)
 	ir_node  *array_ref = get_Arraylength_ptr(arraylength);
 	ir_node  *block     = get_nodes_block(arraylength);
 	ir_node  *cur_mem   = get_Arraylength_mem(arraylength);
-	ir_node  *len       = (*dmemory_model.get_arraylength)(dbgi, array_ref, block, &cur_mem);
+	ir_node  *len       = (*dmemory_model.get_arraylength)(dbgi, block, array_ref, &cur_mem);
 
 	ir_node *in[pn_Arraylength_max+1] = {
 		[pn_Arraylength_M]   = cur_mem,
