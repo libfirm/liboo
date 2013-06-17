@@ -6,6 +6,7 @@
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
 #include "liboo/nodes.h"
+#include "liboo/eh.h"
 #include "adt/obst.h"
 #include "libfirm/adt/pmap.h"
 #include "adt/error.h"
@@ -565,11 +566,13 @@ void oo_init(void)
 	ddispatch_init();
 	dmemory_init();
 	rtti_init();
+	eh_init();
 }
 
 void oo_deinit(void)
 {
 	rtti_deinit();
+	eh_deinit();
 	obstack_free(&oo_info_obst, NULL);
 	pmap_destroy(oo_node_info_map);
 }
