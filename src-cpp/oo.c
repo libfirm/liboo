@@ -536,10 +536,9 @@ static void lower_node(ir_node *node, void *env)
 		dmemory_lower_Arraylength(node);
 	} else if (is_InstanceOf(node)) {
 		rtti_lower_InstanceOf(node);
+	} else if (is_Proj(node) && get_irn_mode(node) == mode_X && is_Raise(skip_Proj(node))) {
+		eh_lower_Raise(skip_Proj(node), node);
 	}
-	/*else if (is_Raise(node)) {
-		eh_lower_Raise(node);
-	}*/
 }
 
 static void lower_type(ir_type *type, void *env)
