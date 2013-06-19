@@ -61,7 +61,7 @@ void eh_init(void)
 
 	ir_type *throw_type = new_type_method(1, 0);
 	set_method_param_type(throw_type, 0, type_reference);
-	throw_entity = new_entity(get_glob_type(), new_id_from_str("oo_rt_throw"), throw_type);
+	throw_entity = new_entity(get_glob_type(), new_id_from_str("firm_personality"), throw_type);
 	set_entity_visibility(throw_entity, ir_visibility_external);
 
 	top = NULL;
