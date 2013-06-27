@@ -551,8 +551,16 @@ static void lower_type(ir_type *type, void *env)
 		int n_members = get_class_n_members(type);
 		for (int m = n_members-1; m >= 0; m--) {
 			ir_entity *entity = get_class_member(type, m);
-			if (is_method_entity(entity))
+			if (is_method_entity(entity)) {
 				set_entity_owner(entity, glob);
+				/* When changing the entity owner type, the overwrites
+				 * information becomes nonsensical and invalid. */
+				const size_t n_overwrites = get_entity_n_overwrites(entity);
+				for (size_t i = 0; i < n_overwrites; ++i) {
+					ir_entity *over = get_entity_overwrites(entity, 0);
+					remove_entity_overwrites(entity, over);
+				}
+			}
 		}
 	}
 }
