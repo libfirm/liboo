@@ -34,16 +34,7 @@ ir_node *dmemory_default_get_arraylength(dbg_info *dbgi, ir_node *block,
 
 void dmemory_init(void)
 {
-	ir_type *type_reference = new_type_primitive(mode_P);
-	ir_type *type_int       = new_type_primitive(mode_Is);
-
-	ir_type *arraylength_type = new_type_method(1, 1);
-	set_method_param_type(arraylength_type, 0, type_reference);
-	set_method_res_type(arraylength_type, 0, type_int);
-	set_method_additional_properties(arraylength_type, mtp_property_pure);
-
 	default_arraylength_mode = mode_Is;
-
 	dmemory_model.get_arraylength = dmemory_default_get_arraylength;
 }
 
