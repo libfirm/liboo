@@ -51,5 +51,5 @@ void firm_personality(void *exception_object)
 #endif
 
 	fprintf(stderr, "UNCAUGHT EXCEPTION 0x%p\n", exception_object);
-	exit(-1);
+	abort();
 }
