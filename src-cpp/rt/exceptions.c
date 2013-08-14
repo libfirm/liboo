@@ -1,9 +1,10 @@
-
+#ifdef LIBOO_USE_EXCEPTIONS
 #define UNW_LOCAL_ONLY
 /* Workaround for buggy glibcs. */
 #define _BSD_SOURCE
 #include <libunwind.h>
 #undef _BSD_SOURCE
+#endif
 
 #include "liboo/rts_types.h"
 #include <stdlib.h>
@@ -12,6 +13,7 @@
 
 extern void firm_personality(void *exception_object);
 
+#ifdef LIBOO_USE_EXCEPTIONS
 extern __thread void *__oo_rt_exception_object__;
 
 static void oo_rt_unwind(void)
@@ -38,13 +40,15 @@ static void oo_rt_unwind(void)
 		}
 	}
 }
+#endif
 
 __attribute__ ((unused))
 void firm_personality(void *exception_object)
 {
+#ifdef LIBOO_USE_EXCEPTIONS
 	__oo_rt_exception_object__ = exception_object;
-
 	oo_rt_unwind();
+#endif
 
 	fprintf(stderr, "UNCAUGHT EXCEPTION 0x%p\n", exception_object);
 	exit(-1);
