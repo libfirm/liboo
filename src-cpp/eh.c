@@ -1,10 +1,13 @@
 #include "liboo/eh.h"
 #include "liboo/nodes.h"
+#include "adt/error.h"
 #include "adt/obst.h"
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+
+#ifdef LIBOO_EXCEPTION_SUPPORT
 
 struct _lpad_t;
 typedef struct _lpad_t lpad_t;
@@ -241,3 +244,68 @@ void eh_lower_Raise(ir_node *raise, ir_node *proj)
 	exchange(raise, throw);
 	set_Proj_proj(proj, pn_Call_X_except);
 }
+
+#else
+
+ir_node *eh_get_exception_object(void)
+{
+	panic("liboo compiled without exception support");
+}
+
+void eh_init(void)
+{
+}
+
+void eh_deinit(void)
+{
+}
+
+void eh_start_method(void)
+{
+	panic("liboo compiled without exception support");
+}
+
+void eh_new_lpad(void)
+{
+	panic("liboo compiled without exception support");
+}
+
+void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
+{
+	(void)catch_type;
+	(void)catch_block;
+	panic("liboo compiled without exception support");
+}
+
+ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
+{
+	(void)irn_ptr;
+	(void)arity;
+	(void)in;
+	(void)type;
+	panic("liboo compiled without exception support");
+}
+
+void eh_throw(ir_node *exo_ptr)
+{
+	(void)exo_ptr;
+	panic("liboo compiled without exception support");
+}
+
+void eh_pop_lpad(void)
+{
+	panic("liboo compiled without exception support");
+}
+
+void eh_end_method(void)
+{
+	panic("liboo compiled without exception support");
+}
+
+void eh_lower_Raise(ir_node *raise, ir_node *proj)
+{
+	(void)raise;
+	(void)proj;
+	panic("liboo compiled without exception support");
+}
+#endif
