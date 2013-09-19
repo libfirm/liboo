@@ -29,7 +29,7 @@
 	<target name="c-build-init" if="libfirm.exists" unless="config.mak.exists">
 		<echo file="${basedir}/config.mak">
 			FIRM_HOME        = ../libfirm
-			LIBFIRM_CPPFLAGS = -I$(FIRM_HOME)/include
+			LIBFIRM_CPPFLAGS = -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
 			LIBFIRM_LFLAGS   = -L$(FIRM_HOME)/build/debug -lfirm
 		</echo>
 	</target>
