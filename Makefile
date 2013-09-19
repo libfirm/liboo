@@ -22,7 +22,7 @@ ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 	RT_CFLAGS += -m32
 	RT_LFLAGS += -m32
 endif
-ifeq ($(TARGET), i686-invasic-octopos)
+ifeq ($(findstring i686-invasic, $(TARGET)), i686-invasic)
 	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/multitile
 	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
 	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include
