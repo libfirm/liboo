@@ -1,7 +1,7 @@
 -include config.mak
 
-LIBFIRM_CPPFLAGS ?= `pkg-config --cflags libfirm`
-LIBFIRM_LFLAGS   ?= `pkg-config --libs libfirm`
+LIBFIRM_CPPFLAGS ?= -I../libfirm/include -I../libfirm/build/gen/include/libfirm
+LIBFIRM_LFLAGS   ?= -L../libfirm/build/debug -lfirm
 INSTALL ?= install
 DLLEXT ?= .so
 CC ?= gcc
