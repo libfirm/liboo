@@ -28,8 +28,8 @@ ifeq ($(findstring i686-invasic, $(TARGET)), i686-invasic)
 	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include
 	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
-ifeq ($(TARGET), sparc-invasic-octopos)
-	OCTOPOS_BASE=../octopos-app/releases/current/leon/4t-ml605
+ifeq ($(findstring sparc-invasic, $(TARGET)), sparc-invasic)
+	OCTOPOS_BASE=../octopos-app/releases/current/leon/4t-sf-chipit-w-iotile
 	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
 	RT_CFLAGS += -msoft-float -fno-stack-protector -nostdinc -I $(OCTOPOS_BASE)/include -isystem $(GCC_INCLUDE)
 	RT_LFLAGS += -msoft-float -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
@@ -41,7 +41,7 @@ GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
 # sparc-elf-gcc does not support shared libraries
-ifeq ($(TARGET), sparc-invasic-octopos)
+ifeq ($(findstring sparc-invasic, $(TARGET)), sparc-invasic)
 	GOAL =
 	GOAL_RT_SHARED =
 endif
