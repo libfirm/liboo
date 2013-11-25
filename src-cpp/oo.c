@@ -548,6 +548,11 @@ static void lower_type(ir_type *type, void *env)
 
 	ir_type *glob = get_glob_type();
 	if (type != glob) {
+
+		const long BITS_PER_WORD = 32;
+		const long BYTES_PER_WORD = 4;
+		long descriptor = 1;
+
 		int n_members = get_class_n_members(type);
 		for (int m = n_members-1; m >= 0; m--) {
 			ir_entity *entity = get_class_member(type, m);
@@ -560,6 +565,37 @@ static void lower_type(ir_type *type, void *env)
 					ir_entity *over = get_entity_overwrites(entity, 0);
 					remove_entity_overwrites(entity, over);
 				}
+			} else {
+				ir_type *type = get_entity_type(entity);
+				ir_mode *mode = get_type_mode(type);
+
+				int offset = get_entity_offset(entity);
+				offset /= BYTES_PER_WORD;
+
+				if (offset >= 30) {
+					/* If the offset gets greater or equal to 30, bitmap GC descriptors can't
+					 * be used. The descriptor and consequently the last 2 bits are therefore
+					 * set to 0 instead of 01.
+					 * The execution of the loop will continue, but the last 2 bits will never
+					 * change. */
+					descriptor &= 0;
+				}
+
+				if (mode != NULL && mode_is_reference(mode)) {
+					descriptor |= 1 << (BITS_PER_WORD - 1 - offset);
+				}
+			}
+		}
+
+		if (is_Class_type(type)) {
+			ir_entity *vtable = oo_get_class_vtable_entity(type);
+			if (vtable != NULL) {
+				ir_graph         *ccode_irg   = get_const_code_irg();
+				ir_node          *desc        = new_r_Const_long(ccode_irg, mode_P, descriptor);
+				ir_initializer_t *slot_init   = create_initializer_const(desc);
+				ir_initializer_t *vtable_init = get_entity_initializer(vtable);
+
+				set_initializer_compound_value(vtable_init, 1, slot_init);
 			}
 		}
 	}

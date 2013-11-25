@@ -39,7 +39,7 @@ static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_i
 	ir_node          *const_0   = new_r_Const_long(ccode_irg, mode_reference, 0);
 	ir_initializer_t *slot_init = create_initializer_const(const_0);
 
-	for (unsigned i = 0; i < ddispatch_model.index_of_first_method; i++) {
+	for (unsigned i = 2; i < ddispatch_model.index_of_first_method; i++) {
 		if (i == ddispatch_model.index_of_rtti_ptr) continue;
 		set_initializer_compound_value(vtable_init, i, slot_init);
 	}
@@ -93,7 +93,7 @@ void ddispatch_init(void)
 	type_reference = new_type_primitive(mode_reference);
 
 	ddispatch_model.vptr_points_to_index        = 0;
-	ddispatch_model.index_of_first_method       = 1;
+	ddispatch_model.index_of_first_method       = 2;
 	ddispatch_model.index_of_rtti_ptr           = 0;
 	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
 	ddispatch_model.abstract_method_ident       = new_id_from_str("oo_rt_abstract_method_error");
