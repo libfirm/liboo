@@ -46,7 +46,7 @@ ifeq ($(findstring sparc-invasic, $(TARGET)), sparc-invasic)
 	GOAL_RT_SHARED =
 endif
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS) $(LIBUNWIND_CPPFLAGS)
-CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
