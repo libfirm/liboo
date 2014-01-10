@@ -5,6 +5,9 @@
 #include <assert.h>
 
 #include <stdbool.h>
+#include <string.h>
+
+#include <liboo/oo.h>
 
 #include "adt/cpmap.h"
 #include "adt/cpset.h"
@@ -48,6 +51,7 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing ne
 typedef struct callgraph_walker_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	cpmap_t *entity2graph; // map for finding the graph to a given entity
+	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
 	cpset_t *enabled_types_set; // used types found in object creation or coming in from external functions
 	cpset_t *unhandled_dyncalls_set; // unhandled potential call targets of dynamic calls
 } callgraph_walker_env;
@@ -141,6 +145,36 @@ static void callgraph_walker(ir_node *node, void *environment) {
 	callgraph_walker_env *env = (callgraph_walker_env*)environment;
 
 	switch (get_irn_opcode(node)) {
+	case iro_Store: {
+		// look for store of vptrs to detect object creation
+		ir_node *dest =  get_irn_n(node, 1);
+		ir_node *src =  get_irn_n(node, 2);
+		printf("\tstore: %s\n", gdb_node_helper(dest));
+		if (is_Sel(dest)) {
+			ir_entity *entity = get_Sel_entity(dest);
+			printf("\t\t%s\n", get_entity_name(entity));
+			if (strncmp(get_entity_name(entity), "@vptr", 5) == 0) { //?? check for vptr entity or are there more than one?
+				printf("\t\t\t%s\n", gdb_node_helper(src));
+
+				assert(is_Add(src)); // src is usually an Add node in bytecode2firm //TODO write code that correctly parses what liboo function ddispatch_prepare_new_instance creates according to the configured vtable layout
+				ir_node *lhs = get_irn_n(src, 0);
+
+				ir_entity *vtable_entity = get_SymConst_entity(lhs);
+				printf("\t\t\t\t%s -> %s -> class %s\n", gdb_node_helper(lhs), get_entity_name(vtable_entity), get_class_name(get_entity_owner(vtable_entity)));
+				ir_type *klass = cpmap_find(env->vtable2class, vtable_entity);
+				assert(klass && is_Class_type(klass));
+				printf("\t\t\t\t\t-> vtable2class: %s\n", get_class_name(klass));
+
+				cpset_insert(env->enabled_types_set, klass);
+
+				printf("\t\t\t\t%s\n", gdb_node_helper(get_irn_n(src, 1))); // rhs
+
+				// if found new used type put all its methods in unhandled_dyncalls_set into workqueue !?
+				move_enabled_methods_from_unhandled_to_workqueue(env); //TODO it would suffice to call this once each time the workqueue becomes empty!?
+			}
+		}
+		break;
+	}
 	case iro_Call: {
 		ir_node *fp = get_irn_n(node, 1);
 		if (is_SymConst(fp)) {
@@ -156,13 +190,6 @@ static void callgraph_walker(ir_node *node, void *environment) {
 				// mark all potentially returned object types as in use
 				handle_external_method(entity, env);
 			}
-			//TODO recognize constructor calls to see which types are used
-			// /!\ but ignore constructor calls in constructor methods that have the this pointer as argument!!
-			//if (is_constructor(...) && !is_constructor(current_method) && argument1 == current_argument1) {
-			// ... get_constructed_type(
-
-			//TODO if found new used type put all its methods in unhandled_dyncalls_set into workqueue !?
-			move_enabled_methods_from_unhandled_to_workqueue(env);
 		} else if (is_Sel(fp)) {
 			// handle dynamic call
 			ir_entity *entity = get_Sel_entity(fp);
@@ -207,6 +234,26 @@ static void callgraph_walker(ir_node *node, void *environment) {
 	}
 }
 
+
+typedef struct class_walker_env {
+	cpmap_t *vtable2class;
+} class_walker_env;
+
+static void class_walker(ir_type *clss, void* environment) {
+	assert(environment);
+	class_walker_env *env = (class_walker_env*)environment;
+
+	cpmap_t *vtable2class = env->vtable2class;
+	ir_entity *vtable_entity = oo_get_class_vtable_entity(clss);
+	if (vtable_entity) {
+		printf(" %s -> %s\n", get_entity_name(vtable_entity), gdb_node_helper(clss));
+		cpmap_set(vtable2class, vtable_entity, clss);
+	}
+	else {
+		//printf(" %s has no vtable\n", gdb_node_helper(clss));
+	}
+}
+
 void run_rta(ir_entity *javamain) { //TODO for other programming languages we might also need to analyze something like global constructors! What's with static sections in Java? (This is important because of closed world assumption!)
 	assert(javamain);
 
@@ -223,8 +270,17 @@ void run_rta(ir_entity *javamain) { //TODO for other programming languages we mi
 	pdeq *workqueue = new_pdeq();
 	pdeq_putr(workqueue, (ir_graph*)cpmap_find(entity2graph, javamain));
 
-	//callgraph_walker_env env = { workqueue, entity2graph, enabled_types_set, unhandled_dyncalls_set };
-	callgraph_walker_env env = { .workqueue = workqueue, .entity2graph = entity2graph, .enabled_types_set = enabled_types_set, .unhandled_dyncalls_set = unhandled_dyncalls_set };
+	cpmap_t vtable2class_map;
+	cpmap_t *vtable2class = &vtable2class_map;
+	cpmap_init(vtable2class, hash_ptr, ptr_equals);
+	// walk all classes to fill the vtable2class map
+	{
+		class_walker_env env = { .vtable2class = vtable2class };
+		class_walk_super2sub(class_walker, NULL, &env);
+	}
+
+	//callgraph_walker_env env = { workqueue, entity2graph, vtable2class, enabled_types_set, unhandled_dyncalls_set };
+	callgraph_walker_env env = { .workqueue = workqueue, .entity2graph = entity2graph, .vtable2class = vtable2class, .enabled_types_set = enabled_types_set, .unhandled_dyncalls_set = unhandled_dyncalls_set };
 
 	cpset_t *done_set = new_cpset(hash_ptr, ptr_equals);
 	while (!pdeq_empty(workqueue)) {
