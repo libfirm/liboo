@@ -160,7 +160,7 @@ static void callgraph_walker(ir_node *node, void *environment) {
 				ir_node *lhs = get_irn_n(src, 0);
 
 				ir_entity *vtable_entity = get_SymConst_entity(lhs);
-				printf("\t\t\t\t%s -> %s -> class %s\n", gdb_node_helper(lhs), get_entity_name(vtable_entity), get_class_name(get_entity_owner(vtable_entity)));
+				printf("\t\t\t\t%s -> %s -> owner: %s\n", gdb_node_helper(lhs), get_entity_name(vtable_entity), get_class_name(get_entity_owner(vtable_entity)));
 				ir_type *klass = cpmap_find(env->vtable2class, vtable_entity);
 				assert(klass && is_Class_type(klass));
 				printf("\t\t\t\t\t-> vtable2class: %s\n", get_class_name(klass));
@@ -182,12 +182,11 @@ static void callgraph_walker(ir_node *node, void *environment) {
 			ir_entity *entity = get_SymConst_entity(fp);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 			ir_graph *graph = (ir_graph*)cpmap_find(env->entity2graph, entity);
-			if (get_entity_visibility(entity) != ir_visibility_external && graph) { // ignore external methods and (if there are) other methods without an graph, especially calloc
-					// treat methods without graph as external methods AND mark all potentially returned types as in use (all means completely down the class hierarchy!)
+			if (graph) {
 				pdeq_putr(env->workqueue, graph);
-			} else {
+			} else { // treat methods without graph as external methods
 				// can't analyze method
-				// mark all potentially returned object types as in use
+				// mark all potentially returned object types as in use (completely down the class hierarchy!)
 				handle_external_method(entity, env);
 			}
 		} else if (is_Sel(fp)) {
@@ -196,17 +195,18 @@ static void callgraph_walker(ir_node *node, void *environment) {
 			printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
 			// static lookup upwards in the class hierarchy (gets just one method entity)
-				// -> seems to be already done!?
+			// The entity from the Sel node is already what the result of a static lookup would be.
 /*			for (size_t i=0; i<get_entity_n_overwrites(entity); i++) {
 				printf("\toverwrites: %s\n", gdb_node_helper(get_entity_overwrites(entity, i))); //?? docu comments might be switched!?
 			}
 */
+
 			// take it
 			ir_graph *graph = (ir_graph*)cpmap_find(env->entity2graph, entity);
 			if (graph) {
 				ir_type *klass = get_entity_owner(entity);
 				assert(is_Class_type(klass));
-				if (JUST_CHA || cpset_find(env->enabled_types_set, klass) != NULL) {
+				if (JUST_CHA || cpset_find(env->enabled_types_set, klass) != NULL) { //TODO what if inherited method and no objects of super class
 					pdeq_putr(env->workqueue, graph);
 				} else {
 					 // add to unhandled set
@@ -217,6 +217,7 @@ static void callgraph_walker(ir_node *node, void *environment) {
 				// mark all potentially returned object types as in use
 				handle_external_method(entity, env);
 			}
+
 			// take all from downwards in the class hierarchy
 				//TODO search down the class hierarchy
 			for (size_t i=0; i<get_entity_n_overwrittenby(entity); i++) {
@@ -255,6 +256,7 @@ static void class_walker(ir_type *clss, void* environment) {
 }
 
 void run_rta(ir_entity *javamain) { //TODO for other programming languages we might also need to analyze something like global constructors! What's with static sections in Java? (This is important because of closed world assumption!)
+	// TODO more parameters to give data structures for the results ?
 	assert(javamain);
 
 	cpmap_t *entity2graph = new_cpmap(hash_ptr, ptr_equals);
