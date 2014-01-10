@@ -16,7 +16,7 @@
 
 
 // override option just for early development to keep going without information about used types
-#define JUST_CHA 1
+#define JUST_CHA 0
 
 
 static int ptr_equals(const void *pt1, const void *pt2) { // missing default pointer compare function
