@@ -115,7 +115,7 @@ static void handle_external_method(ir_entity *entity, callgraph_walker_env *env)
 	}
 }
 
-static void add_overwriting_method(ir_entity *entity, callgraph_walker_env *env) {
+static void add_overwriting_methods(ir_entity *entity, callgraph_walker_env *env) {
 	assert(is_method_entity(entity));
 	assert(env);
 
@@ -134,7 +134,7 @@ static void add_overwriting_method(ir_entity *entity, callgraph_walker_env *env)
 			ir_entity *ent = get_entity_overwrittenby(entity, i);
 			printf("\t\t\t %s.%s %s overwritten", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 			printf(" by %s.%s %s\n", get_class_name(get_entity_owner(ent)), get_entity_name(ent), gdb_node_helper(ent));
-			add_overwriting_method(ent, env);
+			add_overwriting_methods(ent, env);
 		}
 	}
 	//else {} // not necessary to handle external method, done at top level
@@ -224,7 +224,7 @@ static void callgraph_walker(ir_node *node, void *environment) {
 
 				printf("\t\toverwrittenby: %s.%s %s\n", get_class_name(get_entity_owner(ent)), get_entity_name(ent), gdb_node_helper(ent));
 
-				add_overwriting_method(ent, env);
+				add_overwriting_methods(ent, env);
 			}
 		}
 		else
