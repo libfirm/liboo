@@ -23,13 +23,13 @@ ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 	RT_LFLAGS += -m32
 endif
 ifeq ($(findstring i686-invasic, $(TARGET)), i686-invasic)
-	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/3t-w-iotile
+	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/default
 	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
 	RT_CFLAGS += -m32 -fno-stack-protector -mfpmath=sse -msse2 -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include
 	RT_LFLAGS += -m32 -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
 ifeq ($(findstring sparc-invasic, $(TARGET)), sparc-invasic)
-	OCTOPOS_BASE=../octopos-app/releases/current/leon/4t-chipit-w-iotile
+	OCTOPOS_BASE=../octopos-app/releases/current/leon/default
 	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
 	RT_CFLAGS += -fno-stack-protector -nostdinc -I $(OCTOPOS_BASE)/include -isystem $(GCC_INCLUDE)
 	RT_LFLAGS += -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
