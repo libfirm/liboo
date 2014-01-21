@@ -103,15 +103,15 @@ $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 
 $(RUNTIME_BUILDDIR)/shared/%.o: %.c
 	@echo '===> TARGET_CC $@'
-	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
+	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) $(PIC_FLAGS) -MP -MMD -c -o $@ $<
 
 $(RUNTIME_BUILDDIR)/static/%.o: %.c
 	@echo '===> TARGET_CC $@'
-	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) -MMD -c -o $@ $<
+	$(Q)$(TARGET_CC) $(CPPFLAGS) $(CFLAGS) $(RT_CFLAGS) -MP -MMD -c -o $@ $<
 
 $(BUILDDIR)/%.o: %.c
 	@echo '===> CC $@'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MMD -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(PIC_FLAGS) -MP -MMD -c -o $@ $<
 
 clean:
 	rm -rf $(OBJECTS) $(OBJECTS_RT_SHARED) $(OBJECTS_RT_STATIC) $(GOAL) $(GOAL_RT_STATIC) $(GOAL_RT_SHARED) $(DEPS) $(DEPS_RT) $(RUNTIME_BUILDDIR) $(SPEC_GENERATED_HEADERS)
