@@ -228,6 +228,10 @@ void ddispatch_lower_Call(ir_node* call)
 	/* If the call has been explicitly marked as statically bound, then obey. */
 	if (oo_get_call_is_statically_bound(call))
 		binding = bind_static;
+	if (binding == bind_dynamic && oo_get_method_is_final(method_entity))
+		binding = bind_static;
+	if (binding == bind_dynamic && oo_get_class_is_final(classtype))
+		binding = bind_static;
 
 	ir_graph *irg         = get_irn_irg(call);
 	ir_node  *block       = get_nodes_block(call);
