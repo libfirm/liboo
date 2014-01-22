@@ -207,32 +207,32 @@ void ddispatch_lower_Call(ir_node* call)
 {
 	assert(is_Call(call));
 
-	ir_node   *callee        = get_Call_ptr(call);
-	if (! is_Sel(callee))
+	ir_node *callee = get_Call_ptr(call);
+	if (!is_Sel(callee))
 		return;
 
 	ir_node   *objptr        = get_Sel_ptr(callee);
 	ir_entity *method_entity = get_Sel_entity(callee);
-
-	if (! is_method_entity(method_entity))
+	if (!is_method_entity(method_entity))
 		return;
 
-	ir_type   *classtype     = get_entity_owner(method_entity);
-	if (! is_Class_type(classtype))
+	ir_type *classtype = get_entity_owner(method_entity);
+	if (!is_Class_type(classtype))
 		return;
 
 	ddispatch_binding binding = oo_get_entity_binding(method_entity);
 	if (binding == bind_unknown)
-		panic("method %s has no binding specified", get_entity_name(method_entity));
+		panic("method %s has no binding specified",
+		      get_entity_name(method_entity));
 
 	/* If the call has been explicitly marked as statically bound, then obey. */
 	if (oo_get_call_is_statically_bound(call))
 		binding = bind_static;
 
-	ir_graph  *irg           = get_irn_irg(call);
-	ir_node   *block         = get_nodes_block(call);
-	ir_node   *cur_mem       = get_Call_mem(call);
-	ir_node   *real_callee   = NULL;
+	ir_graph *irg         = get_irn_irg(call);
+	ir_node  *block       = get_nodes_block(call);
+	ir_node  *cur_mem     = get_Call_mem(call);
+	ir_node  *real_callee = NULL;
 
 	switch (binding) {
 	case bind_static: {
