@@ -55,6 +55,14 @@ public final class OO {
 		binding_oo.oo_set_method_is_abstract(entity.ptr, isAbstract);
 	}
 
+	public static void setMethodIsFinal(Entity entity, boolean isFinal) {
+		binding_oo.oo_set_method_is_final(entity.ptr, isFinal);
+	}
+
+	public static boolean getMethodIsFinal(Entity entity) {
+		return binding_oo.oo_get_method_is_final(entity.ptr);
+	}
+
 	/**
 	 * @return true if the given field is transient
 	 */
@@ -147,5 +155,13 @@ public final class OO {
 	 */
 	public static void setClassIsInterface(ClassType classType, boolean isInterface) {
 		binding_oo.oo_set_class_is_interface(classType.ptr, isInterface);
+	}
+
+	public static void setClassIsFinal(ClassType classType, boolean isFinal) {
+		binding_oo.oo_set_class_is_final(classType.ptr, isFinal);
+	}
+
+	public static boolean getClassIsFinal(ClassType classType) {
+		return binding_oo.oo_get_class_is_final(classType.ptr);
 	}
 }
