@@ -104,14 +104,20 @@ static void add_new_used_class(ir_type *klass, callgraph_walker_env *env) {
 		// update existing results
 		cpset_t *methods = cpmap_find(env->disabled_targets, klass);
 		if (methods != NULL) {
-			cpset_iterator_t iterator;
-			cpset_iterator_init(&iterator, methods);
-			ir_entity *method;
-			printf("\t\t\t\t\tup to %u methods to enable\n", cpset_size(methods));
-			while ((method = cpset_iterator_next(&iterator)) != NULL) {
-				add_to_dyncalls(method, method, env); // search recursively upwards if overwritten entities had been called and add it to their target sets
-				cpset_remove_iterator(methods, &iterator);
+			{
+				cpset_iterator_t iterator;
+				cpset_iterator_init(&iterator, methods);
+				ir_entity *method;
+				printf("\t\t\t\t\tup to %u methods to enable\n", cpset_size(methods));
+				while ((method = cpset_iterator_next(&iterator)) != NULL) {
+					add_to_dyncalls(method, method, env); // search recursively upwards if overwritten entities had been called and add it to their target sets
+					//cpset_remove_iterator(methods, &iterator);
+				}
 			}
+			// remove the map entry and free the set
+			cpmap_remove(env->disabled_targets, klass);
+			cpset_destroy(methods);
+			free(methods);
 		}
 	}
 }
