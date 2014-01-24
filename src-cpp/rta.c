@@ -276,17 +276,10 @@ static void callgraph_walker(ir_node *node, void *environment) {
 			ir_entity *entity = get_SymConst_entity(fp);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
-			//TODO add to used methods ?
+			// add to used
+			cpset_insert(env->used_methods, entity);
+
 			add_to_workqueue(entity, env);
-/*			ir_graph *graph = (ir_graph*)cpmap_find(env->entity2graph, entity);
-			if (graph) {
-				pdeq_putr(env->workqueue, graph);
-			} else { // treat methods without graph as external methods
-				// can't analyze method
-				// mark all potentially returned object types as in use (completely down the class hierarchy!)
-				handle_external_method(entity, env);
-			}
-*/
 		} else if (is_Sel(fp)) {
 			// handle dynamic call
 			ir_entity *entity = get_Sel_entity(fp);
