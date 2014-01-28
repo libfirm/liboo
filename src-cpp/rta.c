@@ -353,6 +353,8 @@ void run_rta(ir_entity *javamain) { //TODO for other programming languages we mi
 	pdeq *workqueue = new_pdeq();
 	pdeq_putr(workqueue, (ir_graph*)cpmap_find(entity2graph, javamain));
 
+	cpset_insert(used_methods, javamain);
+
 	cpmap_t vtable2class_map;
 	cpmap_t *vtable2class = &vtable2class_map;
 	cpmap_init(vtable2class, hash_ptr, ptr_equals);
