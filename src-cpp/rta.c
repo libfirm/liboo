@@ -414,10 +414,9 @@ void run_rta(ir_entity *javamain) { //TODO for other programming languages we mi
 		cpmap_iterator_t iterator;
 		cpmap_iterator_init(&iterator, dyncall_targets);
 		cpmap_entry_t *entry;
-		while ((entry = cpmap_iterator_next(&iterator)) != NULL) {
+		while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
 			const ir_entity *call_entity = entry->key;
 			assert(call_entity);
-			//printf("\t%s.%s %s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity), gdb_node_helper(call_entity));
 			printf("\t%s.%s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
 
 			cpset_t *targets = entry->data;
