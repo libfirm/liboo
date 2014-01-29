@@ -176,7 +176,7 @@ static void add_to_workqueue(ir_entity *method, callgraph_walker_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
-	ir_graph *graph = (ir_graph*)cpmap_find(env->entity2graph, method);
+	ir_graph *graph = cpmap_find(env->entity2graph, method);
 	if (graph) {
 		//if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
 			printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
@@ -334,59 +334,75 @@ static void class_walker(ir_type *clss, void* environment) {
 	}
 }
 
-void run_rta(ir_entity *javamain) { //TODO for other programming languages we might also need to analyze something like global constructors! What's with static sections in Java? (This is important because of closed world assumption!)
-	// TODO more parameters to give data structures for the results ?
-	assert(javamain);
 
-	cpmap_t *entity2graph = new_cpmap(hash_ptr, ptr_equals);
+void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
+	assert(entry_points);
+	assert(used_classes);
+	assert(used_methods);
+	assert(dyncall_targets);
 
+	assert(cpset_size(entry_points) != 0);
+
+	cpset_init(used_classes, hash_ptr, ptr_equals);
+	cpset_init(used_methods, hash_ptr, ptr_equals);
+	cpmap_init(dyncall_targets, hash_ptr, ptr_equals);
+
+
+	cpmap_t entity2graph;
+	cpmap_init(&entity2graph, hash_ptr, ptr_equals);
 	for (size_t i = 0; i<get_irp_n_irgs(); i++) {
 		ir_graph *g = get_irp_irg(i);
-		cpmap_set(entity2graph, get_irg_entity(g), g);
+		cpmap_set(&entity2graph, get_irg_entity(g), g);
 	}
 
-	//TODO refactor
-	cpset_t *used_classes = new_cpset(hash_ptr, ptr_equals);
-	cpset_t *used_methods = new_cpset(hash_ptr, ptr_equals);
-	cpmap_t *dyncall_targets = new_cpmap(hash_ptr, ptr_equals); assert(cpmap_size(dyncall_targets) == 0);
-	cpmap_t *disabled_targets = new_cpmap(hash_ptr, ptr_equals);
+	cpmap_t disabled_targets;
+	cpmap_init(&disabled_targets, hash_ptr, ptr_equals);
+
 	pdeq *workqueue = new_pdeq();
-	pdeq_putr(workqueue, (ir_graph*)cpmap_find(entity2graph, javamain));
+	{ // add all given entry points to workqueue
+		cpset_iterator_t it;
+		cpset_iterator_init(&it, entry_points);
+		ir_entity *entry;
+		while ((entry = cpset_iterator_next(&it)) != NULL) {
+			assert(is_method_entity(entry));
+			cpset_insert(used_methods, entry);
+			ir_graph *graph = cpmap_find(&entity2graph, entry);
+			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			pdeq_putr(workqueue, graph);
+		}
+	}
 
-	cpset_insert(used_methods, javamain);
-
-	cpmap_t vtable2class_map;
-	cpmap_t *vtable2class = &vtable2class_map;
-	cpmap_init(vtable2class, hash_ptr, ptr_equals);
-	// walk all classes to fill the vtable2class map
-	{
-		class_walker_env env = { .vtable2class = vtable2class };
+	cpmap_t vtable2class;
+	cpmap_init(&vtable2class, hash_ptr, ptr_equals);
+	{ // walk all classes to fill the vtable2class map
+		class_walker_env env = { .vtable2class = &vtable2class };
 		class_walk_super2sub(class_walker, NULL, &env);
 	}
 
-	//callgraph_walker_env env = { workqueue, entity2graph, vtable2class, used_classes, ... };
 	callgraph_walker_env env = {
 		.workqueue = workqueue,
-		.entity2graph = entity2graph,
-		.vtable2class = vtable2class,
+		.entity2graph = &entity2graph,
+		.vtable2class = &vtable2class,
 		.used_classes = used_classes,
 		.used_methods = used_methods,
 		.dyncall_targets = dyncall_targets,
-		.disabled_targets = disabled_targets
+		.disabled_targets = &disabled_targets
 	};
 
-	cpset_t *done_set = new_cpset(hash_ptr, ptr_equals);
+	cpset_t done_set;
+	cpset_init(&done_set, hash_ptr, ptr_equals);
 	while (!pdeq_empty(workqueue)) {
-		ir_graph *g = (ir_graph*)pdeq_getl(workqueue);
+		ir_graph *g = pdeq_getl(workqueue);
 		assert(is_ir_graph(g));
 
-		if (cpset_find(done_set, g) != NULL) continue;
+		if (cpset_find(&done_set, g) != NULL) continue;
 
 		printf("\n== %s.%s\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)));
 
-		cpset_insert(done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
+		cpset_insert(&done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
 		irg_walk_graph(g, NULL, callgraph_walker, &env);
 	}
+
 
 	printf("\n\n==== Results ==============================================\n");
 	{
@@ -432,5 +448,46 @@ void run_rta(ir_entity *javamain) { //TODO for other programming languages we mi
 	}
 
 	// free data structures
-	//TODO
+	del_pdeq(workqueue);
+	cpmap_destroy(&entity2graph);
+	cpmap_destroy(&vtable2class);
+
+	{ // delete the sets in map disabled_targets
+		cpmap_iterator_t it;
+		cpmap_iterator_init(&it, &disabled_targets);
+		cpmap_entry_t *entry;
+		while ((entry = cpmap_iterator_next(&it))->key != NULL) {
+			cpset_t* set = entry->data;
+			cpmap_remove_iterator(&disabled_targets, &it);
+			cpset_destroy(set);
+			free(set);
+		}
+	}
+	cpmap_destroy(&disabled_targets);
+
+	cpset_destroy(&done_set);
+
+	// /!\ used_classes, used_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
+
+}
+
+void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
+	assert(used_classes);
+	assert(used_methods);
+	assert(dyncall_targets);
+
+	cpset_destroy(used_classes);
+	cpset_destroy(used_methods);
+
+	// delete the sets in map disabled_targets
+	cpmap_iterator_t it;
+	cpmap_iterator_init(&it, dyncall_targets);
+	cpmap_entry_t *entry;
+	while ((entry = cpmap_iterator_next(&it)) != NULL) {
+		cpset_t* set = entry->data;
+		cpmap_remove_iterator(dyncall_targets, &it);
+		cpset_destroy(set);
+		free(set);
+	}
+	cpmap_destroy(dyncall_targets);
 }
