@@ -30,9 +30,7 @@ static void default_init_vtable_slots(ir_type* klass, ir_initializer_t *vtable_i
 	ir_entity        *ci        = oo_get_class_rtti_entity(klass);
 	assert (ci);
 
-	symconst_symbol ci_sym;
-	ci_sym.entity_p             = ci;
-	ir_node          *ci_symc   = new_r_SymConst(ccode_irg, mode_P, ci_sym, symconst_addr_ent);
+	ir_node          *ci_symc   = new_r_Address(ccode_irg, ci);
 	ir_initializer_t *ci_init   = create_initializer_const(ci_symc);
 	set_initializer_compound_value(vtable_init, ddispatch_model.index_of_rtti_ptr, ci_init);
 
@@ -67,13 +65,9 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 
 	const char *method_name    = get_entity_name(method);
 	ir_entity  *name_const_ent = rtti_emit_string_const(method_name);
-	symconst_symbol name_const_sym;
-	name_const_sym.entity_p = name_const_ent;
-	ir_node    *name_ref       = new_r_SymConst(irg, mode_P, name_const_sym, symconst_addr_ent);
+	ir_node    *name_ref       = new_r_Address(irg, name_const_ent);
 
-	symconst_symbol callee_sym;
-	callee_sym.entity_p      = default_lookup_interface_entity;
-	ir_node   *callee        = new_r_SymConst(irg, mode_P, callee_sym, symconst_addr_ent);
+	ir_node   *callee        = new_r_Address(irg, default_lookup_interface_entity);
 
 	ir_node   *args[2]       = { ci_ref, name_ref };
 	ir_type   *call_type     = get_entity_type(default_lookup_interface_entity);
@@ -179,20 +173,18 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (is_method_entity(member)) {
 			int member_vtid = oo_get_method_vtable_index(member);
 			if (member_vtid != -1) {
-				union symconst_symbol sym;
+				ir_entity *ent;
 				if (oo_get_method_is_inherited(member)) {
-					ir_entity *impl = oo_get_entity_overwritten_superclass_entity(member);
-					assert (impl);
-					sym.entity_p = impl;
+					ent = oo_get_entity_overwritten_superclass_entity(member);
+					assert (ent);
 				} else if (! oo_get_method_is_abstract(member)) {
-					sym.entity_p = member;
+					ent = member;
 				} else {
-					ident     *id     = ddispatch_model.abstract_method_ident;
-					ir_entity *entity = create_compilerlib_entity(id, get_entity_type(member));
-					sym.entity_p = entity;
+					ident *id = ddispatch_model.abstract_method_ident;
+					ent = create_compilerlib_entity(id, get_entity_type(member));
 				}
-				ir_node *symconst_node = new_r_SymConst(const_code, mode_reference, sym, symconst_addr_ent);
-				ir_initializer_t *val = create_initializer_const(symconst_node);
+				ir_node          *symconst_node = new_r_Address(const_code, ent);
+				ir_initializer_t *val           = create_initializer_const(symconst_node);
 				set_initializer_compound_value (init, member_vtid+ddispatch_model.vptr_points_to_index, val);
 			}
 		}
@@ -240,9 +232,7 @@ void ddispatch_lower_Call(ir_node* call)
 
 	switch (binding) {
 	case bind_static: {
-		symconst_symbol callee_static;
-		callee_static.entity_p = method_entity;
-		real_callee = new_r_SymConst(irg, mode_reference, callee_static, symconst_addr_ent);
+		real_callee = new_r_Address(irg, method_entity);
 		break;
 	}
 	case bind_dynamic: {
@@ -288,9 +278,7 @@ void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *obj
 	ir_node   *vptr_target     = NULL;
 	ir_entity *vtable_entity   = oo_get_class_vtable_entity(klass);
 	if (vtable_entity) {
-		union symconst_symbol sym;
-		sym.entity_p = vtable_entity;
-		ir_node   *vtable_symconst = new_r_SymConst(irg, mode_reference, sym, symconst_addr_ent);
+		ir_node   *vtable_symconst = new_r_Address(irg, vtable_entity);
 		ir_node   *const_offset    = new_r_Const_long(irg, mode_reference, ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference));
 		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset, mode_reference);
 	} else {

@@ -71,10 +71,8 @@ static unsigned scp_hash_function(const void *obj)
 
 static ir_initializer_t *new_initializer_reference(ir_entity *entity)
 {
-	ir_graph *irg = get_const_code_irg();
-	symconst_symbol sym;
-	sym.entity_p = entity;
-	ir_node *symconst = new_r_SymConst(irg, mode_P, sym, symconst_addr_ent);
+	ir_graph *irg      = get_const_code_irg();
+	ir_node  *symconst = new_r_Address(irg, entity);
 	return create_initializer_const(symconst);
 }
 
@@ -318,13 +316,11 @@ void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 	ir_initializer_t *uid_init   = new_initializer_long(uid, uid_type);
 	set_initializer_compound_value(initializer, i++, uid_init);
 
-	ir_graph *const_code_irg = get_const_code_irg();
-	symconst_symbol sym;
-	sym.type_p = klass;
-	ir_type *size_type = get_entity_type(class_info_size);
-	ir_mode *size_mode = get_type_mode(size_type);
-	ir_node *size_node = new_r_SymConst(const_code_irg, size_mode, sym, symconst_type_size);
-	ir_initializer_t *size_init = create_initializer_const(size_node);
+	ir_graph         *const_code_irg = get_const_code_irg();
+	ir_type          *size_type      = get_entity_type(class_info_size);
+	ir_mode          *size_mode      = get_type_mode(size_type);
+	ir_node          *size_node      = new_r_Size(const_code_irg, size_mode, klass);
+	ir_initializer_t *size_init      = create_initializer_const(size_node);
 	set_initializer_compound_value(initializer, i++, size_init);
 
 	ir_entity *superclass_rtti = NULL;
@@ -421,13 +417,9 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 	// get a symconst to klass' classinfo.
 	ir_entity  *test_ci      = oo_get_class_rtti_entity(klass);
 	assert(test_ci);
-	symconst_symbol test_ci_sym;
-	test_ci_sym.entity_p = test_ci;
-	ir_node   *test_ci_ref   = new_r_SymConst(irg, mode_P, test_ci_sym, symconst_addr_ent);
+	ir_node    *test_ci_ref  = new_r_Address(irg, test_ci);
 
-	symconst_symbol callee_sym;
-	callee_sym.entity_p      = default_instanceof_entity;
-	ir_node   *callee        = new_r_SymConst(irg, mode_P, callee_sym, symconst_addr_ent);
+	ir_node   *callee        = new_r_Address(irg, default_instanceof_entity);
 	ir_node   *args[2]       = { obj_ci_ref, test_ci_ref };
 	ir_type   *call_type     = get_entity_type(default_instanceof_entity);
 	ir_node   *call          = new_r_Call(block, cur_mem, callee, 2, args, call_type);

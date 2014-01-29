@@ -27,12 +27,9 @@ static ir_entity *throw_entity;
 
 ir_node *eh_get_exception_object(void)
 {
-	symconst_symbol ex_sym;
-	ex_sym.entity_p = exception_object_entity;
-
 	ir_node *cur_mem = get_store();
 
-	ir_node *ex_symc = new_SymConst(mode_P, ex_sym, symconst_addr_ent);
+	ir_node *ex_symc = new_Address(exception_object_entity);
 	ir_node *ex_load = new_Load(cur_mem, ex_symc, mode_P, cons_none);
 	cur_mem          = new_Proj(ex_load, mode_M, pn_Load_M);
 	ir_node *ex_obj  = new_Proj(ex_load, mode_P, pn_Load_res);
@@ -43,12 +40,9 @@ ir_node *eh_get_exception_object(void)
 
 static void store_exception_object(ir_node *exo_ptr)
 {
-	symconst_symbol ex_sym;
-	ex_sym.entity_p = exception_object_entity;
-
 	ir_node *cur_mem  = get_store();
 
-	ir_node *ex_symc  = new_SymConst(mode_P, ex_sym, symconst_addr_ent);
+	ir_node *ex_symc  = new_Address(exception_object_entity);
 	ir_node *ex_store = new_Store(cur_mem, ex_symc, exo_ptr, cons_none);
 	cur_mem           = new_Proj(ex_store, mode_M, pn_Store_M);
 
@@ -234,9 +228,7 @@ void eh_lower_Raise(ir_node *raise, ir_node *proj)
 	ir_graph *irg     = get_irn_irg(raise);
 	ir_node  *cur_mem = get_Raise_mem(raise);
 
-	symconst_symbol callee_sym;
-	callee_sym.entity_p = throw_entity;
-	ir_node  *c_symc  = new_r_SymConst(irg, mode_P, callee_sym, symconst_addr_ent);
+	ir_node  *c_symc  = new_r_SymConst(irg, throw_entity);
 	ir_node  *in[1]   = { ex_obj };
 
 	ir_node  *throw   = new_r_Call(block, cur_mem, c_symc, 1, in, get_entity_type(throw_entity));
