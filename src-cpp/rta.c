@@ -162,13 +162,15 @@ static void handle_external_method(ir_entity *method, callgraph_walker_env *env)
 		ir_type *type = get_method_res_type(methodtype, i);
 		printf("\t\t\tresult type %s\n", gdb_node_helper(type));
 		if (is_Pointer_type(type)) {
-			ir_type *targettype = get_pointer_points_to_type(type);
-			if (is_Class_type(targettype)) {
+			while (is_Pointer_type(type))
+				type = get_pointer_points_to_type(type);
+			if (is_Class_type(type)) {
 				// add class and all its subclasses to used types
 				//TODO what with interfaces? or rather how to handle interfaces? or are they just class types??
-				add_all_subclasses(targettype, env);
+				add_all_subclasses(type, env);
 			}
-		}
+		} else
+			assert(!is_Class_type(type)); // modern languages shouldn't have class types without pointer
 	}
 }
 
