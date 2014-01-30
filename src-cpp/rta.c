@@ -458,7 +458,7 @@ void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_methods
 		cpmap_iterator_t it;
 		cpmap_iterator_init(&it, &disabled_targets);
 		cpmap_entry_t *entry;
-		while ((entry = cpmap_iterator_next(&it))->key != NULL) {
+		while ((entry = cpmap_iterator_next(&it))->key != NULL || entry->data != NULL) {
 			cpset_t* set = entry->data;
 			cpmap_remove_iterator(&disabled_targets, &it);
 			cpset_destroy(set);
@@ -485,9 +485,10 @@ void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *
 	cpmap_iterator_t it;
 	cpmap_iterator_init(&it, dyncall_targets);
 	cpmap_entry_t *entry;
-	while ((entry = cpmap_iterator_next(&it)) != NULL) {
+	while ((entry = cpmap_iterator_next(&it))->key != NULL || entry->data != NULL) {
 		cpset_t* set = entry->data;
 		cpmap_remove_iterator(dyncall_targets, &it);
+		assert(set);
 		cpset_destroy(set);
 		free(set);
 	}
