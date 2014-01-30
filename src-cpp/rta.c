@@ -494,3 +494,114 @@ void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *
 	}
 	cpmap_destroy(dyncall_targets);
 }
+
+
+typedef struct optimizer_env {
+	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
+	cpmap_t *entity2graph; // map for finding the graph to a given entity
+	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
+} optimizer_env;
+
+static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
+	assert(is_method_entity(method));
+	assert(env);
+
+	ir_graph *graph = cpmap_find(env->entity2graph, method);
+	if (graph) {
+		printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+		pdeq_putr(env->workqueue, graph);
+	}
+}
+
+static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
+	assert(environment);
+	optimizer_env *env = environment;
+
+	switch (get_irn_opcode(node)) {
+	case iro_Call: {
+		ir_node *fp = get_irn_n(node, 1);
+		if (is_SymConst(fp)) {
+			// handle static call
+			ir_entity *entity = get_SymConst_entity(fp);
+			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+
+			optimizer_add_to_workqueue(entity, env);
+
+		} else if (is_Sel(fp)) {
+			// handle dynamic call
+			ir_entity *entity = get_Sel_entity(fp);
+			printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+
+			cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
+			assert(targets);
+			assert(cpset_size(targets) > 0);
+			if (cpset_size(targets) == 1) {
+				// devirtualize call
+				cpset_iterator_t it;
+				cpset_iterator_init(&it, targets);
+				ir_entity *target = cpset_iterator_next(&it);
+				assert(cpset_iterator_next(&it) == NULL);
+
+				printf("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
+				union symconst_symbol sym;
+				sym.entity_p = entity;
+				ir_node *symc = new_SymConst(get_modeP(), sym, symconst_addr_ent);
+				set_irn_n(node, 1, symc);
+			}
+			// add to workqueue
+			cpset_iterator_t it;
+			cpset_iterator_init(&it, targets);
+			ir_entity *target;
+			while ((target = cpset_iterator_next(&it)) != NULL) {
+				optimizer_add_to_workqueue(target, env);
+			}
+		}
+	}
+	}
+
+}
+
+void rta_optimize_dyncalls(cpset_t *entry_points, cpmap_t *dyncall_targets) {
+	assert(dyncall_targets);
+
+	cpmap_t entity2graph;
+	cpmap_init(&entity2graph, hash_ptr, ptr_equals);
+	for (size_t i = 0; i<get_irp_n_irgs(); i++) {
+		ir_graph *g = get_irp_irg(i);
+		cpmap_set(&entity2graph, get_irg_entity(g), g);
+	}
+
+	pdeq *workqueue = new_pdeq();
+	{ // add all given entry points to workqueue
+		cpset_iterator_t it;
+		cpset_iterator_init(&it, entry_points);
+		ir_entity *entry;
+		while ((entry = cpset_iterator_next(&it)) != NULL) {
+			assert(is_method_entity(entry));
+			ir_graph *graph = cpmap_find(&entity2graph, entry);
+			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			pdeq_putr(workqueue, graph);
+		}
+	}
+
+	optimizer_env env = {
+		.workqueue = workqueue,
+		.entity2graph = &entity2graph,
+		.dyncall_targets = dyncall_targets,
+	};
+
+	cpset_t done_set;
+	cpset_init(&done_set, hash_ptr, ptr_equals);
+	while (!pdeq_empty(workqueue)) {
+		ir_graph *g = pdeq_getl(workqueue);
+		assert(is_ir_graph(g));
+
+		if (cpset_find(&done_set, g) != NULL) continue;
+
+		printf("\n== %s.%s\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)));
+
+		cpset_insert(&done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
+		irg_walk_graph(g, NULL, walk_and_optimize_dyncalls, &env);
+	}
+
+}
