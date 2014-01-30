@@ -263,8 +263,8 @@ static void callgraph_walker(ir_node *node, void *environment) {
 
 				assert(is_Add(src)); // src is usually an Add node in bytecode2firm //TODO write code that correctly parses what liboo function ddispatch_prepare_new_instance creates according to the configured vtable layout
 				ir_node *lhs = get_irn_n(src, 0);
-
-				ir_entity *vtable_entity = get_SymConst_entity(lhs);
+				assert(is_Address(lhs));
+				ir_entity *vtable_entity = get_Address_entity(lhs);
 				printf("\t\t\t\tLHS: %s -> %s -> owner: %s\n", gdb_node_helper(lhs), get_entity_name(vtable_entity), get_class_name(get_entity_owner(vtable_entity)));
 				ir_type *klass = cpmap_find(env->vtable2class, vtable_entity);
 				assert(is_Class_type(klass));
@@ -279,9 +279,9 @@ static void callgraph_walker(ir_node *node, void *environment) {
 	}
 	case iro_Call: {
 		ir_node *fp = get_irn_n(node, 1);
-		if (is_SymConst(fp)) {
+		if (is_Address(fp)) {
 			// handle static call
-			ir_entity *entity = get_SymConst_entity(fp);
+			ir_entity *entity = get_Address_entity(fp);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
 			// add to used
@@ -310,7 +310,7 @@ static void callgraph_walker(ir_node *node, void *environment) {
 			}
 		}
 		else
-			assert(false); // neither SymConst nor Sel as callee shouldn't happen!?
+			assert(false); // neither Address nor Sel as callee shouldn't happen!?
 		break;
 	}
 	}
@@ -520,9 +520,9 @@ static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
 	switch (get_irn_opcode(node)) {
 	case iro_Call: {
 		ir_node *fp = get_irn_n(node, 1);
-		if (is_SymConst(fp)) {
+		if (is_Address(fp)) {
 			// handle static call
-			ir_entity *entity = get_SymConst_entity(fp);
+			ir_entity *entity = get_Address_entity(fp);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
 			optimizer_add_to_workqueue(entity, env);
@@ -543,9 +543,7 @@ static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
 				assert(cpset_iterator_next(&it) == NULL);
 
 				printf("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-				union symconst_symbol sym;
-				sym.entity_p = entity;
-				ir_node *symc = new_SymConst(get_modeP(), sym, symconst_addr_ent);
+				ir_node *symc = new_Address(entity);
 				set_irn_n(node, 1, symc);
 			}
 			// add to workqueue
