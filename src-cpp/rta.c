@@ -337,7 +337,15 @@ static void class_walker(ir_type *clss, void* environment) {
 }
 
 
-void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
+/** run Rapid Type Analysis
+ * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically linked call.
+ * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all public functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!! RTA also won't work with programs that dynamically load classes at run-time!
+ * @param entry_points all (public) entry points to program code (as ir_entity*)
+ * @param used_classes give pointer to empty uninitialized set for receiving results, This is a set where all used classes are put (as ir_type*).
+ * @param used_methods give pointer to empty uninitialized set for receiving results, This is a set where all used methods are put (as ir_entity*).
+ * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is a map where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically linked calls if possible. (see also function rta_optimize_dyncalls)
+ */
+static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
 	assert(entry_points);
 	assert(used_classes);
 	assert(used_methods);
@@ -473,7 +481,14 @@ void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_methods
 
 }
 
-void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
+
+/** frees memory allocated for the results returned by function run_rta
+ * @note does not free the memory of the sets and maps themselves, just their content allocated during RTA
+ * @param used_classes as returned by run_rta
+ * @param used_methods as returned by run_rta
+ * @param dyncall_targets as returned by run_rta
+ */
+static void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
 	assert(used_classes);
 	assert(used_methods);
 	assert(dyncall_targets);
@@ -559,7 +574,11 @@ static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
 
 }
 
-void rta_optimize_dyncalls(cpset_t *entry_points, cpmap_t *dyncall_targets) {
+/** devirtualizes dyncalls if their target set contains only one entry
+ * @param entry_points same as used with rta_run
+ * @param dyncall_targets the result map returned from rta_run
+ */
+static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targets) {
 	assert(dyncall_targets);
 
 	cpmap_t entity2graph;
@@ -602,4 +621,22 @@ void rta_optimize_dyncalls(cpset_t *entry_points, cpmap_t *dyncall_targets) {
 		irg_walk_graph(g, NULL, walk_and_optimize_dyncalls, &env);
 	}
 
+}
+
+
+void rta_optimization(size_t n_entry_points, ir_entity** entry_points) {
+	cpset_t entry_points_;
+	cpset_init(&entry_points_, hash_ptr, ptr_equals);
+	for (size_t i=0; i<n_entry_points; i++) {
+		cpset_insert(&entry_points_, entry_points[i]);
+	}
+
+	cpset_t used_classes;
+	cpset_t used_methods;
+	cpmap_t dyncall_targets;
+
+	rta_run(&entry_points_, &used_classes, &used_methods, &dyncall_targets);
+	rta_devirtualize_calls(&entry_points_, &dyncall_targets);
+	//rta_discard_unused(&used_classes, &used_methods); ??
+	rta_dispose_results(&used_classes, &used_methods, &dyncall_targets);
 }
