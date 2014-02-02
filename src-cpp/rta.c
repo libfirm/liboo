@@ -558,7 +558,7 @@ static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
 				assert(cpset_iterator_next(&it) == NULL);
 
 				printf("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-				ir_node *symc = new_Address(entity);
+				ir_node *symc = new_Address(target);
 				set_irn_n(node, 1, symc);
 			}
 			// add to workqueue
