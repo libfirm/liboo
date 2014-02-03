@@ -41,7 +41,7 @@ GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
 # sparc-elf-gcc does not support shared libraries
-ifeq ($(findstring sparc-invasic, $(TARGET)), sparc-invasic)
+ifeq ($(findstring invasic, $(TARGET)), invasic)
 	GOAL =
 	GOAL_RT_SHARED =
 endif
