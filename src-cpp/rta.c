@@ -49,7 +49,7 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing ne
 }
 */
 
-typedef struct callgraph_walker_env {
+typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	cpmap_t *entity2graph; // map for finding the graph to a given entity
 	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
@@ -57,16 +57,16 @@ typedef struct callgraph_walker_env {
 	cpset_t *used_methods; // used method entities
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 	cpmap_t *disabled_targets; // map that stores the set of disabled potential call targets of dynamic calls for every class) (Map: class -> Set: method entities)
-} callgraph_walker_env;
+} analyzer_env;
 
 
-static void add_to_workqueue(ir_entity *method, callgraph_walker_env *env); // forward declaration
+static void add_to_workqueue(ir_entity *method, analyzer_env *env); // forward declaration
 
 
 // add method entity to targets set of all matching calls
 // /!\ should normally be called with call_entity and method entity the same to start search from the method entity you have
 // searches upwards in the class hierarchy if there were calls of overwritten methods
-static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, callgraph_walker_env *env) {
+static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(call_entity));
 	assert(is_method_entity(method));
 	assert(env);
@@ -92,7 +92,7 @@ static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, callgraph
 	}
 }
 
-static void add_new_used_class(ir_type *klass, callgraph_walker_env *env) {
+static void add_new_used_class(ir_type *klass, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(env);
 
@@ -122,7 +122,7 @@ static void add_new_used_class(ir_type *klass, callgraph_walker_env *env) {
 	}
 }
 
-static void memorize_disabled_method(ir_type *klass, ir_entity *entity, callgraph_walker_env *env) {
+static void memorize_disabled_method(ir_type *klass, ir_entity *entity, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(is_method_entity(entity));
 	assert(env);
@@ -135,7 +135,7 @@ static void memorize_disabled_method(ir_type *klass, ir_entity *entity, callgrap
 	cpset_insert(methods, entity);
 }
 
-static void add_all_subclasses(ir_type *klass, callgraph_walker_env *env) {
+static void add_all_subclasses(ir_type *klass, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(env);
 
@@ -151,7 +151,7 @@ static void add_all_subclasses(ir_type *klass, callgraph_walker_env *env) {
 	}
 }
 
-static void handle_external_method(ir_entity *method, callgraph_walker_env *env) { //TODO
+static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
@@ -166,7 +166,6 @@ static void handle_external_method(ir_entity *method, callgraph_walker_env *env)
 				type = get_pointer_points_to_type(type);
 			if (is_Class_type(type)) {
 				// add class and all its subclasses to used types
-				//TODO what with interfaces? or rather how to handle interfaces? or are they just class types??
 				add_all_subclasses(type, env);
 			}
 		} else
@@ -174,7 +173,7 @@ static void handle_external_method(ir_entity *method, callgraph_walker_env *env)
 	}
 }
 
-static void add_to_workqueue(ir_entity *method, callgraph_walker_env *env) {
+static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
@@ -192,7 +191,7 @@ static void add_to_workqueue(ir_entity *method, callgraph_walker_env *env) {
 	}
 }
 
-static void take_entity(ir_entity *entity, cpset_t *result_set, callgraph_walker_env *env) {
+static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *env) {
 	assert(is_method_entity(entity));
 	assert(result_set);
 	assert(env);
@@ -200,7 +199,7 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, callgraph_walker
 	if (cpset_find(result_set, entity) == NULL) { // take each entity only once (the sets won't mind but the workqueue)
 		printf("\t\ttaking entity %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity));
 
-		// add to used
+		// add to used methods
 		cpset_insert(env->used_methods, entity);
 
 		// add to result set
@@ -214,7 +213,7 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, callgraph_walker
 // collect method entities from downwards in the class hierarchy
 // /!\ should normally be called with the owner class of the entity e.g. to start at the static looked up entity
 // it walks down the classes to have the entities with the classes even when the method is inherited
-static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_set, callgraph_walker_env *env) {
+static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(is_method_entity(entity));
 	assert(result_set);
@@ -222,7 +221,7 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 
 	printf("\t\twalking class %s\n", get_class_name(klass));
 	ir_entity *current_entity = entity;
-	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity)); //?? Is there a more efficient way?
+	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity)); //?? Is there a more efficient way? // /!\ note: only works because whole signature is already encoded in entity name!
 	if (overwriting_entity != NULL && overwriting_entity != current_entity) { // if has overwriting entity
 		assert(klass == get_entity_owner(overwriting_entity));
 		printf("\t\t%s.%s overwrites %s.%s\n", get_class_name(get_entity_owner(overwriting_entity)), get_entity_name(overwriting_entity), get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
@@ -245,9 +244,9 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 }
 
 
-static void callgraph_walker(ir_node *node, void *environment) {
+static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 	assert(environment);
-	callgraph_walker_env *env = (callgraph_walker_env*)environment;
+	analyzer_env *env = (analyzer_env*)environment;
 
 	switch (get_irn_opcode(node)) {
 	case iro_Store: {
@@ -258,7 +257,7 @@ static void callgraph_walker(ir_node *node, void *environment) {
 		if (is_Sel(dest)) {
 			ir_entity *entity = get_Sel_entity(dest);
 			printf("\t\t%s\n", get_entity_name(entity));
-			if (strncmp(get_entity_name(entity), "@vptr", 5) == 0) { //?? check for vptr entity or are there more than one?
+			if (strncmp(get_entity_name(entity), "@vptr", 5) == 0) {
 				printf("\t\t\t%s\n", gdb_node_helper(src));
 
 				assert(is_Add(src)); // src is usually an Add node in bytecode2firm //TODO write code that correctly parses what liboo function ddispatch_prepare_new_instance creates according to the configured vtable layout
@@ -283,15 +282,26 @@ static void callgraph_walker(ir_node *node, void *environment) {
 			// handle static call
 			ir_entity *entity = get_Address_entity(fp);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+			printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+			printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+			printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+			printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+			printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
-			// add to used
+			// add to used methods
 			cpset_insert(env->used_methods, entity);
 
 			add_to_workqueue(entity, env);
+
 		} else if (is_Sel(fp)) {
 			// handle dynamic call
 			ir_entity *entity = get_Sel_entity(fp);
 			printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+			printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+			printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+			printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+			printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+			printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
 			if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
 				// calculate set of method entities that this call could potentially call
@@ -303,13 +313,12 @@ static void callgraph_walker(ir_node *node, void *environment) {
 				cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
 				ir_type *owner = get_entity_owner(entity);
 				collect_methods(owner, entity, result_set, env);
+
 				assert(cpset_size(result_set) > 0);
 
-				//printf("cpmap_insert dyncall_targets %x %x\n", (unsigned)entity,  (unsigned)result_set);
 				cpmap_set(env->dyncall_targets, entity, result_set); //??
 			}
-		}
-		else
+		} else
 			assert(false); // neither Address nor Sel as callee shouldn't happen!?
 		break;
 	}
@@ -317,22 +326,24 @@ static void callgraph_walker(ir_node *node, void *environment) {
 }
 
 
-typedef struct class_walker_env {
+typedef struct class_collector_env {
 	cpmap_t *vtable2class;
-} class_walker_env;
+} class_collector_env;
 
-static void class_walker(ir_type *clss, void* environment) {
+static void walk_classes_and_collect(ir_type *klass, void* environment) {
 	assert(environment);
-	class_walker_env *env = (class_walker_env*)environment;
+	class_collector_env *env = (class_collector_env*)environment;
 
 	cpmap_t *vtable2class = env->vtable2class;
-	ir_entity *vtable_entity = oo_get_class_vtable_entity(clss);
+	ir_entity *vtable_entity = oo_get_class_vtable_entity(klass);
 	if (vtable_entity) {
-		//printf(" %s -> %s\n", get_entity_name(vtable_entity), gdb_node_helper(clss));
-		cpmap_set(vtable2class, vtable_entity, clss);
+		//printf(" %s -> %s\n", get_entity_name(vtable_entity), gdb_node_helper(klass));
+		cpmap_set(vtable2class, vtable_entity, klass);
 	}
 	else {
-		//printf(" %s has no vtable\n", gdb_node_helper(clss));
+		//printf(" %s has no vtable\n", gdb_node_helper(klass));
+		//printf("\tis interface: %u\n", oo_get_class_is_interface(klass));
+		//printf("\tis extern: %u\n", oo_get_class_is_extern(klass));
 	}
 }
 
@@ -365,6 +376,13 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		cpmap_set(&entity2graph, get_irg_entity(g), g);
 	}
 
+	cpmap_t vtable2class;
+	cpmap_init(&vtable2class, hash_ptr, ptr_equals);
+	{ // walk all classes to fill the vtable2class map
+		class_collector_env env = { .vtable2class = &vtable2class };
+		class_walk_super2sub(walk_classes_and_collect, NULL, &env);
+	}
+
 	cpmap_t disabled_targets;
 	cpmap_init(&disabled_targets, hash_ptr, ptr_equals);
 
@@ -382,14 +400,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		}
 	}
 
-	cpmap_t vtable2class;
-	cpmap_init(&vtable2class, hash_ptr, ptr_equals);
-	{ // walk all classes to fill the vtable2class map
-		class_walker_env env = { .vtable2class = &vtable2class };
-		class_walk_super2sub(class_walker, NULL, &env);
-	}
-
-	callgraph_walker_env env = {
+	analyzer_env env = {
 		.workqueue = workqueue,
 		.entity2graph = &entity2graph,
 		.vtable2class = &vtable2class,
@@ -410,7 +421,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		printf("\n== %s.%s\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)));
 
 		cpset_insert(&done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
-		irg_walk_graph(g, NULL, callgraph_walker, &env);
+		irg_walk_graph(g, NULL, walk_callgraph_and_analyze, &env);
 	}
 
 
@@ -435,7 +446,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		}
 	}
 	{
-		printf("\ndyncall targets:\n");
+		printf("\ndyncall target sets:\n");
 		//printf("size %u\n", cpmap_size(dyncall_targets));
 		cpmap_iterator_t iterator;
 		cpmap_iterator_init(&iterator, dyncall_targets);
@@ -456,6 +467,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 			}
 		}
 	}
+	printf("\n=============================================================\n");
 
 	// free data structures
 	del_pdeq(workqueue);
@@ -469,6 +481,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		while ((entry = cpmap_iterator_next(&it))->key != NULL || entry->data != NULL) {
 			cpset_t* set = entry->data;
 			cpmap_remove_iterator(&disabled_targets, &it);
+			assert(set);
 			cpset_destroy(set);
 			free(set);
 		}
@@ -528,9 +541,9 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
 	}
 }
 
-static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
+static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 	assert(environment);
-	optimizer_env *env = environment;
+	optimizer_env *env = (optimizer_env*)environment;
 
 	switch (get_irn_opcode(node)) {
 	case iro_Call: {
@@ -561,6 +574,7 @@ static void walk_and_optimize_dyncalls(ir_node *node, void* environment) {
 				ir_node *symc = new_Address(target);
 				set_irn_n(node, 1, symc);
 			}
+
 			// add to workqueue
 			cpset_iterator_t it;
 			cpset_iterator_init(&it, targets);
@@ -618,8 +632,13 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 		printf("\n== %s.%s\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)));
 
 		cpset_insert(&done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
-		irg_walk_graph(g, NULL, walk_and_optimize_dyncalls, &env);
+		irg_walk_graph(g, NULL, walk_callgraph_and_devirtualize, &env);
 	}
+
+	// free data structures
+	del_pdeq(workqueue);
+	cpmap_destroy(&entity2graph);
+	cpset_destroy(&done_set);
 
 }
 
