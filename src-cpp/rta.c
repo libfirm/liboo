@@ -96,7 +96,8 @@ static void add_new_used_class(ir_type *klass, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(env);
 
-	if (cpset_find(env->used_classes, klass) == NULL) { // if it had not already been added
+	if (cpset_find(env->used_classes, klass) == NULL // if it had not already been added
+	    && !oo_get_class_is_abstract(klass)) { // if not abstract
 		// add to used classes
 		cpset_insert(env->used_classes, klass);
 		printf("\t\t\t\t\tadded new used class %s\n", get_class_name(klass));
@@ -141,8 +142,6 @@ static void add_all_subclasses(ir_type *klass, analyzer_env *env) {
 
 	// add itself
 	add_new_used_class(klass, env);
-
-	printf("\t\t\tadded class type %s to used types\n", get_class_name(klass));
 
 	// add recursively all subclasses
 	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
