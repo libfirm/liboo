@@ -229,10 +229,12 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	}
 	//else // inherited
 
-	if (JUST_CHA || cpset_find(env->used_classes, klass) != NULL) { // if in use
-		take_entity(current_entity, result_set, env);
-	} else {
-		memorize_disabled_method(klass, current_entity, env); // remember entity with this class for patching if this class will become used
+	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
+		if (cpset_find(env->used_classes, klass) != NULL || JUST_CHA) { // if class is actually in use
+			take_entity(current_entity, result_set, env);
+		} else {
+			memorize_disabled_method(klass, current_entity, env); // remember entity with this class for patching if this class will become used
+		}
 	}
 
 	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
