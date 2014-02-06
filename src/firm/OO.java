@@ -55,6 +55,13 @@ public final class OO {
 		binding_oo.oo_set_method_is_abstract(entity.ptr, isAbstract);
 	}
 
+	/**
+	 * @return true if method is abstract
+	 */
+	public static boolean isMethodAbstract(Entity entity) {
+		return binding_oo.oo_get_method_is_abstract(entity.ptr);
+	}
+
 	public static void setMethodIsFinal(Entity entity, boolean isFinal) {
 		binding_oo.oo_set_method_is_final(entity.ptr, isFinal);
 	}
@@ -82,6 +89,14 @@ public final class OO {
 	 */
 	public static void setEntityBinding(Entity entity, binding_oo.ddispatch_binding binding) {
 		binding_oo.oo_set_entity_binding(entity.ptr, binding.val);
+	}
+
+	/**
+	 * returns the binding mode of a method
+	 */
+	public static binding_oo.ddispatch_binding getEntityBinding(Entity entity) {
+		int binding = binding_oo.oo_get_entity_binding(entity.ptr);
+		return binding_oo.ddispatch_binding.getEnum(binding);
 	}
 
 	/**
