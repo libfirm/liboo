@@ -277,6 +277,47 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 		}
 		break;
 	}
+	case iro_Load: {
+		// look for load of non-private fields of external classes to detect used objects whose creations we can't analyze elseway
+		// note: This is necessary because we can't analyze the standard library.
+		// note: We can't check for "public" so we have to do it for _all_ fields (which is very suboptimal).
+		ir_node *src =  get_irn_n(node, 1);
+		printf("\tload: %s\n", gdb_node_helper(src));
+		if (is_Address(src)) { // static field
+			ir_entity *entity = get_Address_entity(src);
+			printf("\t\t%s\n", get_entity_name(entity));
+			ir_type *owner = get_entity_owner(entity);
+			printf("\t\t\towner: %s\n", get_class_name(owner));
+			ir_type *type = get_entity_type(entity);
+			while (is_Pointer_type(type))
+				type = get_pointer_points_to_type(type);
+			printf("\t\t\t(points to) type: %s\n", gdb_node_helper(type));
+
+			// note: problem is we can't say where the static field came from (extern class or not)
+			if (is_Class_type(type)) {
+				printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
+				add_all_subclasses(type, env);
+			}
+		} else if (is_Sel(src)) { // nonstatic field
+			ir_entity *entity = get_Sel_entity(src);
+			printf("\t\t%s\n", get_entity_name(entity));
+			ir_type *owner = get_entity_owner(entity);
+			printf("\t\t\towner: %s\n", get_class_name(owner));
+			ir_type *type = get_entity_type(entity);
+			while (is_Pointer_type(type))
+				type = get_pointer_points_to_type(type);
+			printf("\t\t\t(points to) type: %s\n", gdb_node_helper(type));
+
+			printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
+			if (oo_get_class_is_extern(owner)) { // add to used classes only if its an field of an external class
+				if (is_Class_type(type)) {
+					add_all_subclasses(type, env);
+				}
+			}
+		} else
+			assert(false); // shouldn't happen!??? Are there more possibilities than Address and Sel?
+		break;
+	}
 	case iro_Call: {
 		ir_node *fp = get_irn_n(node, 1);
 		if (is_Address(fp)) {
