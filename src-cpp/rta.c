@@ -388,18 +388,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 	cpmap_init(&disabled_targets, hash_ptr, ptr_equals);
 
 	pdeq *workqueue = new_pdeq();
-	{ // add all given entry points to workqueue
-		cpset_iterator_t it;
-		cpset_iterator_init(&it, entry_points);
-		ir_entity *entry;
-		while ((entry = cpset_iterator_next(&it)) != NULL) {
-			assert(is_method_entity(entry));
-			cpset_insert(used_methods, entry);
-			ir_graph *graph = cpmap_find(&entity2graph, entry);
-			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
-			pdeq_putr(workqueue, graph);
-		}
-	}
 
 	analyzer_env env = {
 		.workqueue = workqueue,
@@ -410,6 +398,42 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		.dyncall_targets = dyncall_targets,
 		.disabled_targets = &disabled_targets
 	};
+
+	{ // add all given entry points to workqueue and check their parameters for class types
+		cpset_iterator_t it;
+		cpset_iterator_init(&it, entry_points);
+		ir_entity *entry;
+		while ((entry = cpset_iterator_next(&it)) != NULL) {
+			assert(is_method_entity(entry));
+
+			// add to used methods
+			cpset_insert(used_methods, entry);
+
+			// add to workqueue
+			ir_graph *graph = cpmap_find(&entity2graph, entry);
+			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			pdeq_putr(workqueue, graph);
+
+			// check parameters for incoming class types
+			printf("entry point: %s.%s %s\n", get_class_name(get_entity_owner(entry)), get_entity_name(entry), gdb_node_helper(entry));
+			ir_type *methodtype = get_entity_type(entry);
+			assert(is_Method_type(methodtype));
+			for (size_t i=0; i<get_method_n_params(methodtype); i++) {
+				ir_type *type = get_method_param_type(methodtype, i);
+				printf("\tparameter type %s\n", gdb_node_helper(type));
+				if (is_Pointer_type(type)) {
+					while (is_Pointer_type(type))
+						type = get_pointer_points_to_type(type);
+					if (is_Class_type(type)) {
+						printf("\t\tfound class type: %s\n", get_class_name(type));
+						add_all_subclasses(type, &env);
+					}
+				} else
+					assert(!is_Class_type(type)); // class type without pointer shouldn't happen
+			}
+
+		}
+	}
 
 	cpset_t done_set;
 	cpset_init(&done_set, hash_ptr, ptr_equals);
@@ -604,6 +628,13 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 	}
 
 	pdeq *workqueue = new_pdeq();
+
+	optimizer_env env = {
+		.workqueue = workqueue,
+		.entity2graph = &entity2graph,
+		.dyncall_targets = dyncall_targets,
+	};
+
 	{ // add all given entry points to workqueue
 		cpset_iterator_t it;
 		cpset_iterator_init(&it, entry_points);
@@ -615,12 +646,6 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 			pdeq_putr(workqueue, graph);
 		}
 	}
-
-	optimizer_env env = {
-		.workqueue = workqueue,
-		.entity2graph = &entity2graph,
-		.dyncall_targets = dyncall_targets,
-	};
 
 	cpset_t done_set;
 	cpset_init(&done_set, hash_ptr, ptr_equals);
