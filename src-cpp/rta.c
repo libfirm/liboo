@@ -563,9 +563,9 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 /** frees memory allocated for the results returned by function run_rta
  * @note does not free the memory of the sets and maps themselves, just their content allocated during RTA
- * @param used_classes as returned by run_rta
- * @param used_methods as returned by run_rta
- * @param dyncall_targets as returned by run_rta
+ * @param used_classes as returned by rta_run
+ * @param used_methods as returned by rta_run
+ * @param dyncall_targets as returned by rta_run
  */
 static void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
 	assert(used_classes);
@@ -637,8 +637,8 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 				assert(cpset_iterator_next(&it) == NULL);
 
 				printf("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-				ir_node *symc = new_Address(target);
-				set_irn_n(node, 1, symc);
+				ir_node *address = new_Address(target);
+				set_irn_n(node, 1, address);
 			}
 
 			// add to workqueue
