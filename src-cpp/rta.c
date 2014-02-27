@@ -300,20 +300,23 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 			}
 		} else if (is_Sel(src)) { // nonstatic field
 			ir_entity *entity = get_Sel_entity(src);
-			printf("\t\t%s\n", get_entity_name(entity));
 			ir_type *owner = get_entity_owner(entity);
-			printf("\t\t\towner: %s\n", get_class_name(owner));
-			ir_type *type = get_entity_type(entity);
-			while (is_Pointer_type(type))
-				type = get_pointer_points_to_type(type);
-			printf("\t\t\t(points to) type: %s\n", gdb_node_helper(type));
+			//printf("\t\t\towner: %s\n", gdb_node_helper(owner));
+			if (is_Class_type(owner)) {
+				printf("\t\t%s\n", get_entity_name(entity));
+				printf("\t\t\towner: %s\n", get_class_name(owner));
+				ir_type *type = get_entity_type(entity);
+				while (is_Pointer_type(type))
+					type = get_pointer_points_to_type(type);
+				printf("\t\t\t(points to) type: %s\n", gdb_node_helper(type));
 
-			printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
-			if (oo_get_class_is_extern(owner)) { // add to used classes only if its an field of an external class
-				if (is_Class_type(type)) {
-					add_all_subclasses(type, env);
+				printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
+				if (oo_get_class_is_extern(owner)) { // add to used classes only if its an field of an external class
+					if (is_Class_type(type)) {
+						add_all_subclasses(type, env);
+					}
 				}
-			}
+			} //else // array access or other
 		} else
 			assert(false); // shouldn't happen!??? Are there more possibilities than Address and Sel?
 		break;
