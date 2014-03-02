@@ -51,7 +51,6 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing ne
 
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
-	cpmap_t *entity2graph; // map for finding the graph to a given entity
 	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
 	cpset_t *used_classes; // used classes found by examining object creation or coming in from external functions
 	cpset_t *used_methods; // used method entities
@@ -176,7 +175,7 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
-	ir_graph *graph = cpmap_find(env->entity2graph, method);
+	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
 		//if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
 			printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
@@ -413,14 +412,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 	cpset_init(used_methods, hash_ptr, ptr_equals);
 	cpmap_init(dyncall_targets, hash_ptr, ptr_equals);
 
-
-	cpmap_t entity2graph;
-	cpmap_init(&entity2graph, hash_ptr, ptr_equals);
-	for (size_t i = 0; i<get_irp_n_irgs(); i++) {
-		ir_graph *g = get_irp_irg(i);
-		cpmap_set(&entity2graph, get_irg_entity(g), g);
-	}
-
 	cpmap_t vtable2class;
 	cpmap_init(&vtable2class, hash_ptr, ptr_equals);
 	{ // walk all classes to fill the vtable2class map
@@ -435,7 +426,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 	analyzer_env env = {
 		.workqueue = workqueue,
-		.entity2graph = &entity2graph,
 		.vtable2class = &vtable2class,
 		.used_classes = used_classes,
 		.used_methods = used_methods,
@@ -454,7 +444,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 			cpset_insert(used_methods, entry);
 
 			// add to workqueue
-			ir_graph *graph = cpmap_find(&entity2graph, entry);
+			ir_graph *graph = get_entity_irg(entry);
 			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
 			pdeq_putr(workqueue, graph);
 
@@ -540,7 +530,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 	// free data structures
 	del_pdeq(workqueue);
-	cpmap_destroy(&entity2graph);
 	cpmap_destroy(&vtable2class);
 
 	{ // delete the sets in map disabled_targets
@@ -595,7 +584,6 @@ static void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cp
 
 typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
-	cpmap_t *entity2graph; // map for finding the graph to a given entity
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 } optimizer_env;
 
@@ -603,7 +591,7 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
-	ir_graph *graph = cpmap_find(env->entity2graph, method);
+	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
 		printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 		pdeq_putr(env->workqueue, graph);
@@ -664,18 +652,10 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targets) {
 	assert(dyncall_targets);
 
-	cpmap_t entity2graph;
-	cpmap_init(&entity2graph, hash_ptr, ptr_equals);
-	for (size_t i = 0; i<get_irp_n_irgs(); i++) {
-		ir_graph *g = get_irp_irg(i);
-		cpmap_set(&entity2graph, get_irg_entity(g), g);
-	}
-
 	pdeq *workqueue = new_pdeq();
 
 	optimizer_env env = {
 		.workqueue = workqueue,
-		.entity2graph = &entity2graph,
 		.dyncall_targets = dyncall_targets,
 	};
 
@@ -685,7 +665,7 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 		ir_entity *entry;
 		while ((entry = cpset_iterator_next(&it)) != NULL) {
 			assert(is_method_entity(entry));
-			ir_graph *graph = cpmap_find(&entity2graph, entry);
+			ir_graph *graph = get_entity_irg(entry);
 			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
 			pdeq_putr(workqueue, graph);
 		}
@@ -707,7 +687,6 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 
 	// free data structures
 	del_pdeq(workqueue);
-	cpmap_destroy(&entity2graph);
 	cpset_destroy(&done_set);
 
 }
