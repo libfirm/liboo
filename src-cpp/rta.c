@@ -1,6 +1,16 @@
+/*
+ * This file is part of liboo.
+ */
+
+/**
+ * @file	rta.c
+ * @brief	Devirtualization of dynamically linked calls through Rapid Type Analysis
+ * @author	Steffen Knoth
+ * @date	2014
+ */
 
 
-#include "include/liboo/rta.h"
+#include "liboo/rta.h"
 
 #include <assert.h>
 
