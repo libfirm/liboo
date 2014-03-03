@@ -228,7 +228,9 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	}
 	//else // inherited
 
-	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
+	if (!oo_get_method_is_abstract(current_entity) // ignore abstract methods
+		&& !oo_get_method_is_inherited(current_entity)) { // ignore copied entities of inherited methods
+
 		if (cpset_find(env->used_classes, klass) != NULL || JUST_CHA) { // if class is actually in use
 			take_entity(current_entity, result_set, env);
 		} else {
