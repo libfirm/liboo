@@ -338,11 +338,11 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 			// handle static call
 			ir_entity *entity = get_Address_entity(fp);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-			printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-			printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-			printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-			printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-			printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
+			//printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+			//printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+			//printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+			//printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+			//printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
 			// add to used methods
 			cpset_insert(env->used_methods, entity);
@@ -353,11 +353,11 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 			// handle dynamic call
 			ir_entity *entity = get_Sel_entity(fp);
 			printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-			printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-			printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-			printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-			printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-			printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
+			//printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+			//printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+			//printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+			//printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+			//printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
 			if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
 				// calculate set of method entities that this call could potentially call
@@ -401,12 +401,24 @@ static void walk_classes_and_collect(ir_type *klass, void* environment) {
 		//printf("\tis interface: %u\n", oo_get_class_is_interface(klass));
 		//printf("\tis extern: %u\n", oo_get_class_is_extern(klass));
 	}
+
+/*	size_t n = get_class_n_supertypes(klass);
+	printf("\t%u ", n);
+	for (size_t i=0; i<n; i++) {
+		ir_type *super = get_class_supertype(klass, i);
+		printf("%s", get_class_name(super));
+		if (i<n-1) printf(", ");
+	}
+	printf("\n");
+*/
 }
 
 
 /** run Rapid Type Analysis
  * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically linked call.
- * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all public functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!! RTA also won't work with programs that dynamically load classes at run-time!
+ * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!!
+ * @note RTA also won't work with programs that dynamically load classes at run-time! It can lead to defective programs!!
+ * @note RTA needs to know about _all_ classes. (The class hierarchy graph(s) must be complete.) This means it is necessary to load _all_ inner dependencies of external library classes! Otherwise the results can be incorrect and can lead to defective programs!!
  * @param entry_points all (public) entry points to program code (as ir_entity*)
  * @param used_classes give pointer to empty uninitialized set for receiving results, This is a set where all used classes are put (as ir_type*).
  * @param used_methods give pointer to empty uninitialized set for receiving results, This is a set where all used methods are put (as ir_entity*).
@@ -430,6 +442,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		class_collector_env env = { .vtable2class = &vtable2class };
 		class_walk_super2sub(walk_classes_and_collect, NULL, &env);
 	}
+	printf("number of classes with vtables: %u\n", cpmap_size(&vtable2class));
 
 	cpmap_t disabled_targets;
 	cpmap_init(&disabled_targets, hash_ptr, ptr_equals);
@@ -704,19 +717,20 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 }
 
 
-void rta_optimization(size_t n_entry_points, ir_entity** entry_points) {
-	cpset_t entry_points_;
-	cpset_init(&entry_points_, hash_ptr, ptr_equals);
+void rta_optimization(size_t n_entry_points, ir_entity **entry_points) {
+	cpset_t entry_points_set;
+	cpset_init(&entry_points_set, hash_ptr, ptr_equals);
 	for (size_t i=0; i<n_entry_points; i++) {
-		cpset_insert(&entry_points_, entry_points[i]);
+		ir_entity *entry_point = entry_points[i];
+		cpset_insert(&entry_points_set, entry_point);
 	}
 
 	cpset_t used_classes;
 	cpset_t used_methods;
 	cpmap_t dyncall_targets;
 
-	rta_run(&entry_points_, &used_classes, &used_methods, &dyncall_targets);
-	rta_devirtualize_calls(&entry_points_, &dyncall_targets);
+	rta_run(&entry_points_set, &used_classes, &used_methods, &dyncall_targets);
+	rta_devirtualize_calls(&entry_points_set, &dyncall_targets);
 	//rta_discard_unused(&used_classes, &used_methods); ??
 	rta_dispose_results(&used_classes, &used_methods, &dyncall_targets);
 }
