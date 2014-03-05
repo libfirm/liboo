@@ -249,7 +249,7 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	//else // inherited
 
 	while (oo_get_method_is_inherited(current_entity)) { // use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
-		ir_entity *impl_entity = get_entity_overwrites(current_entity, 0); // first entity overwrite should be the nonabstract one
+		ir_entity *impl_entity = oo_get_entity_overwritten_superclass_entity(current_entity);
 		//assert(!oo_get_method_is_inherited(impl_entity));
 		assert(!oo_get_class_is_interface(get_entity_owner(impl_entity)));
 		printf("\t\t\tfound copied method entity %s.%s -> %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), get_class_name(get_entity_owner(impl_entity)), get_entity_name(impl_entity));
