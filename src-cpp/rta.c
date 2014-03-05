@@ -172,6 +172,7 @@ static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
+	assert(!oo_get_method_is_inherited(method));
 	printf("\t\thandling external method %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 	//TODO what if we already had handled this external method?
 	ir_type *methodtype = get_entity_type(method);
