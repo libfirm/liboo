@@ -127,6 +127,8 @@ void ddispatch_setup_vtable(ir_type *klass)
 			continue;
 
 		ir_entity *overwritten_entity = oo_get_entity_overwritten_superclass_entity(member);
+		while (overwritten_entity && oo_get_method_is_inherited(overwritten_entity))
+			overwritten_entity = oo_get_entity_overwritten_superclass_entity(overwritten_entity);
 		if (overwritten_entity) {
 			int vtable_id = oo_get_method_vtable_index(overwritten_entity);
 			assert (vtable_id != -1);
@@ -175,7 +177,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 			if (member_vtid != -1) {
 				ir_entity *ent;
 				if (oo_get_method_is_inherited(member)) {
-					ent = oo_get_entity_overwritten_superclass_entity(member);
+					ent = member;
+					while (ent && oo_get_method_is_inherited(ent))
+						ent = oo_get_entity_overwritten_superclass_entity(ent);
 					assert (ent);
 				} else if (! oo_get_method_is_abstract(member)) {
 					ent = member;

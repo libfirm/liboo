@@ -250,7 +250,8 @@ static ir_entity *create_method_table(ir_type *klass, size_t n_methods)
 			continue;
 
 		if (oo_get_method_is_inherited(member)) {
-			member = oo_get_entity_overwritten_superclass_entity(member);
+			while (member && oo_get_method_is_inherited(member))
+				member = oo_get_entity_overwritten_superclass_entity(member);
 			assert(member != NULL);
 		}
 		ir_initializer_t *mt_init = create_method_info(member);
