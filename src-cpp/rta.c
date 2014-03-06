@@ -154,17 +154,18 @@ static void memorize_disabled_method(ir_type *klass, ir_entity *entity, analyzer
 	cpset_insert(methods, entity);
 }
 
-static void add_all_subclasses(ir_type *klass, analyzer_env *env) {
+static void add_all_external_subclasses(ir_type *klass, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(env);
 
 	// add itself
-	add_new_used_class(klass, env);
+	if (oo_get_class_is_extern(klass))
+		add_new_used_class(klass, env);
 
 	// add recursively all subclasses
 	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
 		ir_type *subclass = get_class_subtype(klass, i);
-		add_all_subclasses(subclass, env);
+		add_all_external_subclasses(subclass, env);
 	}
 }
 
@@ -184,7 +185,7 @@ static void handle_external_method(ir_entity *method, analyzer_env *env) {
 				type = get_pointer_points_to_type(type);
 			if (is_Class_type(type)) {
 				// add class and all its subclasses to used types
-				add_all_subclasses(type, env);
+				add_all_external_subclasses(type, env);
 			}
 		} else
 			assert(!is_Class_type(type)); // modern languages shouldn't have class types without pointer
@@ -324,7 +325,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 			// note: problem is we can't say where the static field came from (extern class or not)
 			if (is_Class_type(type)) {
 				printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
-				add_all_subclasses(type, env);
+				add_all_external_subclasses(type, env);
 			}
 		} else if (is_Sel(src)) { // nonstatic field
 			ir_entity *entity = get_Sel_entity(src);
@@ -341,7 +342,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 				printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
 				if (oo_get_class_is_extern(owner)) { // add to used classes only if its an field of an external class
 					if (is_Class_type(type)) {
-						add_all_subclasses(type, env);
+						add_all_external_subclasses(type, env);
 					}
 				}
 			} //else // array access or other
@@ -502,7 +503,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 						type = get_pointer_points_to_type(type);
 					if (is_Class_type(type)) {
 						printf("\t\tfound class type: %s\n", get_class_name(type));
-						add_all_subclasses(type, &env);
+						add_all_external_subclasses(type, &env);
 					}
 				} else
 					assert(!is_Class_type(type)); // class type without pointer shouldn't happen
