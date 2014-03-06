@@ -107,7 +107,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 	assert(is_Class_type(klass));
 
 	ir_entity *vtable = oo_get_class_vtable_entity(klass);
-	if (! vtable)
+	if (vtable == NULL)
+		return;
+	if (get_entity_initializer(vtable) != NULL)
 		return;
 
 	unsigned vtable_size;
