@@ -324,12 +324,17 @@ void ddispatch_set_abstract_method_ident(ident* ami)
 	ddispatch_model.abstract_method_ident = ami;
 }
 
-unsigned ddispatch_get_vptr_points_to_index()
+unsigned ddispatch_get_vptr_points_to_index(void)
 {
 	return ddispatch_model.vptr_points_to_index;
 }
 
-unsigned ddispatch_get_index_of_rtti_ptr()
+unsigned ddispatch_get_index_of_rtti_ptr(void)
 {
 	return ddispatch_model.index_of_rtti_ptr;
+}
+
+unsigned ddispatch_get_index_of_first_method(void)
+{
+	return ddispatch_model.index_of_first_method;
 }

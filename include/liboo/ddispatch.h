@@ -76,5 +76,6 @@ ir_entity *ddispatch_get_bound_entity(ir_entity *entity);
 
 unsigned ddispatch_get_vptr_points_to_index(void);
 unsigned ddispatch_get_index_of_rtti_ptr(void);
+unsigned ddispatch_get_index_of_first_method(void);
 
 #endif
