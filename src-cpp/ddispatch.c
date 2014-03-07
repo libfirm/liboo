@@ -4,9 +4,11 @@
 #include "liboo/oo.h"
 #include "liboo/rtti.h"
 #include "liboo/dmemory.h"
+#include "liboo/nodes.h"
 
 #include <assert.h>
 #include "adt/error.h"
+#include "adt/util.h"
 
 static ir_mode   *mode_reference;
 static ir_type   *type_reference;
@@ -210,70 +212,74 @@ void ddispatch_lower_Call(ir_node* call)
 	assert(is_Call(call));
 
 	ir_node *callee = get_Call_ptr(call);
-	if (!is_Sel(callee))
+	if (!is_Proj(callee))
+		return;
+	ir_node *methodsel = get_Proj_pred(callee);
+	if (!is_MethodSel(methodsel))
 		return;
 
-	ir_node   *objptr        = get_Sel_ptr(callee);
-	ir_entity *method_entity = get_Sel_entity(callee);
-	if (!is_method_entity(method_entity))
-		return;
+	ir_node   *objptr = get_MethodSel_ptr(methodsel);
+	ir_node   *mem    = get_MethodSel_mem(methodsel);
+	ir_entity *method = get_MethodSel_entity(methodsel);
+	assert(is_method_entity(method));
 
-	ir_type *classtype = get_entity_owner(method_entity);
-	if (!is_Class_type(classtype))
-		return;
+	ir_type *classtype = get_entity_owner(method);
+	assert(is_Class_type(classtype));
 
-	ddispatch_binding binding = oo_get_entity_binding(method_entity);
+	ddispatch_binding binding = oo_get_entity_binding(method);
 	if (binding == bind_unknown)
-		panic("method %s has no binding specified",
-		      get_entity_name(method_entity));
+		panic("method %s has no binding specified", get_entity_name(method));
 
 	/* If the call has been explicitly marked as statically bound, then obey. */
 	if (oo_get_call_is_statically_bound(call))
 		binding = bind_static;
-	if (binding == bind_dynamic && oo_get_method_is_final(method_entity))
+	if (binding == bind_dynamic && oo_get_method_is_final(method))
 		binding = bind_static;
 	if (binding == bind_dynamic && oo_get_class_is_final(classtype))
 		binding = bind_static;
 
-	ir_graph *irg         = get_irn_irg(call);
-	ir_node  *block       = get_nodes_block(call);
-	ir_node  *cur_mem     = get_Call_mem(call);
-	ir_node  *real_callee = NULL;
+	ir_graph *irg   = get_irn_irg(call);
+	ir_node  *block = get_nodes_block(call);
 
+	ir_node *new_mem = mem;
+	ir_node *new_res;
 	switch (binding) {
-	case bind_static: {
-		real_callee = new_r_Address(irg, method_entity);
+	case bind_static:
+		new_res = new_r_Address(irg, method);
 		break;
-	}
+
 	case bind_dynamic: {
 		ir_entity *vptr_entity  = oo_get_class_vptr_entity(classtype);
 		ir_node   *vptr         = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
 
-		ir_node   *vtable_load  = new_r_Load(block, cur_mem, vptr, mode_reference, cons_none);
+		ir_node   *vtable_load  = new_r_Load(block, mem, vptr, mode_reference, cons_none);
 		ir_node   *vtable_addr  = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
-		cur_mem                 = new_r_Proj(vtable_load, mode_M, pn_Load_M);
+		ir_node   *vtable_mem   = new_r_Proj(vtable_load, mode_M, pn_Load_M);
 
-		int        vtable_id    = oo_get_method_vtable_index(method_entity);
+		int        vtable_id    = oo_get_method_vtable_index(method);
 		assert(vtable_id != -1);
 
 		unsigned type_ref_size  = get_type_size_bytes(type_reference);
 		ir_node *vtable_offset  = new_r_Const_long(irg, mode_reference, vtable_id * type_ref_size);
 		ir_node *funcptr_addr   = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
-		ir_node *callee_load    = new_r_Load(block, cur_mem, funcptr_addr, mode_reference, cons_none);
-		real_callee             = new_r_Proj(callee_load, mode_reference, pn_Load_res);
-		cur_mem                 = new_r_Proj(callee_load, mode_M, pn_Load_M);
+		ir_node *callee_load    = new_r_Load(block, vtable_mem, funcptr_addr, mode_reference, cons_none);
+		new_res                 = new_r_Proj(callee_load, mode_reference, pn_Load_res);
+		new_mem                 = new_r_Proj(callee_load, mode_M, pn_Load_M);
 		break;
 	}
-	case bind_interface: {
-		real_callee = (*ddispatch_model.construct_interface_lookup)(objptr, classtype, method_entity, irg, block, &cur_mem);
+	case bind_interface:
+		new_res = (*ddispatch_model.construct_interface_lookup)(objptr, classtype, method, irg, block, &new_mem);
 		break;
-	}
+
 	default:
 		panic("Cannot lower call.");
 	}
 
-	set_Call_ptr(call, real_callee);
-	set_Call_mem(call, cur_mem);
+	ir_node *in[] = {
+		[pn_MethodSel_M]   = new_mem,
+		[pn_MethodSel_res] = new_res,
+	};
+	turn_into_tuple(methodsel, ARRAY_SIZE(in), in);
 }
 
 void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *objptr, ir_node **mem, ir_type* klass)

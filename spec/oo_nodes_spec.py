@@ -37,3 +37,22 @@ class Arraylength:
 	]
 	flags   = [ "uses_memory" ]
 	pinned  = "no"
+
+@op
+class MethodSel:
+	"""Performs a vtable lookup for a method (or rtti info)."""
+	ins = [
+		("mem", "memory dependency"),
+		("ptr", "pointer to an object with a vtable"),
+	]
+	outs = [
+		("M",   "memory result"),
+		("res", "address of method"),
+	]
+	attrs = [
+		Attribute("entity", type="ir_entity*",
+		          comment="method entity which should be selected"),
+	]
+	attr_struct = "op_MethodSel_attr_t"
+	flags       = [ "uses_memory" ]
+	pinned      = "no"
