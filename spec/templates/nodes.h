@@ -2,15 +2,14 @@
 #ifndef FIRM_{{spec.name|upper}}_NODES_H
 #define FIRM_{{spec.name|upper}}_NODES_H
 
-{% if spec.external -%}
+{% if spec.external %}
 {% set FIRM_API="" %}
 #include <libfirm/firm_types.h>
-{%- else -%}
+{% else %}
 #include "firm_types.h"
-
 #include "begin.h"
-{%- set FIRM_API="FIRM_API "-%}
-{%- endif -%}
+{% set FIRM_API="FIRM_API "-%}
+{% endif %}
 
 /** The opcodes of the libFirm predefined operations.
  * @ingroup ir_op
@@ -154,10 +153,22 @@ ir_node **get_{{node.name}}_{{node.input_name}}_arr(ir_node *node);
 
 {% endfor -%}
 
-/** @} */
+{% for node in abstract_nodes -%}
+/**
+ * Test if node is a {{node.name}}
+ * @returns 1 if the node is a {{node.name}} node, 0 otherwise
+ */
+{{FIRM_API}} int is_{{node.name}}(const ir_node *node);
 
-{% if not spec.external %}
-#include "end.h"
-{% endif %}
+{%- for attr in node.attrs|hasnot("noprop") %}
+/** Returns {{attr.name}} attribute of {{node.name|a_an}} node. */
+{{FIRM_API}} {{attr.type}} get_{{node.name}}_{{attr.name}}(const ir_node *node);
+/** Sets {{attr.name}} attribute of {{node.name|a_an}} node. */
+{{FIRM_API}} void set_{{node.name}}_{{attr.name}}(ir_node *node, {{attr.type}} {{attr.name}});
+{% endfor -%}
+
+{% endfor %}
+
+/** @} */
 
 #endif

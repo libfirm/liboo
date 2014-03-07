@@ -4,24 +4,24 @@
 # Copyright (C) 2012 Karlsruhe Institute of Technology.
 import sys
 from jinja2 import Environment, Template, FileSystemLoader
-from spec_util import is_dynamic_pinned, isAbstract, setdefault, load_spec
-from filters import format_arguments, filter_isnot, filter_hasnot, filter_notset
+from spec_util import is_dynamic_pinned, isAbstract, setdefault, load_spec, Attribute
+from filters import format_arguments, format_filtjoin, filter_has, filter_hasnot
 
 def format_parameterlist(parameterlist):
 	return "\n".join(parameterlist)
 
 def format_nodearguments(node):
-	arguments = map(lambda arg: arg["name"], node.arguments)
+	arguments = [arg.name for arg in node.arguments]
 	return format_parameterlist(arguments)
 
 def format_nodeparameters(node):
-	parameters = map(lambda arg: arg["type"] + " " + arg["name"], node.arguments)
+	parameters = ["%s %s" % (arg.type, arg.name) for arg in node.arguments]
 	return format_parameterlist(parameters)
 
 def format_nodeparametershelp(node):
 	res = ""
 	for param in node.arguments:
-		res += " * @param %-9s %s\n" % (param["name"], param["comment"])
+		res += " * @param %-9s %s\n" % (param.name, param.comment)
 	return res
 
 def format_a_an(text):
@@ -77,19 +77,18 @@ def format_insdecl(node):
 
 	if arity == "variable":
 		insarity = len(node.ins)
-		res  = "int r_arity = arity + " + `insarity` + ";"
-		res += "\n\tir_node **r_in;"
-		res += "\n\tNEW_ARR_A(ir_node *, r_in, r_arity);"
+		res  = "int r_arity = arity + " + repr(insarity) + ";"
+		res += "\n\tir_node **r_in= ALLOCAN(ir_node*, r_arity);"
 		i = 0
 		for input in node.ins:
-			res += "\n\tr_in[" + `i` + "] = irn_" + input[0] + ";"
+			res += "\n\tr_in[" + repr(i) + "] = irn_" + input[0] + ";"
 			i += 1
-		res += "\n\tmemcpy(&r_in[" + `insarity` + "], in, sizeof(ir_node *) * arity);\n\t"
+		res += "\n\tmemcpy(&r_in[" + repr(insarity) + "], in, sizeof(ir_node *) * arity);\n\t"
 	else:
-		res = "ir_node *in[" + `arity` + "];"
+		res = "ir_node *in[" + repr(arity) + "];"
 		i = 0
 		for input in node.ins:
-			res += "\n\tin[" + `i` + "] = irn_" + input[0] + ";"
+			res += "\n\tin[" + repr(i) + "] = irn_" + input[0] + ";"
 			i += 1
 	return res
 
@@ -105,7 +104,7 @@ def format_arity_and_ins(node):
 	elif arity == 0:
 		return "0, NULL"
 	else:
-		return `arity` + ", in"
+		return repr(arity) + ", in"
 
 def format_arity(node):
 	if hasattr(node, "arity_override"):
@@ -125,9 +124,7 @@ def format_pinned(node):
 		return "op_pin_state_floats"
 	if pinned == "exception":
 		return "op_pin_state_exc_pinned"
-	if pinned == "memory":
-		return "op_pin_state_mem_pinned"
-	print "WARNING: Unknown pinned state %s in format pined" % pinned
+	print("WARNING: Unknown pinned state %s in format pined" % pinned)
 	return ""
 
 def format_flags(node):
@@ -135,6 +132,9 @@ def format_flags(node):
 	if flags == []:
 		flags = [ "irop_flag_none" ]
 	return " | ".join(flags)
+
+def format_stringformat(string, *args):
+	return string % args
 
 def format_attr_size(node):
 	if not hasattr(node, "attr_struct"):
@@ -155,42 +155,55 @@ def format_escape_keywords(word):
 def format_parameters(string):
 	return format_arguments(string, voidwhenempty = True)
 
-env = Environment(loader=FileSystemLoader("."))
-env.filters['a_an']            = format_a_an
-env.filters['parameterlist']   = format_parameterlist
-env.filters['nodearguments']   = format_nodearguments
-env.filters['nodeparameters']  = format_nodeparameters
-env.filters['nodeparametershelp'] = format_nodeparametershelp
-env.filters['blockparameter']  = format_blockparameter
-env.filters['blockparameterhelp'] = format_blockparameterhelp
-env.filters['blockargument']   = format_blockargument
-env.filters['irgassign']       = format_irgassign
-env.filters['curblock']        = format_curblock
-env.filters['insdecl']         = format_insdecl
-env.filters['arity_and_ins']   = format_arity_and_ins
-env.filters['arity']           = format_arity
-env.filters['pinned']          = format_pinned
-env.filters['flags']           = format_flags
-env.filters['attr_size']       = format_attr_size
-env.filters['opindex']         = format_opindex
-env.filters['isnot']           = filter_isnot
-env.filters['hasnot']          = filter_hasnot
-env.filters['arguments']       = format_arguments
-env.filters['parameters']      = format_parameters
-env.filters['escape_keywords'] = format_escape_keywords
+def format_args(arglist):
+	argument_names = [ arg.name for arg in arglist ]
+	return "\n".join(argument_names)
 
-def prepare_attr(attr):
-	if "init" in attr:
-		return dict(
-			type = attr["type"],
-			name = attr["name"],
-			init = attr["init"],
-			comment = attr["comment"])
+def format_block(node):
+	if hasattr(node, "knownBlock"):
+		if hasattr(node, "knownGraph"):
+			return ""
+		return "env->irg"
 	else:
-		return dict(
-			type = attr["type"],
-			name = attr["name"],
-			comment = attr["comment"])
+		return "block"
+
+def format_simplify_type(string):
+	"""Returns a simplified version of a C type for use in a function name.
+	Stars are replaced with _ref, spaces removed and the ir_ firm namespace
+	prefix stripped."""
+	res = string.replace("*", "_ref").replace(" ", "")
+	if res.startswith("ir_"):
+		res = res[3:]
+	return res
+
+env = Environment(loader=FileSystemLoader([".", "/"]), keep_trailing_newline=True)
+env.filters['a_an']               = format_a_an
+env.filters['args']               = format_args
+env.filters['arguments']          = format_arguments
+env.filters['arity_and_ins']      = format_arity_and_ins
+env.filters['arity']              = format_arity
+env.filters['attr_size']          = format_attr_size
+env.filters['blockargument']      = format_blockargument
+env.filters['block']              = format_block
+env.filters['blockparameter']     = format_blockparameter
+env.filters['blockparameterhelp'] = format_blockparameterhelp
+env.filters['curblock']           = format_curblock
+env.filters['escape_keywords']    = format_escape_keywords
+env.filters['flags']              = format_flags
+env.filters['filtjoin']           = format_filtjoin
+env.filters['has']                = filter_has
+env.filters['hasnot']             = filter_hasnot
+env.filters['insdecl']            = format_insdecl
+env.filters['irgassign']          = format_irgassign
+env.filters['nodearguments']      = format_nodearguments
+env.filters['nodeparameters']     = format_nodeparameters
+env.filters['nodeparametershelp'] = format_nodeparametershelp
+env.filters['opindex']            = format_opindex
+env.filters['parameterlist']      = format_parameterlist
+env.filters['parameters']         = format_parameters
+env.filters['pinned']             = format_pinned
+env.filters['simplify_type']      = format_simplify_type
+env.filters['stringformat']       = format_stringformat
 
 def preprocess_node(node):
 	setdefault(node, "attrs_name", node.name.lower())
@@ -200,96 +213,88 @@ def preprocess_node(node):
 	arguments = [ ]
 	initattrs = [ ]
 	for input in node.ins:
-		arguments.append(dict(
-				type    = "ir_node *",
-				name    = "irn_" + input[0],
-				comment = input[1]))
+		arguments.append(
+			Attribute("irn_" + input[0], type="ir_node *",
+			          comment=input[1]))
 
 	if node.arity == "variable" or node.arity == "dynamic":
-		arguments.append(dict(
-				type    = "int",
-				name    = "arity",
-				comment = "size of additional inputs array"))
-		arguments.append(dict(
-				type    = "ir_node *const *",
-				name    = "in",
-				comment = "additional inputs"))
+		arguments.append(
+			Attribute("arity", type="int",
+			          comment="size of additional inputs array"))
+		arguments.append(
+			Attribute("in", type="ir_node *const *",
+			          comment="additional inputs"))
 
 	if not hasattr(node, "mode"):
-		arguments.append(dict(
-				type    = "ir_mode *",
-				name    = "mode",
-				comment = "mode of the operations result"))
-		node.mode = "mode"
+		arguments.append(
+			Attribute("mode", type="ir_mode *",
+			          comment = "mode of the operations result"))
 
 	for attr in node.attrs:
-		attr["fqname"] = attr["name"]
-		if "init" in attr:
+		if attr.init is not None:
 			continue
 		arguments.append(attr)
 
 	# dynamic pin state means more constructor arguments
 	if is_dynamic_pinned(node):
 		if hasattr(node, "pinned_init"):
-			initattrs.append(dict(
-				fqname = "exc.pin_state",
-				init   = node.pinned_init
-			))
+			initattrs.append(
+				Attribute("pin_state", fqname="exc.pin_state",
+				          type="op_pin_state", init=node.pinned_init))
 		else:
 			node.constructor_args.append(
-				dict(
-					name    = "pin_state",
-					type    = "op_pin_state",
-					comment = "pinned state",
-				)
-			)
-			initattrs.append(dict(
-				fqname = "exc.pin_state",
-				init   = "pin_state"
-			))
+				Attribute("pin_state", type="op_pin_state",
+				          comment = "pinned state"))
+			initattrs.append(
+				Attribute("pin_state", fqname="exc.pin_state",
+				          type="op_pin_state", init="pin_state"))
 	if hasattr(node, "throws_init"):
-		initattrs.append(dict(
-			fqname = "exc.throws_exception",
-			init   = node.throws_init
-		))
+		initattrs.append(
+			Attribute("throws_exception", fqname="exc.throws_exception",
+			          type="unsigned", init=node.throws_init))
 
 	for arg in node.constructor_args:
-		arguments.append(prepare_attr(arg))
+		arguments.append(arg)
 
 	node.arguments = arguments
 	node.initattrs = initattrs
 
 def prepare_nodes(nodes):
 	real_nodes = []
+	abstract_nodes = []
 	for node in nodes:
 		if isAbstract(node):
-			continue
-		real_nodes.append(node)
+			abstract_nodes.append(node)
+		else:
+			real_nodes.append(node)
 
 	for node in real_nodes:
 		preprocess_node(node)
 
-	return real_nodes
+	return (real_nodes, abstract_nodes)
 
 def main(argv):
 	if len(argv) < 3:
-		print "usage: %s specfile templatefile" % argv[0]
+		print("usage: %s specfile templatefile" % argv[0])
 		sys.exit(1)
 
-	specfile   = argv[1]
-	spec       = load_spec(specfile)
-	nodes      = spec.nodes
-	real_nodes = prepare_nodes(nodes)
+	specfile = argv[1]
+	spec     = load_spec(specfile)
+	(nodes, abstract_nodes) = prepare_nodes(spec.nodes)
 
 	templatefile = argv[2]
 
-	env.globals['nodes']   = real_nodes
+	env.globals['nodes']          = nodes
+	env.globals['abstract_nodes'] = abstract_nodes
 	env.globals['spec']    = spec
 	env.globals['len']     = len
+	env.globals['hasattr'] = hasattr
+	env.globals['is_dynamic_pinned'] = is_dynamic_pinned
 	env.globals['warning'] = "/* Warning: automatically generated file */"
 
 	template = env.get_template(templatefile)
-	sys.stdout.write(template.render().encode("utf-8"))
+	result = template.render()
+	sys.stdout.write(result)
 
 if __name__ == "__main__":
 	main(sys.argv)

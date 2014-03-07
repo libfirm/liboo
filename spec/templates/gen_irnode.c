@@ -16,7 +16,6 @@
 #include "irverify_t.h"
 #include "iropt_t.h"
 #include "ircons_t.h"
-#include "array_t.h"
 #include "irgraph_t.h"
 #include "irbackedge_t.h"
 #include "irgopt.h"
@@ -58,7 +57,11 @@ ir_node *new_rd_{{node.name}}(
 			irg
 			{{node.block}}
 			op_{{node.name}}
-			{{node.mode}}
+			{% if hasattr(node, 'mode') -%}
+				{{node.mode}}
+			{%- else -%}
+				mode
+			{%- endif %}
 			{{node|arity_and_ins}}
 		{% endfilter %});
 	{%- if node.arity == "dynamic" %}
@@ -73,17 +76,17 @@ ir_node *new_rd_{{node.name}}(
 	{{node.attr_struct}} *attr = &res->attr.{{node.attrs_name}};
 	{%- endif %}
 	{%- for attr in node.attrs %}
-	attr->{{attr["fqname"]}} =
-		{%- if "init" in attr %} {{ attr["init"] -}};
-		{%- else              %} {{ attr["name"] -}};
+	attr->{{attr.fqname}} =
+		{%- if attr.init %} {{ attr.init -}};
+		{%- else         %} {{ attr.name -}};
 		{%- endif %}
 	{%- endfor %}
 	{%- for attr in node.initattrs %}
-	attr->{{attr["fqname"]}} = {{ attr["init"] -}};
+	attr->{{attr.fqname}} = {{ attr.init -}};
 	{%- endfor %}
 	{%- endif %}
 	{{- node.init }}
-	irn_verify_irg(res, irg);
+	verify_new_node(irg, res);
 	res = optimize_node(res);
 	{{- node.init_after_opt }}
 	return res;
@@ -132,21 +135,6 @@ ir_node *new_{{node.name}}(
 }
 {% endif %}
 
-int (is_{{node.name}})(const ir_node *node)
-{
-	return is_{{node.name}}_(node);
-}
-{%  for attr in node.attrs|hasnot("noprop") %}
-{{attr.type}} (get_{{node.name}}_{{attr.name}})(const ir_node *node)
-{
-	return get_{{node.name}}_{{attr.name}}_(node);
-}
-
-void (set_{{node.name}}_{{attr.name}})(ir_node *node, {{attr.type}} {{attr.name}})
-{
-	set_{{node.name}}_{{attr.name}}_(node, {{attr.name}});
-}
-{% endfor -%}
 {%- for input in node.ins %}
 ir_node *(get_{{node.name}}_{{input[0]}})(const ir_node *node)
 {
@@ -186,6 +174,26 @@ ir_op *get_op_{{node.name}}(void)
 {
 	return op_{{node.name}};
 }
+{% endfor %}
+
+{%- for node in nodes+abstract_nodes %}
+
+int (is_{{node.name}})(const ir_node *node)
+{
+	return is_{{node.name}}_(node);
+}
+{%- for attr in node.attrs|hasnot("noprop") %}
+
+{{attr.type}} (get_{{node.name}}_{{attr.name}})(const ir_node *node)
+{
+	return get_{{node.name}}_{{attr.name}}_(node);
+}
+
+void (set_{{node.name}}_{{attr.name}})(ir_node *node, {{attr.type}} {{attr.name}})
+{
+	set_{{node.name}}_{{attr.name}}_(node, {{attr.name}});
+}
+{%- endfor -%}
 {% endfor %}
 
 void {{spec.name}}_init_opcodes(void)

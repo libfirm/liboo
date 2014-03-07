@@ -1,4 +1,4 @@
-from spec_util import abstract, op
+from spec_util import abstract, op, Attribute
 
 name = "oo"
 external = "liboo"
@@ -18,11 +18,7 @@ class InstanceOf:
 		("res",   "result of instanceof check"), # mode_b
 	]
 	attrs = [
-		dict(
-			name    = "type",
-			type    = "ir_type*",
-			comment = "classtype to check for",
-		)
+		Attribute("type", type="ir_type*", comment="classtype to check for"),
 	]
 	flags       = [ "uses_memory" ]
 	pinned      = "no"
