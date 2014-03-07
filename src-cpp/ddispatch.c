@@ -156,9 +156,9 @@ void ddispatch_setup_vtable(ir_type *klass)
 
 	// the vtable currently is an array of pointers
 	unsigned type_reference_size = get_type_size_bytes(type_reference);
-	ir_type *vtable_type = new_type_array(1, type_reference);
+	ir_type *vtable_type = new_type_array(type_reference);
 	size_t vtable_ent_size = vtable_size + ddispatch_model.vptr_points_to_index;
-	set_array_bounds_int(vtable_type, 0, 0, vtable_ent_size);
+	set_array_size_int(vtable_type, vtable_ent_size);
 	set_type_size_bytes(vtable_type, type_reference_size * vtable_ent_size);
 	set_type_state(vtable_type, layout_fixed);
 	set_entity_type(vtable, vtable_type);
