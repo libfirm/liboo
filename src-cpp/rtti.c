@@ -395,7 +395,7 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 	// we need the reference to the object's class$ field
 	// first, dereference the vptr in order to get the vtable address.
 	ir_entity  *vptr_entity  = oo_get_class_vptr_entity(klass); // XXX: this is a bit weird and works iff the vptr entity is the same in the whole type hierarchy.
-	ir_node    *vptr_addr    = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node    *vptr_addr    = new_r_Sel(block, objptr, 0, NULL, vptr_entity);
 	ir_node    *vptr_load    = new_r_Load(block, cur_mem, vptr_addr, mode_P, cons_none);
 	ir_node    *vtable_addr  = new_r_Proj(vptr_load, mode_P, pn_Load_res);
 	            cur_mem      = new_r_Proj(vptr_load, mode_M, pn_Load_M);

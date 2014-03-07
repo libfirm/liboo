@@ -52,7 +52,7 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	// we need the reference to the object's class$ field
 	// first, dereference the vptr in order to get the vtable address.
 	ir_entity  *vptr_entity    = oo_get_class_vptr_entity(iface);
-	ir_node    *vptr_addr      = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node    *vptr_addr      = new_r_Sel(block, objptr, 0, NULL, vptr_entity);
 	ir_node    *vptr_load      = new_r_Load(block, cur_mem, vptr_addr, mode_P, cons_none);
 	ir_node    *vtable_addr    = new_r_Proj(vptr_load, mode_P, pn_Load_res);
 	            cur_mem        = new_r_Proj(vptr_load, mode_M, pn_Load_M);
@@ -250,7 +250,7 @@ void ddispatch_lower_Call(ir_node* call)
 
 	case bind_dynamic: {
 		ir_entity *vptr_entity  = oo_get_class_vptr_entity(classtype);
-		ir_node   *vptr         = new_r_Sel(block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+		ir_node   *vptr         = new_r_Sel(block, objptr, 0, NULL, vptr_entity);
 
 		ir_node   *vtable_load  = new_r_Load(block, mem, vptr, mode_reference, cons_none);
 		ir_node   *vtable_addr  = new_r_Proj(vtable_load, mode_reference, pn_Load_res);
@@ -289,7 +289,7 @@ void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *obj
 
 	ir_node   *cur_mem         = *mem;
 	ir_entity *vptr_entity     = oo_get_class_vptr_entity(klass);
-	ir_node   *vptr            = new_rd_Sel(dbgi, block, new_r_NoMem(irg), objptr, 0, NULL, vptr_entity);
+	ir_node   *vptr            = new_rd_Sel(dbgi, block, objptr, 0, NULL, vptr_entity);
 
 	ir_node   *vptr_target     = NULL;
 	ir_entity *vtable_entity   = oo_get_class_vtable_entity(klass);
