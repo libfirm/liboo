@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include <liboo/oo.h>
+#include <liboo/nodes.h>
 
 #include "adt/cpmap.h"
 #include "adt/cpset.h"
@@ -351,10 +352,10 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 		break;
 	}
 	case iro_Call: {
-		ir_node *fp = get_irn_n(node, 1);
-		if (is_Address(fp)) {
+		ir_node *callee = get_irn_n(node, 1);
+		if (is_Address(callee)) {
 			// handle static call
-			ir_entity *entity = get_Address_entity(fp);
+			ir_entity *entity = get_Address_entity(callee);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 			//printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
 			//printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
@@ -367,35 +368,42 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 
 			add_to_workqueue(entity, env);
 
-		} else if (is_Sel(fp)) {
-			// handle dynamic call
-			ir_entity *entity = get_Sel_entity(fp);
-			printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-			//printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-			//printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-			//printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-			//printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-			//printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
+		} else if (is_Proj(callee)) {
+			callee = get_Proj_pred(callee);
+			if (is_MethodSel(callee)) {
+				// handle dynamic call
+				ir_entity *entity = get_MethodSel_entity(callee);
+				printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+				//printf("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+				//printf("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+				//printf("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+				//printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+				//printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
-			if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
-				// calculate set of method entities that this call could potentially call
+				if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
+					// calculate set of method entities that this call could potentially call
 
-				// static lookup upwards in the class hierarchy (gets just one method entity)
-				// The entity from the Sel node is already what the result of a static lookup would be.
+					// static lookup upwards in the class hierarchy (gets just one method entity)
+					// The entity from the Sel node is already what the result of a static lookup would be.
 
-				// collect all potentially called method entities from downwards the class hierarchy
-				cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
-				ir_type *owner = get_entity_owner(entity);
-				collect_methods(owner, entity, result_set, env);
+					// collect all potentially called method entities from downwards the class hierarchy
+					cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
+					ir_type *owner = get_entity_owner(entity);
+					collect_methods(owner, entity, result_set, env);
 
-				assert(cpset_size(result_set) > 0);
+					assert(cpset_size(result_set) > 0);
 
-				cpmap_set(env->dyncall_targets, entity, result_set); //??
-			}
+					cpmap_set(env->dyncall_targets, entity, result_set); //??
+				}
+			} else
+				assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
 		} else
-			assert(false); // neither Address nor Sel as callee shouldn't happen!?
+			assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
 		break;
 	}
+	default:
+		// skip other node types
+		break;
 	}
 }
 
@@ -647,43 +655,58 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 
 	switch (get_irn_opcode(node)) {
 	case iro_Call: {
-		ir_node *fp = get_irn_n(node, 1);
-		if (is_Address(fp)) {
+		ir_node *callee = get_irn_n(node, 1);
+		if (is_Address(callee)) {
 			// handle static call
-			ir_entity *entity = get_Address_entity(fp);
+			ir_entity *entity = get_Address_entity(callee);
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
 			optimizer_add_to_workqueue(entity, env);
 
-		} else if (is_Sel(fp)) {
-			// handle dynamic call
-			ir_entity *entity = get_Sel_entity(fp);
-			printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+		} else if (is_Proj(callee)) {
+			callee = get_Proj_pred(callee);
+			if (is_MethodSel(callee)) {
+				// handle dynamic call
+				ir_entity *entity = get_MethodSel_entity(callee);
+				printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
-			cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
-			assert(targets);
-			assert(cpset_size(targets) > 0);
-			if (cpset_size(targets) == 1) {
-				// devirtualize call
+				cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
+				assert(targets);
+				assert(cpset_size(targets) > 0);
+				if (cpset_size(targets) == 1) {
+					// devirtualize call
+					cpset_iterator_t it;
+					cpset_iterator_init(&it, targets);
+					ir_entity *target = cpset_iterator_next(&it);
+					assert(cpset_iterator_next(&it) == NULL);
+
+					printf("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
+					// set an Address node as callee
+					ir_graph *graph = get_irn_irg(callee);
+					ir_node *address = new_r_Address(graph, target);
+					set_irn_n(node, 1, address);
+					// disconnect MethodSel node from Mem edge
+					ir_node *mem = get_irn_n(callee, 0);
+					set_irn_n(callee, 0, get_irg_no_mem(graph));
+					set_irn_n(node, 0, mem);
+				}
+
+				// add to workqueue
 				cpset_iterator_t it;
 				cpset_iterator_init(&it, targets);
-				ir_entity *target = cpset_iterator_next(&it);
-				assert(cpset_iterator_next(&it) == NULL);
-
-				printf("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-				ir_node *address = new_Address(target);
-				set_irn_n(node, 1, address);
-			}
-
-			// add to workqueue
-			cpset_iterator_t it;
-			cpset_iterator_init(&it, targets);
-			ir_entity *target;
-			while ((target = cpset_iterator_next(&it)) != NULL) {
-				optimizer_add_to_workqueue(target, env);
-			}
-		}
+				ir_entity *target;
+				while ((target = cpset_iterator_next(&it)) != NULL) {
+					optimizer_add_to_workqueue(target, env);
+				}
+			} else
+				assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
+		} else
+			assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
+		break;
 	}
+	default:
+		// skip other node types
+		break;
 	}
 
 }
