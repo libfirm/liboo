@@ -255,9 +255,11 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	//else // inherited
 
 	while (oo_get_method_is_inherited(current_entity)) { // use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
-		ir_entity *impl_entity = oo_get_entity_overwritten_superclass_entity(current_entity);
-		//assert(!oo_get_method_is_inherited(impl_entity));
+		ir_entity *impl_entity = ddispatch_get_bound_entity(current_entity);
+		assert(impl_entity);
+		assert(!oo_get_method_is_inherited(impl_entity));
 		assert(!oo_get_class_is_interface(get_entity_owner(impl_entity)));
+		assert(!oo_get_method_is_abstract(impl_entity));
 		printf("\t\t\tfound copied method entity %s.%s -> %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), get_class_name(get_entity_owner(impl_entity)), get_entity_name(impl_entity));
 
 		current_entity = impl_entity;
@@ -267,9 +269,11 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 		if (cpset_find(env->used_classes, klass) != NULL || JUST_CHA) { // if class is actually in use
 			take_entity(current_entity, result_set, env);
 		} else {
+			printf("\t\t\tclass not in use, memorizing %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
 			memorize_disabled_method(klass, current_entity, env); // remember entity with this class for patching if this class will become used
 		}
-	}
+	} else
+		printf("\t\t\t%s.%s is abstract\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
 
 	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
 		ir_type *subclass = get_class_subtype(klass, i);
