@@ -2,7 +2,6 @@
 package firm.oo.nodes;
 
 import com.sun.jna.Pointer;
-import firm.bindings.binding_irop;
 import firm.bindings.binding_ircons;
 import firm.nodes.Node;
 import firm.nodes.NodeVisitor;
@@ -19,14 +18,14 @@ public class Arraylength extends Node {
 
 	static void init() {
 		Pointer op = firm.bindings.binding_nodes.get_op_Arraylength();
-		Node.registerFactory(binding_irop.get_op_code(op), new Factory());
+		Node.registerFactory(firm.bindings.binding_irop.get_op_code(op), new Factory());
 	}
-	public static Node create(Node block, Node mem, Node ptr) {
-		return Node.createWrapper(firm.bindings.binding_nodes.new_r_Arraylength(block.ptr, mem.ptr, ptr.ptr));
+	public static Node create(Node block, Node mem, Node _ptr) {
+		return Node.createWrapper(firm.bindings.binding_nodes.new_r_Arraylength(block.ptr, mem.ptr, _ptr.ptr));
 	}
 
-	public static Node create(Construction cons, Node mem, Node ptr) {
-		return Node.createWrapper(firm.bindings.binding_nodes.new_r_Arraylength(binding_ircons.get_r_cur_block(cons.getGraph().ptr), mem.ptr, ptr.ptr));
+	public static Node create(Construction cons, Node mem, Node _ptr) {
+		return Node.createWrapper(firm.bindings.binding_nodes.new_r_Arraylength(binding_ircons.get_r_cur_block(cons.getGraph().ptr), mem.ptr, _ptr.ptr));
 	}
 
 	public Arraylength(Pointer ptr) {
@@ -45,8 +44,8 @@ public class Arraylength extends Node {
 		return createWrapper(firm.bindings.binding_nodes.get_Arraylength_ptr(ptr));
 	}
 
-	public void setPtr(Node ptr) {
-		firm.bindings.binding_nodes.set_Arraylength_ptr(this.ptr, ptr.ptr);
+	public void setPtr(Node _ptr) {
+		firm.bindings.binding_nodes.set_Arraylength_ptr(this.ptr, _ptr.ptr);
 	}
 
 	@Override

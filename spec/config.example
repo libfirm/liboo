@@ -1,3 +1,4 @@
 FIRM_HOME="../../libfirm"
 FIRM_INC="${FIRM_HOME}/include"
+FIRM_INC2="${FIRM_HOME}/build/gen/include/libfirm"
 FIRM_BUILD="${FIRM_HOME}/build/debug/"

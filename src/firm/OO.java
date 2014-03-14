@@ -70,6 +70,10 @@ public final class OO {
 		return binding_oo.oo_get_method_is_final(entity.ptr);
 	}
 
+	public static void setMethodIsInherited(Entity entity, boolean isInherited) {
+		binding_oo.oo_set_method_is_inherited(entity.ptr, isInherited);
+	}
+
 	/**
 	 * @return true if the given field is transient
 	 */

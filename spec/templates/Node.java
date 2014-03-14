@@ -2,7 +2,6 @@
 package {{package}};
 
 import com.sun.jna.Pointer;
-import firm.bindings.binding_irop;
 {%- if spec.external %}
 import firm.bindings.binding_ircons;
 import firm.nodes.Node;
@@ -23,7 +22,7 @@ public {% if isAbstract(node) %}abstract {%endif-%} class {{node.classname}} ext
 
 	static void init() {
 		Pointer op = {{binding}}.get_op_{{node.name}}();
-		Node.registerFactory(binding_irop.get_op_code(op), new Factory());
+		Node.registerFactory(firm.bindings.binding_irop.get_op_code(op), new Factory());
 	}
 
 	{%- if spec.external %}
@@ -69,6 +68,7 @@ public {% if isAbstract(node) %}abstract {%endif-%} class {{node.classname}} ext
 
 	{% endfor -%}
 
+	{%- if not isAbstract(node) %}
 	{%- for attr in node.attrs -%}
 	public {{attr.java_type}} get{{attr.java_name|CamelCase}}() {
 		{{attr.wrap_type}} _res = {{binding}}.get_{{node.name}}_{{attr.name}}(ptr);
@@ -80,6 +80,7 @@ public {% if isAbstract(node) %}abstract {%endif-%} class {{node.classname}} ext
 	}
 
 	{% endfor -%}
+	{% endif -%}
 
 	{{- node.java_add -}}
 	{%- if not isAbstract(node) -%}

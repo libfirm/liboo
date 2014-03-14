@@ -5,5 +5,6 @@ public class Nodes {
 	public static void init() {
 		Arraylength.init();
 		InstanceOf.init();
+		MethodSel.init();
 	}
 }

@@ -83,8 +83,7 @@ public class binding_nodes {
 	public static enum op_pin_state {
 		op_pin_state_floats(0),
 		op_pin_state_pinned(1),
-		op_pin_state_exc_pinned(),
-		op_pin_state_mem_pinned();
+		op_pin_state_exc_pinned();
 		public final int val;
 
 		private static class C {
@@ -176,36 +175,6 @@ public class binding_nodes {
 		}
 	}
 
-	public static enum symconst_kind {
-		symconst_type_size(),
-		symconst_type_align(),
-		symconst_addr_ent(),
-		symconst_ofs_ent(),
-		symconst_enum_const();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		symconst_kind(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		symconst_kind() {
-			this.val = C.next_val++;
-		}
-
-		public static symconst_kind getEnum(int val) {
-			for (symconst_kind entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum ir_builtin_kind {
 		ir_bk_trap(),
 		ir_bk_debugbreak(),
@@ -223,7 +192,8 @@ public class binding_nodes {
 		ir_bk_inner_trampoline(),
 		ir_bk_saturating_increment(),
 		ir_bk_compare_swap(),
-		ir_bk_last(ir_builtin_kind.ir_bk_compare_swap.val);
+		ir_bk_may_alias(),
+		ir_bk_last(ir_builtin_kind.ir_bk_may_alias.val);
 		public final int val;
 
 		private static class C {
@@ -305,8 +275,9 @@ public class binding_nodes {
 	public static enum oo_opcode {
 		ooo_Arraylength(),
 		ooo_InstanceOf(),
+		ooo_MethodSel(),
 		ooo_first(oo_opcode.ooo_Arraylength.val),
-		ooo_last(oo_opcode.ooo_InstanceOf.val);
+		ooo_last(oo_opcode.ooo_MethodSel.val);
 		public final int val;
 
 		private static class C {
@@ -443,6 +414,62 @@ public class binding_nodes {
 		}
 	}
 
+	public static enum n_MethodSel {
+		n_MethodSel_mem(),
+		n_MethodSel_ptr(),
+		n_MethodSel_max(n_MethodSel.n_MethodSel_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_MethodSel(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_MethodSel() {
+			this.val = C.next_val++;
+		}
+
+		public static n_MethodSel getEnum(int val) {
+			for (n_MethodSel entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum pn_MethodSel {
+		pn_MethodSel_M(),
+		pn_MethodSel_res(),
+		pn_MethodSel_max(pn_MethodSel.pn_MethodSel_res.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		pn_MethodSel(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		pn_MethodSel() {
+			this.val = C.next_val++;
+		}
+
+		public static pn_MethodSel getEnum(int val) {
+			for (pn_MethodSel entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 
 	public static native int is_oo_node(Pointer node);
 
@@ -491,4 +518,28 @@ public class binding_nodes {
 	public static native void set_InstanceOf_type(Pointer node, Pointer type);
 
 	public static native Pointer get_op_InstanceOf();
+
+	public static native Pointer new_rd_MethodSel(Pointer dbgi, Pointer block, Pointer irn_mem, Pointer irn_ptr, Pointer entity);
+
+	public static native Pointer new_r_MethodSel(Pointer block, Pointer irn_mem, Pointer irn_ptr, Pointer entity);
+
+	public static native Pointer new_d_MethodSel(Pointer dbgi, Pointer irn_mem, Pointer irn_ptr, Pointer entity);
+
+	public static native Pointer new_MethodSel(Pointer irn_mem, Pointer irn_ptr, Pointer entity);
+
+	public static native int is_MethodSel(Pointer node);
+
+	public static native Pointer get_MethodSel_mem(Pointer node);
+
+	public static native void set_MethodSel_mem(Pointer node, Pointer mem);
+
+	public static native Pointer get_MethodSel_ptr(Pointer node);
+
+	public static native void set_MethodSel_ptr(Pointer node, Pointer ptr);
+
+	public static native Pointer get_MethodSel_entity(Pointer node);
+
+	public static native void set_MethodSel_entity(Pointer node, Pointer entity);
+
+	public static native Pointer get_op_MethodSel();
 }
