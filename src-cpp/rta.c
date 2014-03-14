@@ -76,6 +76,7 @@ typedef struct analyzer_env {
 	cpset_t *used_methods; // used method entities
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 	cpmap_t *disabled_targets; // map that stores the set of disabled potential call targets of dynamic calls for every class) (Map: class -> Set: method entities)
+	cpset_t *external_methods; // set that stores already handled external methods (just for not handling the same method more than once)
 } analyzer_env;
 
 
@@ -175,21 +176,24 @@ static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	assert(env);
 
 	assert(!oo_get_method_is_inherited(method));
-	printf("\t\thandling external method %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
-	//TODO what if we already had handled this external method?
-	ir_type *methodtype = get_entity_type(method);
-	for (size_t i=0; i<get_method_n_ress(methodtype); i++) {
-		ir_type *type = get_method_res_type(methodtype, i);
-		printf("\t\t\tresult type %s\n", gdb_node_helper(type));
-		if (is_Pointer_type(type)) {
-			while (is_Pointer_type(type))
-				type = get_pointer_points_to_type(type);
-			if (is_Class_type(type)) {
-				// add class and all its subclasses to used types
-				add_all_external_subclasses(type, env);
-			}
-		} else
-			assert(!is_Class_type(type)); // modern languages shouldn't have class types without pointer
+	if (cpset_find(env->external_methods, method) == NULL) { // check if not already handled this method
+		printf("\t\thandling external method %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+		ir_type *methodtype = get_entity_type(method);
+		for (size_t i=0; i<get_method_n_ress(methodtype); i++) {
+			ir_type *type = get_method_res_type(methodtype, i);
+			printf("\t\t\tresult type %s\n", gdb_node_helper(type));
+			if (is_Pointer_type(type)) {
+				while (is_Pointer_type(type))
+					type = get_pointer_points_to_type(type);
+				if (is_Class_type(type)) {
+					// add class and all its subclasses to used types
+					add_all_external_subclasses(type, env);
+				}
+			} else
+				assert(!is_Class_type(type));
+		}
+		// add to used
+		cpset_insert(env->external_methods, method);
 	}
 }
 
@@ -473,6 +477,9 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 	cpmap_t disabled_targets;
 	cpmap_init(&disabled_targets, hash_ptr, ptr_equals);
 
+	cpset_t external_methods;
+	cpset_init(&external_methods, hash_ptr, ptr_equals);
+
 	pdeq *workqueue = new_pdeq();
 
 	analyzer_env env = {
@@ -481,7 +488,8 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		.used_classes = used_classes,
 		.used_methods = used_methods,
 		.dyncall_targets = dyncall_targets,
-		.disabled_targets = &disabled_targets
+		.disabled_targets = &disabled_targets,
+		.external_methods = &external_methods
 	};
 
 	{ // add all given entry points to workqueue and check their parameters for class types
@@ -596,6 +604,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		}
 	}
 	cpmap_destroy(&disabled_targets);
+	cpset_destroy(&external_methods);
 
 	cpset_destroy(&done_set);
 
