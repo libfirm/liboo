@@ -772,6 +772,8 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 
 
 void rta_optimization(size_t n_entry_points, ir_entity **entry_points) {
+	assert(entry_points);
+
 	cpset_t entry_points_set;
 	cpset_init(&entry_points_set, hash_ptr, ptr_equals);
 	for (size_t i=0; i<n_entry_points; i++) {
