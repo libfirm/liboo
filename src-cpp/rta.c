@@ -71,6 +71,7 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing ne
 
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
+	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
 	cpset_t *used_classes; // used classes found by examining object creation or coming in from external functions
@@ -204,9 +205,10 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
-		if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
+		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
 			printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 			pdeq_putr(env->workqueue, graph);
+			cpset_insert(env->in_queue, graph);
 		}
 	} else {
 		// treat methods without graph as external methods
@@ -487,11 +489,15 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 	pdeq *workqueue = new_pdeq();
 
+	cpset_t in_queue;
+	cpset_init(&in_queue, hash_ptr, ptr_equals);
+
 	cpset_t done_set;
 	cpset_init(&done_set, hash_ptr, ptr_equals);
 
 	analyzer_env env = {
 		.workqueue = workqueue,
+		.in_queue = &in_queue,
 		.done_set = &done_set,
 		.vtable2class = &vtable2class,
 		.used_classes = used_classes,
@@ -514,7 +520,9 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entry);
 			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			// note: omiting to check if already in queue assuming no duplicates in given entry points
 			pdeq_putr(workqueue, graph);
+			cpset_insert(&in_queue, graph);
 
 			// check parameters for incoming class types
 			printf("entry point: %s.%s %s\n", get_class_name(get_entity_owner(entry)), get_entity_name(entry), gdb_node_helper(entry));
@@ -540,6 +548,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
 		assert(is_ir_graph(g));
+		cpset_remove(&in_queue, g);
 
 		if (cpset_find(&done_set, g) != NULL) continue;
 
@@ -548,6 +557,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		cpset_insert(&done_set, g); // mark as done _before_ walking to not add it again in case of recursive calls
 		irg_walk_graph(g, NULL, walk_callgraph_and_analyze, &env);
 	}
+	assert(cpset_size(&in_queue) == 0);
 
 
 	printf("\n\n==== Results ==============================================\n");
@@ -596,6 +606,8 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 	// free data structures
 	del_pdeq(workqueue);
+	cpset_destroy(&in_queue);
+	cpset_destroy(&done_set);
 	cpmap_destroy(&vtable2class);
 
 	{ // delete the sets in map disabled_targets
@@ -612,8 +624,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 	}
 	cpmap_destroy(&disabled_targets);
 	cpset_destroy(&external_methods);
-
-	cpset_destroy(&done_set);
 
 	// /!\ used_classes, used_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
 
@@ -651,6 +661,7 @@ static void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cp
 
 typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
+	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 } optimizer_env;
@@ -661,9 +672,10 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
 
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
-		if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
+		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
 			printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 			pdeq_putr(env->workqueue, graph);
+			cpset_insert(env->in_queue, graph);
 		}
 	}
 }
@@ -739,13 +751,17 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 
 	pdeq *workqueue = new_pdeq();
 
+	cpset_t in_queue;
+	cpset_init(&in_queue, hash_ptr, ptr_equals);
+
 	cpset_t done_set;
 	cpset_init(&done_set, hash_ptr, ptr_equals);
 
 	optimizer_env env = {
 		.workqueue = workqueue,
+		.in_queue = &in_queue,
 		.done_set = &done_set,
-		.dyncall_targets = dyncall_targets,
+		.dyncall_targets = dyncall_targets
 	};
 
 	{ // add all given entry points to workqueue
@@ -756,13 +772,16 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 			assert(is_method_entity(entry));
 			ir_graph *graph = get_entity_irg(entry);
 			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			// note: omiting to check if already in queue assuming no duplicates in given entry points
 			pdeq_putr(workqueue, graph);
+			cpset_insert(&in_queue, graph);
 		}
 	}
 
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
 		assert(is_ir_graph(g));
+		cpset_remove(&in_queue, g);
 
 		if (cpset_find(&done_set, g) != NULL) continue;
 
@@ -771,11 +790,12 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 		cpset_insert(&done_set, g); // mark as done _before_ walking to not add it again in case of recursive calls
 		irg_walk_graph(g, NULL, walk_callgraph_and_devirtualize, &env);
 	}
+	assert(cpset_size(&in_queue) == 0);
 
 	// free data structures
 	del_pdeq(workqueue);
+	cpset_destroy(&in_queue);
 	cpset_destroy(&done_set);
-
 }
 
 
