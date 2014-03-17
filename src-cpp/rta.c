@@ -71,6 +71,7 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing ne
 
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
+	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
 	cpset_t *used_classes; // used classes found by examining object creation or coming in from external functions
 	cpset_t *used_methods; // used method entities
@@ -203,10 +204,10 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
-		//if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
+		if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
 			printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 			pdeq_putr(env->workqueue, graph);
-		//}
+		}
 	} else {
 		// treat methods without graph as external methods
 		// since we can't analyze it, mark all potentially returned object types as in use (completely down the class hierarchy!)
@@ -486,8 +487,12 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 	pdeq *workqueue = new_pdeq();
 
+	cpset_t done_set;
+	cpset_init(&done_set, hash_ptr, ptr_equals);
+
 	analyzer_env env = {
 		.workqueue = workqueue,
+		.done_set = &done_set,
 		.vtable2class = &vtable2class,
 		.used_classes = used_classes,
 		.used_methods = used_methods,
@@ -532,8 +537,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		}
 	}
 
-	cpset_t done_set;
-	cpset_init(&done_set, hash_ptr, ptr_equals);
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
 		assert(is_ir_graph(g));
@@ -542,7 +545,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 		printf("\n== %s.%s\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)));
 
-		cpset_insert(&done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
+		cpset_insert(&done_set, g); // mark as done _before_ walking to not add it again in case of recursive calls
 		irg_walk_graph(g, NULL, walk_callgraph_and_analyze, &env);
 	}
 
@@ -648,6 +651,7 @@ static void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cp
 
 typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
+	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 } optimizer_env;
 
@@ -657,8 +661,10 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
 
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
-		printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
-		pdeq_putr(env->workqueue, graph);
+		if (cpset_find(env->done_set, graph) == NULL) { // only enqueue if not already done yet
+			printf("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+			pdeq_putr(env->workqueue, graph);
+		}
 	}
 }
 
@@ -733,8 +739,12 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 
 	pdeq *workqueue = new_pdeq();
 
+	cpset_t done_set;
+	cpset_init(&done_set, hash_ptr, ptr_equals);
+
 	optimizer_env env = {
 		.workqueue = workqueue,
+		.done_set = &done_set,
 		.dyncall_targets = dyncall_targets,
 	};
 
@@ -750,8 +760,6 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 		}
 	}
 
-	cpset_t done_set;
-	cpset_init(&done_set, hash_ptr, ptr_equals);
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
 		assert(is_ir_graph(g));
@@ -760,7 +768,7 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 
 		printf("\n== %s.%s\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)));
 
-		cpset_insert(&done_set, g); // mark as done _before_ walking because of possible recursive calls !??? -> not necessary but not wrong!? TODO
+		cpset_insert(&done_set, g); // mark as done _before_ walking to not add it again in case of recursive calls
 		irg_walk_graph(g, NULL, walk_callgraph_and_devirtualize, &env);
 	}
 
