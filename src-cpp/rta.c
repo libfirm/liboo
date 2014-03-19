@@ -26,7 +26,7 @@
 #include "adt/hashptr.h"
 
 
-// override option just for early development to keep going without information about used types
+// override option just for early development to keep going without information about live classes
 #define JUST_CHA 0
 
 
@@ -74,8 +74,8 @@ typedef struct analyzer_env {
 	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
-	cpset_t *used_classes; // used classes found by examining object creation or coming in from external functions
-	cpset_t *used_methods; // used method entities
+	cpset_t *live_classes; // live classes found by examining object creation (external classes are left out and always considered as live)
+	cpset_t *live_methods; // live method entities
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 	cpmap_t *disabled_targets; // map that stores the set of disabled potential call targets of dynamic calls for every class) (Map: class -> Set: method entities)
 	cpset_t *external_methods; // set that stores already handled external methods (just for not handling the same method more than once)
@@ -99,8 +99,8 @@ static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, analyzer_
 		// add to targets set
 		cpset_insert(targets, method);
 
-		// add to used methods
-		cpset_insert(env->used_methods, method);
+		// add to live methods
+		cpset_insert(env->live_methods, method);
 
 		// add to workqueue
 		add_to_workqueue(method, env);
@@ -114,15 +114,15 @@ static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, analyzer_
 	}
 }
 
-static void add_new_used_class(ir_type *klass, analyzer_env *env) {
+static void add_new_live_class(ir_type *klass, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(env);
 
-	if (cpset_find(env->used_classes, klass) == NULL // if it had not already been added
-	    && !oo_get_class_is_abstract(klass)) { // if not abstract
-		// add to used classes
-		cpset_insert(env->used_classes, klass);
-		printf("\t\t\t\t\tadded new used class %s\n", get_class_name(klass));
+	if (cpset_find(env->live_classes, klass) == NULL // if it had not already been added
+	    && !oo_get_class_is_extern(klass) && !oo_get_class_is_abstract(klass)) { // if not extern and not abstract
+		// add to live classes
+		cpset_insert(env->live_classes, klass);
+		printf("\t\t\t\t\tadded new live class %s\n", get_class_name(klass));
 
 		// update existing results
 		cpset_t *methods = cpmap_find(env->disabled_targets, klass);
@@ -158,21 +158,6 @@ static void memorize_disabled_method(ir_type *klass, ir_entity *entity, analyzer
 	cpset_insert(methods, entity);
 }
 
-static void add_all_external_subclasses(ir_type *klass, analyzer_env *env) {
-	assert(is_Class_type(klass));
-	assert(env);
-
-	// add itself
-	if (oo_get_class_is_extern(klass))
-		add_new_used_class(klass, env);
-
-	// add recursively all subclasses
-	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
-		ir_type *subclass = get_class_subtype(klass, i);
-		add_all_external_subclasses(subclass, env);
-	}
-}
-
 static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
@@ -180,21 +165,9 @@ static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	assert(!oo_get_method_is_inherited(method));
 	if (cpset_find(env->external_methods, method) == NULL) { // check if not already handled this method
 		printf("\t\thandling external method %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
-		ir_type *methodtype = get_entity_type(method);
-		for (size_t i=0; i<get_method_n_ress(methodtype); i++) {
-			ir_type *type = get_method_res_type(methodtype, i);
-			printf("\t\t\tresult type %s\n", gdb_node_helper(type));
-			if (is_Pointer_type(type)) {
-				while (is_Pointer_type(type))
-					type = get_pointer_points_to_type(type);
-				if (is_Class_type(type)) {
-					// add class and all its subclasses to used types
-					add_all_external_subclasses(type, env);
-				}
-			} else
-				assert(!is_Class_type(type));
-		}
-		// add to used
+
+		// something to do?
+
 		cpset_insert(env->external_methods, method);
 	}
 }
@@ -203,6 +176,7 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
+	assert(!oo_get_method_is_inherited(method));
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
 		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
@@ -226,8 +200,8 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 	if (cpset_find(result_set, entity) == NULL) { // take each entity only once (the sets won't mind but the workqueue)
 		printf("\t\ttaking entity %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity));
 
-		// add to used methods
-		cpset_insert(env->used_methods, entity);
+		// add to live methods
+		cpset_insert(env->live_methods, entity);
 
 		// add to result set
 		cpset_insert(result_set, entity);
@@ -269,7 +243,7 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	}
 
 	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
-		if (cpset_find(env->used_classes, klass) != NULL || JUST_CHA) { // if class is actually in use
+		if (cpset_find(env->live_classes, klass) != NULL || oo_get_class_is_extern(klass) || JUST_CHA) { // if class is considered in use
 			take_entity(current_entity, result_set, env);
 		} else {
 			printf("\t\t\tclass not in use, memorizing %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
@@ -311,55 +285,11 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 				assert(is_Class_type(klass));
 				printf("\t\t\t\t\t-> vtable2class: %s\n", get_class_name(klass));
 
-				add_new_used_class(klass, env);
+				add_new_live_class(klass, env);
 
 				printf("\t\t\t\tRHS: %s\n", gdb_node_helper(get_irn_n(src, 1))); // rhs
 			}
 		}
-		break;
-	}
-	case iro_Load: {
-		// look for load of non-private fields of external classes to detect used objects whose creations we can't analyze elseway
-		// note: This is necessary because we can't analyze the standard library.
-		// note: We can't check for "public" so we have to do it for _all_ fields (which is very suboptimal).
-		ir_node *src =  get_irn_n(node, 1);
-		printf("\tload: %s\n", gdb_node_helper(src));
-		if (is_Address(src)) { // static field
-			ir_entity *entity = get_Address_entity(src);
-			printf("\t\t%s\n", get_entity_name(entity));
-			ir_type *owner = get_entity_owner(entity);
-			printf("\t\t\towner: %s\n", get_class_name(owner));
-			ir_type *type = get_entity_type(entity);
-			while (is_Pointer_type(type))
-				type = get_pointer_points_to_type(type);
-			printf("\t\t\t(points to) type: %s\n", gdb_node_helper(type));
-
-			// note: problem is we can't say where the static field came from (extern class or not)
-			if (is_Class_type(type)) {
-				printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
-				add_all_external_subclasses(type, env);
-			}
-		} else if (is_Sel(src)) { // nonstatic field
-			ir_entity *entity = get_Sel_entity(src);
-			ir_type *owner = get_entity_owner(entity);
-			//printf("\t\t\towner: %s\n", gdb_node_helper(owner));
-			if (is_Class_type(owner)) {
-				printf("\t\t%s\n", get_entity_name(entity));
-				printf("\t\t\towner: %s\n", get_class_name(owner));
-				ir_type *type = get_entity_type(entity);
-				while (is_Pointer_type(type))
-					type = get_pointer_points_to_type(type);
-				printf("\t\t\t(points to) type: %s\n", gdb_node_helper(type));
-
-				printf("\t\t\tfield entity is extern: %u\n", get_entity_visibility(entity) == ir_visibility_external);
-				if (oo_get_class_is_extern(owner)) { // add to used classes only if its an field of an external class
-					if (is_Class_type(type)) {
-						add_all_external_subclasses(type, env);
-					}
-				}
-			} //else // array access or other
-		} else
-			assert(false); // shouldn't happen!??? Are there more possibilities than Address and Sel?
 		break;
 	}
 	case iro_Call: {
@@ -374,8 +304,8 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 			//printf("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
 			//printf("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
-			// add to used methods
-			cpset_insert(env->used_methods, entity);
+			// add to live methods
+			cpset_insert(env->live_methods, entity);
 
 			add_to_workqueue(entity, env);
 
@@ -402,9 +332,9 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 					ir_type *owner = get_entity_owner(entity);
 					collect_methods(owner, entity, result_set, env);
 
-					assert(cpset_size(result_set) > 0);
+					assert(cpset_size(result_set) > 0 || (oo_get_class_is_extern(owner) && !oo_get_class_is_final(owner))); // if we found no call targets then something went wrong (except it was a call to an entity of a nonfinal external class because there can be unknown external subclasses)
 
-					cpmap_set(env->dyncall_targets, entity, result_set); //??
+					cpmap_set(env->dyncall_targets, entity, result_set);
 				}
 			} else
 				assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
@@ -455,22 +385,22 @@ static void walk_classes_and_collect(ir_type *klass, void* environment) {
  * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically linked call.
  * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!!
  * @note RTA also won't work with programs that dynamically load classes at run-time! It can lead to defective programs!!
- * @note RTA needs to know about _all_ classes. (The class hierarchy graph(s) must be complete.) This means it is necessary to load _all_ inner dependencies of external library classes! Otherwise the results can be incorrect and can lead to defective programs!!
+ * @note RTA might also produce incorrect programs if there is some Java Reflections shenanigans in the code (internal or external), especially using java.lang.Class.newInstance()
  * @param entry_points all (public) entry points to program code (as ir_entity*)
- * @param used_classes give pointer to empty uninitialized set for receiving results, This is a set where all used classes are put (as ir_type*).
- * @param used_methods give pointer to empty uninitialized set for receiving results, This is a set where all used methods are put (as ir_entity*).
+ * @param live_classes give pointer to empty uninitialized set for receiving results, This is a set where all live classes are put (as ir_type*).
+ * @param live_methods give pointer to empty uninitialized set for receiving results, This is a set where all live methods are put (as ir_entity*).
  * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is a map where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically linked calls if possible. (see also function rta_optimize_dyncalls)
  */
-static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
+static void rta_run(cpset_t *entry_points, cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets) {
 	assert(entry_points);
-	assert(used_classes);
-	assert(used_methods);
+	assert(live_classes);
+	assert(live_methods);
 	assert(dyncall_targets);
 
 	assert(cpset_size(entry_points) != 0);
 
-	cpset_init(used_classes, hash_ptr, ptr_equals);
-	cpset_init(used_methods, hash_ptr, ptr_equals);
+	cpset_init(live_classes, hash_ptr, ptr_equals);
+	cpset_init(live_methods, hash_ptr, ptr_equals);
 	cpmap_init(dyncall_targets, hash_ptr, ptr_equals);
 
 	cpmap_t vtable2class;
@@ -500,22 +430,22 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		.in_queue = &in_queue,
 		.done_set = &done_set,
 		.vtable2class = &vtable2class,
-		.used_classes = used_classes,
-		.used_methods = used_methods,
+		.live_classes = live_classes,
+		.live_methods = live_methods,
 		.dyncall_targets = dyncall_targets,
 		.disabled_targets = &disabled_targets,
 		.external_methods = &external_methods
 	};
 
-	{ // add all given entry points to workqueue and check their parameters for class types
+	{ // add all given entry points to workqueue
 		cpset_iterator_t it;
 		cpset_iterator_init(&it, entry_points);
 		ir_entity *entry;
 		while ((entry = cpset_iterator_next(&it)) != NULL) {
 			assert(is_method_entity(entry));
 
-			// add to used methods
-			cpset_insert(used_methods, entry);
+			// add to live methods
+			cpset_insert(live_methods, entry);
 
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entry);
@@ -523,25 +453,6 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 			// note: omiting to check if already in queue assuming no duplicates in given entry points
 			pdeq_putr(workqueue, graph);
 			cpset_insert(&in_queue, graph);
-
-			// check parameters for incoming class types
-			printf("entry point: %s.%s %s\n", get_class_name(get_entity_owner(entry)), get_entity_name(entry), gdb_node_helper(entry));
-			ir_type *methodtype = get_entity_type(entry);
-			assert(is_Method_type(methodtype));
-			for (size_t i=0; i<get_method_n_params(methodtype); i++) {
-				ir_type *type = get_method_param_type(methodtype, i);
-				printf("\tparameter type %s\n", gdb_node_helper(type));
-				if (is_Pointer_type(type)) {
-					while (is_Pointer_type(type))
-						type = get_pointer_points_to_type(type);
-					if (is_Class_type(type)) {
-						printf("\t\tfound class type: %s\n", get_class_name(type));
-						add_all_external_subclasses(type, &env);
-					}
-				} else
-					assert(!is_Class_type(type)); // class type without pointer shouldn't happen
-			}
-
 		}
 	}
 
@@ -562,18 +473,18 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 
 	printf("\n\n==== Results ==============================================\n");
 	{
-		printf("\nused classes:\n");
+		printf("\nlive classes:\n");
 		cpset_iterator_t iterator;
-		cpset_iterator_init(&iterator, used_classes);
+		cpset_iterator_init(&iterator, live_classes);
 		ir_type *klass;
 		while ((klass = cpset_iterator_next(&iterator)) != NULL) {
 			printf("\t%s\n", get_class_name(klass));
 		}
 	}
 	{
-		printf("\nused methods:\n");
+		printf("\nlive methods:\n");
 		cpset_iterator_t iterator;
-		cpset_iterator_init(&iterator, used_methods);
+		cpset_iterator_init(&iterator, live_methods);
 		ir_entity *method;
 		while ((method = cpset_iterator_next(&iterator)) != NULL) {
 			//printf("\t%s.%s %s\n", get_class_name(get_entity_owner(method)), get_entity_name(method), gdb_node_helper(method));
@@ -589,7 +500,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 		while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
 			const ir_entity *call_entity = entry->key;
 			assert(call_entity);
-			printf("\t%s.%s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
+			printf("\t%s.%s %s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 
 			cpset_t *targets = entry->data;
 			assert(targets);
@@ -598,7 +509,7 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 			ir_entity *method;
 			while ((method = cpset_iterator_next(&it)) != NULL) {
 				//printf("\t\t%s.%s %s\n", get_class_name(get_entity_owner(method)), get_entity_name(method), gdb_node_helper(method));
-				printf("\t\t%s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+				printf("\t\t%s.%s %s\n", get_class_name(get_entity_owner(method)), get_entity_name(method), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 			}
 		}
 	}
@@ -625,24 +536,24 @@ static void rta_run(cpset_t *entry_points, cpset_t *used_classes, cpset_t *used_
 	cpmap_destroy(&disabled_targets);
 	cpset_destroy(&external_methods);
 
-	// /!\ used_classes, used_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
+	// /!\ live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
 
 }
 
 
 /** frees memory allocated for the results returned by function run_rta
  * @note does not free the memory of the sets and maps themselves, just their content allocated during RTA
- * @param used_classes as returned by rta_run
- * @param used_methods as returned by rta_run
+ * @param live_classes as returned by rta_run
+ * @param live_methods as returned by rta_run
  * @param dyncall_targets as returned by rta_run
  */
-static void rta_dispose_results(cpset_t *used_classes, cpset_t *used_methods, cpmap_t *dyncall_targets) {
-	assert(used_classes);
-	assert(used_methods);
+static void rta_dispose_results(cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets) {
+	assert(live_classes);
+	assert(live_methods);
 	assert(dyncall_targets);
 
-	cpset_destroy(used_classes);
-	cpset_destroy(used_methods);
+	cpset_destroy(live_classes);
+	cpset_destroy(live_methods);
 
 	// delete the sets in map disabled_targets
 	cpmap_iterator_t it;
@@ -699,12 +610,13 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 			if (is_MethodSel(callee)) {
 				// handle dynamic call
 				ir_entity *entity = get_MethodSel_entity(callee);
-				printf("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+				ir_type *owner = get_entity_owner(entity);
+				printf("\tdynamic call: %s.%s %s\n", get_class_name(owner), get_entity_name(entity), gdb_node_helper(entity));
 
 				cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
 				assert(targets);
-				assert(cpset_size(targets) > 0);
-				if (cpset_size(targets) == 1) {
+				assert(cpset_size(targets) > 0 || (oo_get_class_is_extern(owner) && !oo_get_class_is_final(owner)));
+				if (cpset_size(targets) == 1 && (!oo_get_class_is_extern(owner) || oo_get_class_is_final(owner))) {
 					// devirtualize call
 					cpset_iterator_t it;
 					cpset_iterator_init(&it, targets);
@@ -809,12 +721,12 @@ void rta_optimization(size_t n_entry_points, ir_entity **entry_points) {
 		cpset_insert(&entry_points_set, entry_point);
 	}
 
-	cpset_t used_classes;
-	cpset_t used_methods;
+	cpset_t live_classes;
+	cpset_t live_methods;
 	cpmap_t dyncall_targets;
 
-	rta_run(&entry_points_set, &used_classes, &used_methods, &dyncall_targets);
+	rta_run(&entry_points_set, &live_classes, &live_methods, &dyncall_targets);
 	rta_devirtualize_calls(&entry_points_set, &dyncall_targets);
-	//rta_discard_unused(&used_classes, &used_methods); ??
-	rta_dispose_results(&used_classes, &used_methods, &dyncall_targets);
+	//rta_discard(&live_classes, &live_methods); ??
+	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
 }
