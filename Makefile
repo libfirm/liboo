@@ -40,9 +40,8 @@ RUNTIME_BUILDDIR=$(BUILDDIR)/$(TARGET)
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
-# sparc-elf-gcc does not support shared libraries
+# We only need a static runtime lib for invasic targets
 ifeq ($(findstring invasic, $(TARGET)), invasic)
-	GOAL =
 	GOAL_RT_SHARED =
 endif
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS) $(LIBUNWIND_CPPFLAGS)
