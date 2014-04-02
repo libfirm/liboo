@@ -1076,6 +1076,86 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 }
 
 
+typedef struct discarder_env {
+	cpset_t *live_classes;
+	cpset_t *live_methods;
+	ir_entity *discard_error_method;
+} discarder_env;
+
+static void walk_classes_and_discard_unused(ir_type *klass, void* environment)
+{
+	assert(environment);
+	discarder_env *env = environment;
+
+	if (oo_get_class_is_extern(klass)) // skip external classes
+		return;
+	if (oo_get_class_is_interface(klass)) // skip interfaces
+		return;
+
+	// discard members if possible
+	size_t n_members = get_class_n_members(klass);
+	for (size_t i=0; i<n_members; i++) {
+		ir_entity *member = get_class_member(klass, i);
+
+		if (is_method_entity(member)) {
+			if (is_inherited_copy(member)) // skip entity copies of inherited methods
+				continue;
+			if (oo_get_method_is_abstract(member)) // skip abstract methods
+				continue;
+			if (cpset_find(env->live_methods, member) == NULL) { // if never used
+				DEBUGOUT("discarding method %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
+				// redirect to error method
+				set_entity_ld_ident(member, get_entity_ld_ident(env->discard_error_method)); // redirect to error function
+				set_entity_visibility(member, ir_visibility_external); // set to link externally
+				// delete graph
+				ir_graph *graph = get_entity_irg(member);
+				if (graph) {
+					DEBUGOUT("\tdeleting graph\n");
+					free_ir_graph(graph);
+				}
+				// exclude from vtable if possible
+				if (get_entity_n_overwrittenby(member) == 0) { // make sure it is not needed for vtable index (if there are dynamically linked calls to this entity even though there are never instances of this class)
+					DEBUGOUT("\texcluding from vtable\n");
+					oo_set_method_exclude_from_vtable(member, true);
+				}
+				// remove from overwrites
+				if (get_entity_n_overwrites(member) > 0) {
+					DEBUGOUT("\tremove from %u overwrites\n", get_entity_n_overwrites(member));
+					pdeq *queue = new_pdeq();
+					for (size_t i=0, n=get_entity_n_overwrites(member); i < n; i++) { // collect first to avoid removal during iteration
+						ir_entity *entity = get_entity_overwrites(member, i);
+						pdeq_putr(queue, entity);
+					}
+					while (!pdeq_empty(queue)) {
+						ir_entity *entity = pdeq_getl(queue);
+						DEBUGOUT("\t\tremoving from %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+						remove_entity_overwrites(entity, member);
+					}
+				}
+			}
+		}
+	}
+}
+
+static void rta_discard_unused(cpset_t *live_classes, cpset_t *live_methods)
+{
+	assert(live_classes);
+	assert(live_methods);
+
+	ir_type *methodtype = new_type_method(0, 0);
+	ident *id = new_id_from_str("oo_rt_method_optimized_away_error");
+	ir_entity *discard_error_method = create_compilerlib_entity(id, methodtype);
+
+	discarder_env env = {
+		.live_classes = live_classes,
+		.live_methods = live_methods,
+		.discard_error_method = discard_error_method
+	};
+
+	class_walk_super2sub(NULL, walk_classes_and_discard_unused, &env); // postfix of super2sub is sub2super, right?
+}
+
+
 void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 {
 	assert(entry_points);
@@ -1086,6 +1166,6 @@ void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 
 	rta_run(entry_points, initial_live_classes, &live_classes, &live_methods, &dyncall_targets);
 	rta_devirtualize_calls(entry_points, &dyncall_targets);
-	//rta_discard(&live_classes, &live_methods); //TODO
+	rta_discard_unused(&live_classes, &live_methods);
 	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
 }
