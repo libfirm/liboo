@@ -386,18 +386,18 @@ static void walk_classes_and_collect(ir_type *klass, void* environment) {
  * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!!
  * @note RTA also won't work with programs that dynamically load classes at run-time! It can lead to defective programs!!
  * @note RTA might also produce incorrect programs if there is some Java Reflections shenanigans in the code (internal or external), especially using java.lang.Class.newInstance()
- * @param entry_points all (public) entry points to program code (as ir_entity*)
- * @param live_classes give pointer to empty uninitialized set for receiving results, This is a set where all live classes are put (as ir_type*).
- * @param live_methods give pointer to empty uninitialized set for receiving results, This is a set where all live methods are put (as ir_entity*).
- * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is a map where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically linked calls if possible. (see also function rta_optimize_dyncalls)
+ * @note Give classes that are instantiated in native methods of a nonexternal standard library or runtime as initial_live_classes, give methods called in these native methods as additional entry points. If something is missing, RTA could produce incorrect programs! This also means that native methods in the program that do arbitrary things are not supported.
+ * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
+ * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
+ * @param live_classes give pointer to empty uninitialized set for receiving results, This is where all live classes are put (as ir_type*).
+ * @param live_methods give pointer to empty uninitialized set for receiving results, This is where all live methods are put (as ir_entity*).
+ * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically linked calls if possible. (see also function rta_optimize_dyncalls)
  */
-static void rta_run(cpset_t *entry_points, cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets) {
+static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets) {
 	assert(entry_points);
 	assert(live_classes);
 	assert(live_methods);
 	assert(dyncall_targets);
-
-	assert(cpset_size(entry_points) != 0);
 
 	cpset_init(live_classes, hash_ptr, ptr_equals);
 	cpset_init(live_methods, hash_ptr, ptr_equals);
@@ -437,14 +437,11 @@ static void rta_run(cpset_t *entry_points, cpset_t *live_classes, cpset_t *live_
 		.external_methods = &external_methods
 	};
 
-	{ // add all given entry points to workqueue
-		cpset_iterator_t it;
-		cpset_iterator_init(&it, entry_points);
+	{ // add all given entry points to live methods and to workqueue
 		ir_entity *entry;
-		while ((entry = cpset_iterator_next(&it)) != NULL) {
+		size_t i = 0;
+		for (; (entry = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entry));
-
-			// add to live methods
 			cpset_insert(live_methods, entry);
 
 			// add to workqueue
@@ -453,6 +450,16 @@ static void rta_run(cpset_t *entry_points, cpset_t *live_classes, cpset_t *live_
 			// note: omiting to check if already in queue assuming no duplicates in given entry points
 			pdeq_putr(workqueue, graph);
 			cpset_insert(&in_queue, graph);
+		}
+		assert(i > 0 && "give at least one entry point");
+	}
+
+	// add all given initial live classes to live classes
+	if (initial_live_classes != NULL) {
+		ir_type *entry;
+		for (size_t i=0; (entry = initial_live_classes[i]) != NULL; i++) {
+			assert(is_Class_type(entry));
+			cpset_insert(live_classes, entry);
 		}
 	}
 
@@ -658,7 +665,7 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
  * @param entry_points same as used with rta_run
  * @param dyncall_targets the result map returned from rta_run
  */
-static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targets) {
+static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_targets) {
 	assert(dyncall_targets);
 
 	pdeq *workqueue = new_pdeq();
@@ -677,10 +684,8 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 	};
 
 	{ // add all given entry points to workqueue
-		cpset_iterator_t it;
-		cpset_iterator_init(&it, entry_points);
 		ir_entity *entry;
-		while ((entry = cpset_iterator_next(&it)) != NULL) {
+		for (size_t i=0; (entry = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entry));
 			ir_graph *graph = get_entity_irg(entry);
 			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
@@ -711,22 +716,15 @@ static void rta_devirtualize_calls(cpset_t *entry_points, cpmap_t *dyncall_targe
 }
 
 
-void rta_optimization(size_t n_entry_points, ir_entity **entry_points) {
+void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes) {
 	assert(entry_points);
-
-	cpset_t entry_points_set;
-	cpset_init(&entry_points_set, hash_ptr, ptr_equals);
-	for (size_t i=0; i<n_entry_points; i++) {
-		ir_entity *entry_point = entry_points[i];
-		cpset_insert(&entry_points_set, entry_point);
-	}
 
 	cpset_t live_classes;
 	cpset_t live_methods;
 	cpmap_t dyncall_targets;
 
-	rta_run(&entry_points_set, &live_classes, &live_methods, &dyncall_targets);
-	rta_devirtualize_calls(&entry_points_set, &dyncall_targets);
+	rta_run(entry_points, initial_live_classes, &live_classes, &live_methods, &dyncall_targets);
+	rta_devirtualize_calls(entry_points, &dyncall_targets);
 	//rta_discard(&live_classes, &live_methods); ??
 	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
 }
