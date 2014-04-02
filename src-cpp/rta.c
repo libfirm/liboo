@@ -604,7 +604,8 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 
 	switch (get_irn_opcode(node)) {
 	case iro_Call: {
-		ir_node *callee = get_irn_n(node, 1);
+		ir_node *call = node;
+		ir_node *callee = get_irn_n(call, 1);
 		if (is_Address(callee)) {
 			// handle static call
 			ir_entity *entity = get_Address_entity(callee);
@@ -613,10 +614,11 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 			optimizer_add_to_workqueue(entity, env);
 
 		} else if (is_Proj(callee)) {
-			callee = get_Proj_pred(callee);
-			if (is_MethodSel(callee)) {
+			ir_node *pred = get_Proj_pred(callee);
+			if (is_MethodSel(pred)) {
+				ir_node *methodsel = pred;
 				// handle dynamic call
-				ir_entity *entity = get_MethodSel_entity(callee);
+				ir_entity *entity = get_MethodSel_entity(methodsel);
 				ir_type *owner = get_entity_owner(entity);
 				printf("\tdynamic call: %s.%s %s\n", get_class_name(owner), get_entity_name(entity), gdb_node_helper(entity));
 
@@ -634,11 +636,16 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 					// set an Address node as callee
 					ir_graph *graph = get_irn_irg(callee);
 					ir_node *address = new_r_Address(graph, target);
-					set_irn_n(node, 1, address);
+					set_irn_n(call, 1, address);
 					// disconnect MethodSel node from Mem edge
-					ir_node *mem = get_irn_n(callee, 0);
+					ir_node *mem = get_irn_n(methodsel, 0);
 					set_irn_n(callee, 0, get_irg_no_mem(graph));
-					set_irn_n(node, 0, mem);
+					ir_node *projm = get_irn_n(call, 0);
+					ir_node *pred;
+					while ((pred = get_irn_n(projm, 0)) != methodsel) // find correct ProjM node
+						projm = pred;
+					assert(is_Proj(projm));
+					exchange(projm, mem);
 				}
 
 				// add to workqueue
