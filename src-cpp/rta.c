@@ -332,7 +332,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 					ir_type *owner = get_entity_owner(entity);
 					collect_methods(owner, entity, result_set, env);
 
-					assert(cpset_size(result_set) > 0 || (oo_get_class_is_extern(owner) && !oo_get_class_is_final(owner) && !oo_get_method_is_final(entity))); // if we found no call targets then something went wrong (except it was a call to a nonfinal method of a nonfinal external class because there can be unknown external subclasses that overwrite the method)
+					// note: we can't check here for a nonempty result set because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
 
 					cpmap_set(env->dyncall_targets, entity, result_set);
 				}
@@ -624,7 +624,7 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 
 				cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
 				assert(targets);
-				assert(cpset_size(targets) > 0 || (oo_get_class_is_extern(owner) && !oo_get_class_is_final(owner) && !oo_get_method_is_final(entity)));
+				assert(cpset_size(targets) > 0 || (oo_get_class_is_extern(owner) && !oo_get_class_is_final(owner) && !oo_get_method_is_final(entity))); // if we found no call targets then something went wrong (except it was a call to a nonfinal method of a nonfinal external class because then there can be unknown external subclasses that overwrite the method)
 				if (cpset_size(targets) == 1 && (!oo_get_class_is_extern(owner) || oo_get_class_is_final(owner) || oo_get_method_is_final(entity))) {
 					// devirtualize call
 					cpset_iterator_t it;
