@@ -72,6 +72,21 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing ne
 }
 */
 
+
+static ir_type *default_detect_creation(ir_node *call) { (void)call; return NULL; }
+static ir_entity *default_detect_call(ir_node *call) { (void)call; return NULL; }
+
+static ir_type *(*detect_creation)(ir_node *call) = &default_detect_creation;
+static ir_entity *(*detect_call)(ir_node *call) = &default_detect_call;
+
+void rta_set_detection_callbacks(ir_type *(*detect_creation_callback)(ir_node *call), ir_entity *(*detect_call_callback)(ir_node *call)) {
+	assert(detect_creation_callback);
+	assert(detect_call_callback);
+	detect_creation = detect_creation_callback;
+	detect_call = detect_call_callback;
+}
+
+
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	cpset_t *in_queue; // set to avoid duplicates in the workqueue
@@ -310,6 +325,29 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 			cpset_insert(env->live_methods, entity);
 
 			add_to_workqueue(entity, env);
+
+
+			// hack to detect object creation or calls (like class initialization) that are hidden in frontend-specific nodes
+			ir_graph *graph = get_entity_irg(entity);
+			if (!graph) {
+				// ask frontend if there are objects created here (e.g. needed to detect GCJ object creation)
+				ir_type *klass = detect_creation(node); //TODO support for more than one
+				if (klass) {
+					printf("\t\texternal method creates class %s\n", get_class_name(klass));
+					add_new_live_class(klass, env);
+				}
+
+				// ask frontend if there are additional methods called here (e.g. needed to detect class initialization)
+				ir_entity *called_method = detect_call(node); //TODO support for more than one
+				if (called_method) {
+					assert(is_method_entity(called_method));
+					//assert(get_entity_irg(called_method)); // can be external
+					printf("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+					cpset_insert(env->live_methods, called_method);
+					add_to_workqueue(called_method, env);
+				}
+			}
+
 
 		} else if (is_Proj(callee)) {
 			callee = get_Proj_pred(callee);
@@ -614,6 +652,20 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
 			printf("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
 			optimizer_add_to_workqueue(entity, env);
+
+
+			// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
+			ir_graph *graph = get_entity_irg(entity);
+			if (!graph) {
+				ir_entity *called_method = detect_call(call);
+				if (called_method) {
+					assert(is_method_entity(called_method));
+					//assert(get_entity_irg(called_method)); // can be external
+					printf("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+					optimizer_add_to_workqueue(called_method, env);
+				}
+			}
+
 
 		} else if (is_Proj(callee)) {
 			ir_node *pred = get_Proj_pred(callee);
