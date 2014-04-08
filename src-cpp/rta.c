@@ -30,6 +30,9 @@
 #define JUST_CHA 0
 
 
+#define is_inherited_copy(X) (oo_get_method_is_inherited(X) && ddispatch_get_bound_entity(X) != X)
+
+
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) { // function which was removed from newer libfirm versions
 	for (size_t i = 0, n = get_class_n_members(cls); i < n; ++i) {
 		ir_entity *entity = get_class_member(cls, i);
@@ -162,7 +165,7 @@ static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
-	assert(!oo_get_method_is_inherited(method));
+	assert(!is_inherited_copy(method));
 	if (cpset_find(env->external_methods, method) == NULL) { // check if not already handled this method
 		printf("\t\thandling external method %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 
@@ -176,7 +179,7 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 	assert(is_method_entity(method));
 	assert(env);
 
-	assert(!oo_get_method_is_inherited(method));
+	assert(!is_inherited_copy(method));
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
 		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
@@ -231,10 +234,9 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	}
 	//else // inherited
 
-	while (oo_get_method_is_inherited(current_entity)) { // use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
+	while (is_inherited_copy(current_entity)) { // use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
 		ir_entity *impl_entity = ddispatch_get_bound_entity(current_entity);
 		assert(impl_entity);
-		assert(!oo_get_method_is_inherited(impl_entity));
 		assert(!oo_get_class_is_interface(get_entity_owner(impl_entity)));
 		assert(!oo_get_method_is_abstract(impl_entity));
 		printf("\t\t\tfound copied method entity %s.%s -> %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), get_class_name(get_entity_owner(impl_entity)), get_entity_name(impl_entity));
