@@ -95,7 +95,7 @@ typedef struct analyzer_env {
 	cpset_t *live_classes; // live classes found by examining object creation (external classes are left out and always considered as live)
 	cpset_t *live_methods; // live method entities
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
-	cpmap_t *disabled_targets; // map that stores the set of disabled potential call targets of dynamic calls for every class) (Map: class -> Set: method entities)
+	cpmap_t *unused_targets; // map that stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: class -> (Map: method entity -> Set: call entities)) This is needed to patch analysis result when a class becomes live after there were already some dynamically linked calls that would call a method of it.
 	cpset_t *external_methods; // set that stores already handled external methods (just for not handling the same method more than once)
 } analyzer_env;
 
@@ -103,16 +103,20 @@ typedef struct analyzer_env {
 static void add_to_workqueue(ir_entity *method, analyzer_env *env); // forward declaration
 
 
-// add method entity to targets set of all matching calls
-// /!\ should normally be called with call_entity and method entity the same to start search from the method entity you have
-// searches upwards in the class hierarchy if there were calls of overwritten methods
-static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, analyzer_env *env) {
-	assert(is_method_entity(call_entity));
+// add method entity to target sets of all call entities
+static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, analyzer_env *env) {
 	assert(is_method_entity(method));
+	assert(call_entities);
 	assert(env);
 
-	cpset_t *targets = cpmap_find(env->dyncall_targets, call_entity);
-	if (targets != NULL && cpset_find(targets, method) == NULL) { // if there were calls to this entity AND method not already added to targets set
+	cpset_iterator_t iterator;
+	cpset_iterator_init(&iterator, call_entities);
+	ir_entity *call_entity;
+	while ((call_entity = cpset_iterator_next(&iterator)) != NULL) {
+		cpset_t *targets = cpmap_find(env->dyncall_targets, call_entity);
+		assert(targets != NULL);
+		assert(cpset_find(targets, method) == NULL);
+
 		printf("\t\t\t\t\tupdating method %s.%s for call %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method), get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
 		// add to targets set
 		cpset_insert(targets, method);
@@ -122,13 +126,6 @@ static void add_to_dyncalls(ir_entity *call_entity, ir_entity *method, analyzer_
 
 		// add to workqueue
 		add_to_workqueue(method, env);
-	}
-
-	// search recursively upwards if there were calls to overwritten entities (and if found add the method entity to their targets set)
-	for (size_t i=0; i<get_entity_n_overwrites(call_entity); i++) {
-		ir_entity *overwritten_method = get_entity_overwrites(call_entity, i);
-		assert(overwritten_method != call_entity);
-		add_to_dyncalls(overwritten_method, method, env);
 	}
 }
 
@@ -143,37 +140,47 @@ static void add_new_live_class(ir_type *klass, analyzer_env *env) {
 		printf("\t\t\t\t\tadded new live class %s\n", get_class_name(klass));
 
 		// update existing results
-		cpset_t *methods = cpmap_find(env->disabled_targets, klass);
+		cpmap_t *methods = cpmap_find(env->unused_targets, klass);
 		if (methods != NULL) {
 			{
-				cpset_iterator_t iterator;
-				cpset_iterator_init(&iterator, methods);
-				ir_entity *method;
-				printf("\t\t\t\t\tup to %u methods to enable\n", cpset_size(methods));
-				while ((method = cpset_iterator_next(&iterator)) != NULL) {
-					add_to_dyncalls(method, method, env); // search recursively upwards if overwritten entities had been called and add it to their target sets
-					//cpset_remove_iterator(methods, &iterator);
+				cpmap_iterator_t iterator;
+				cpmap_iterator_init(&iterator, methods);
+				cpmap_entry_t *entry;
+				while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
+					ir_entity *method = (ir_entity*)entry->key;
+					cpset_t *call_entities = entry->data;
+
+					add_to_dyncalls(method, call_entities, env);
+
+					cpmap_remove_iterator(methods, &iterator);
+					cpset_destroy(call_entities);
+					free(call_entities);
 				}
 			}
-			// remove the map entry and free the set
-			cpmap_remove(env->disabled_targets, klass);
-			cpset_destroy(methods);
+			cpmap_remove(env->unused_targets, klass);
+			cpmap_destroy(methods);
 			free(methods);
 		}
 	}
 }
 
-static void memorize_disabled_method(ir_type *klass, ir_entity *entity, analyzer_env *env) {
+static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity *call_entity, analyzer_env *env) {
 	assert(is_Class_type(klass));
 	assert(is_method_entity(entity));
+	assert(is_method_entity(call_entity));
 	assert(env);
 
-	cpset_t *methods = cpmap_find(env->disabled_targets, klass);
+	cpmap_t *methods = cpmap_find(env->unused_targets, klass);
 	if (methods == NULL) {
-		methods = new_cpset(hash_ptr, ptr_equals);
-		cpmap_set(env->disabled_targets, klass, methods);
+		methods = new_cpmap(hash_ptr, ptr_equals);
+		cpmap_set(env->unused_targets, klass, methods);
 	}
-	cpset_insert(methods, entity);
+	cpset_t *call_entities = cpmap_find(methods, entity);
+	if (call_entities == NULL) {
+		call_entities = new_cpset(hash_ptr, ptr_equals);
+		cpmap_set(methods, entity, call_entities);
+	}
+	cpset_insert(call_entities, call_entity);
 }
 
 static void handle_external_method(ir_entity *method, analyzer_env *env) {
@@ -232,7 +239,8 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 // collect method entities from downwards in the class hierarchy
 // /!\ should normally be called with the owner class of the entity e.g. to start at the static looked up entity
 // it walks down the classes to have the entities with the classes even when the method is inherited
-static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env) {
+static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env) {
+	assert(is_method_entity(call_entity));
 	assert(is_Class_type(klass));
 	assert(is_method_entity(entity));
 	assert(result_set);
@@ -264,7 +272,7 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 			take_entity(current_entity, result_set, env);
 		} else {
 			printf("\t\t\tclass not in use, memorizing %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
-			memorize_disabled_method(klass, current_entity, env); // remember entity with this class for patching if this class will become used
+			memorize_unused_target(klass, current_entity, call_entity, env); // remember entity with this class for patching if this class will become used
 		}
 	} else
 		printf("\t\t\t%s.%s is abstract\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
@@ -272,7 +280,7 @@ static void collect_methods(ir_type *klass, ir_entity *entity, cpset_t *result_s
 	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
 		ir_type *subclass = get_class_subtype(klass, i);
 
-		collect_methods(subclass, current_entity, result_set, env);
+		collect_methods(call_entity, subclass, current_entity, result_set, env);
 	}
 }
 
@@ -370,7 +378,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
 					// collect all potentially called method entities from downwards the class hierarchy
 					cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
 					ir_type *owner = get_entity_owner(entity);
-					collect_methods(owner, entity, result_set, env);
+					collect_methods(entity, owner, entity, result_set, env);
 
 					// note: we can't check here for a nonempty result set because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
 
@@ -451,8 +459,8 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	}
 	printf("number of classes with vtables: %u\n", cpmap_size(&vtable2class));
 
-	cpmap_t disabled_targets;
-	cpmap_init(&disabled_targets, hash_ptr, ptr_equals);
+	cpmap_t unused_targets;
+	cpmap_init(&unused_targets, hash_ptr, ptr_equals);
 
 	cpset_t external_methods;
 	cpset_init(&external_methods, hash_ptr, ptr_equals);
@@ -473,7 +481,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		.live_classes = live_classes,
 		.live_methods = live_methods,
 		.dyncall_targets = dyncall_targets,
-		.disabled_targets = &disabled_targets,
+		.unused_targets = &unused_targets,
 		.external_methods = &external_methods
 	};
 
@@ -568,19 +576,31 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	cpset_destroy(&done_set);
 	cpmap_destroy(&vtable2class);
 
-	{ // delete the sets in map disabled_targets
-		cpmap_iterator_t it;
-		cpmap_iterator_init(&it, &disabled_targets);
+	{ // delete the maps and sets in map unused_targets
+		cpmap_iterator_t iterator;
+		cpmap_iterator_init(&iterator, &unused_targets);
 		cpmap_entry_t *entry;
-		while ((entry = cpmap_iterator_next(&it))->key != NULL || entry->data != NULL) {
-			cpset_t* set = entry->data;
-			cpmap_remove_iterator(&disabled_targets, &it);
-			assert(set);
-			cpset_destroy(set);
-			free(set);
+		while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
+			cpmap_t* map = entry->data;
+			assert(map);
+
+			cpmap_iterator_t inner_iterator;
+			cpmap_iterator_init(&inner_iterator, map);
+			cpmap_entry_t *inner_entry;
+			while ((inner_entry = cpmap_iterator_next(&inner_iterator))->key != NULL || inner_entry->data != NULL) {
+				cpset_t *set = inner_entry->data;
+				assert(set);
+
+				cpmap_remove_iterator(map, &inner_iterator);
+				cpset_destroy(set);
+				free(set);
+			}
+			cpmap_remove_iterator(&unused_targets, &iterator);
+			cpmap_destroy(map);
+			free(map);
 		}
 	}
-	cpmap_destroy(&disabled_targets);
+	cpmap_destroy(&unused_targets);
 	cpset_destroy(&external_methods);
 
 	// /!\ live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
@@ -602,7 +622,7 @@ static void rta_dispose_results(cpset_t *live_classes, cpset_t *live_methods, cp
 	cpset_destroy(live_classes);
 	cpset_destroy(live_methods);
 
-	// delete the sets in map disabled_targets
+	// delete the sets in map dyncall_targets
 	cpmap_iterator_t it;
 	cpmap_iterator_init(&it, dyncall_targets);
 	cpmap_entry_t *entry;
