@@ -103,6 +103,46 @@ typedef struct analyzer_env {
 static void add_to_workqueue(ir_entity *method, analyzer_env *env); // forward declaration
 
 
+static void check_for_external_superclasses_recursive(ir_type *klass, ir_type* superclass, analyzer_env *env) {
+	assert(is_Class_type(klass));
+	assert(is_Class_type(superclass));
+	assert(env);
+
+	printf("\t\t\t\t\t\t\tchecking superclass %s of %s\n", get_class_name(superclass), get_class_name(klass));
+	if (oo_get_class_is_extern(superclass)) { // if extern
+		// add all methods of superclass that were overwritten by klass to workqueue because they could be called by external code
+		printf("\t\t\t\t\t\t\tfound external superclass %s of %s\n", get_class_name(superclass), get_class_name(klass));
+		for (size_t i=0, n=get_class_n_members(superclass); i<n; i++) {
+			ir_entity *member = get_class_member(superclass, i);
+			if (!is_method_entity(member)) continue;
+			if (oo_get_method_is_final(member)) continue;
+			ir_entity *overwriting = get_class_member_by_name(klass, get_entity_ident(member)); // note: This only works because whole signature is already encoded in entity name!
+			if (overwriting != NULL && !is_inherited_copy(overwriting)) { //FIXME constructors should be skipped but no frontend independent notion of constructors in liboo
+				cpset_insert(env->live_methods, overwriting);
+				add_to_workqueue(overwriting, env);
+			}
+		}
+	}
+
+	for (size_t i=0, n=get_class_n_supertypes(superclass); i<n; i++) {
+		ir_type *sc = get_class_supertype(superclass, i);
+		check_for_external_superclasses_recursive(klass, sc, env);
+	}
+}
+
+static void check_for_external_superclasses(ir_type *klass, analyzer_env *env) {
+	assert(is_Class_type(klass));
+	assert(env);
+
+	if (oo_get_class_is_extern(klass)) return;
+
+	printf("\t\t\t\t\t\tchecking for external superclasses of %s\n", get_class_name(klass));
+	for (size_t i=0, n=get_class_n_supertypes(klass); i<n; i++) {
+		ir_type *superclass = get_class_supertype(klass, i);
+		check_for_external_superclasses_recursive(klass, superclass, env);
+	}
+}
+
 // add method entity to target sets of all call entities
 static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, analyzer_env *env) {
 	assert(is_method_entity(method));
@@ -161,6 +201,8 @@ static void add_new_live_class(ir_type *klass, analyzer_env *env) {
 			cpmap_destroy(methods);
 			free(methods);
 		}
+
+		check_for_external_superclasses(klass, env);
 	}
 }
 
@@ -248,9 +290,8 @@ static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *e
 
 	printf("\t\twalking class %s\n", get_class_name(klass));
 	ir_entity *current_entity = entity;
-	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity)); //?? Is there a more efficient way? // /!\ note: only works because whole signature is already encoded in entity name!
+	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity)); // note: This only works because whole signature is already encoded in entity name!
 	if (overwriting_entity != NULL && overwriting_entity != current_entity) { // if has overwriting entity
-		assert(klass == get_entity_owner(overwriting_entity));
 		printf("\t\t\t%s.%s overwrites %s.%s\n", get_class_name(get_entity_owner(overwriting_entity)), get_entity_name(overwriting_entity), get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
 
 		current_entity = overwriting_entity;
@@ -508,6 +549,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		for (size_t i=0; (entry = initial_live_classes[i]) != NULL; i++) {
 			assert(is_Class_type(entry));
 			cpset_insert(live_classes, entry);
+			check_for_external_superclasses(entry, &env);
 		}
 	}
 
