@@ -33,7 +33,8 @@
 #define is_inherited_copy(X) (oo_get_method_is_inherited(X) && ddispatch_get_bound_entity(X) != X)
 
 
-static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) { // function which was removed from newer libfirm versions
+static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
+{
 	for (size_t i = 0, n = get_class_n_members(cls); i < n; ++i) {
 		ir_entity *entity = get_class_member(cls, i);
 		if (get_entity_ident(entity) == ident)
@@ -42,36 +43,39 @@ static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) { // func
 	return NULL;
 }
 
-static int ptr_equals(const void *pt1, const void *pt2) { // missing default pointer compare function
+static int ptr_equals(const void *pt1, const void *pt2) // missing default pointer compare function
+{
 	return pt1 == pt2;
 }
 
-static inline cpmap_t *new_cpmap(cpmap_hash_function hash_function, cpmap_cmp_function cmp_function) { // missing new function for cpmap
+static inline cpmap_t *new_cpmap(cpmap_hash_function hash_function, cpmap_cmp_function cmp_function) // missing new function for cpmap
+{
 	cpmap_t *cpmap = (cpmap_t*)malloc(sizeof(cpmap_t));
 	cpmap_init(cpmap, hash_function, cmp_function);
 	return cpmap;
 }
 
-static inline cpset_t *new_cpset(cpset_hash_function hash_function, cpset_cmp_function cmp_function) { // missing new function for cpmap
+static inline cpset_t *new_cpset(cpset_hash_function hash_function, cpset_cmp_function cmp_function) // missing new function for cpset
+{
 	cpset_t *cpset = (cpset_t*)malloc(sizeof(cpset_t));
 	cpset_init(cpset, hash_function, cmp_function);
 	return cpset;
 }
-
 /*
-static inline cpmap_iterator_t *new_cpmap_iterator(cpmap_t *map) { // missing new function for cpmap iterator
+static inline cpmap_iterator_t *new_cpmap_iterator(cpmap_t *map) // missing new function for cpmap iterator
+{
 	cpmap_iterator_t *it = (cpmap_iterator_t*)malloc(sizeof(cpmap_iterator_t));
 	cpmap_iterator_init(it, map);
 	return it;
 }
 
-static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) { // missing new function for cpset iterator
+static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) // missing new function for cpset iterator
+{
 	cpset_iterator_t *it = (cpset_iterator_t*)malloc(sizeof(cpset_iterator_t));
 	cpset_iterator_init(it, set);
 	return it;
 }
 */
-
 
 static ir_type *default_detect_creation(ir_node *call) { (void)call; return NULL; }
 static ir_entity *default_detect_call(ir_node *call) { (void)call; return NULL; }
@@ -79,7 +83,8 @@ static ir_entity *default_detect_call(ir_node *call) { (void)call; return NULL; 
 static ir_type *(*detect_creation)(ir_node *call) = &default_detect_creation;
 static ir_entity *(*detect_call)(ir_node *call) = &default_detect_call;
 
-void rta_set_detection_callbacks(ir_type *(*detect_creation_callback)(ir_node *call), ir_entity *(*detect_call_callback)(ir_node *call)) {
+void rta_set_detection_callbacks(ir_type *(*detect_creation_callback)(ir_node *call), ir_entity *(*detect_call_callback)(ir_node *call))
+{
 	assert(detect_creation_callback);
 	assert(detect_call_callback);
 	detect_creation = detect_creation_callback;
@@ -103,7 +108,8 @@ typedef struct analyzer_env {
 static void add_to_workqueue(ir_entity *method, analyzer_env *env); // forward declaration
 
 
-static void check_for_external_superclasses_recursive(ir_type *klass, ir_type* superclass, analyzer_env *env) {
+static void check_for_external_superclasses_recursive(ir_type *klass, ir_type* superclass, analyzer_env *env)
+{
 	assert(is_Class_type(klass));
 	assert(is_Class_type(superclass));
 	assert(env);
@@ -130,7 +136,8 @@ static void check_for_external_superclasses_recursive(ir_type *klass, ir_type* s
 	}
 }
 
-static void check_for_external_superclasses(ir_type *klass, analyzer_env *env) {
+static void check_for_external_superclasses(ir_type *klass, analyzer_env *env)
+{
 	assert(is_Class_type(klass));
 	assert(env);
 
@@ -144,7 +151,8 @@ static void check_for_external_superclasses(ir_type *klass, analyzer_env *env) {
 }
 
 // add method entity to target sets of all call entities
-static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, analyzer_env *env) {
+static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, analyzer_env *env)
+{
 	assert(is_method_entity(method));
 	assert(call_entities);
 	assert(env);
@@ -169,7 +177,8 @@ static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, analyzer_
 	}
 }
 
-static void add_new_live_class(ir_type *klass, analyzer_env *env) {
+static void add_new_live_class(ir_type *klass, analyzer_env *env)
+{
 	assert(is_Class_type(klass));
 	assert(env);
 
@@ -206,7 +215,8 @@ static void add_new_live_class(ir_type *klass, analyzer_env *env) {
 	}
 }
 
-static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity *call_entity, analyzer_env *env) {
+static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity *call_entity, analyzer_env *env)
+{
 	assert(is_Class_type(klass));
 	assert(is_method_entity(entity));
 	assert(is_method_entity(call_entity));
@@ -225,7 +235,8 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 	cpset_insert(call_entities, call_entity);
 }
 
-static void handle_external_method(ir_entity *method, analyzer_env *env) {
+static void handle_external_method(ir_entity *method, analyzer_env *env)
+{
 	assert(is_method_entity(method));
 	assert(env);
 
@@ -239,7 +250,8 @@ static void handle_external_method(ir_entity *method, analyzer_env *env) {
 	}
 }
 
-static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
+static void add_to_workqueue(ir_entity *method, analyzer_env *env)
+{
 	assert(is_method_entity(method));
 	assert(env);
 
@@ -259,7 +271,8 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env) {
 	}
 }
 
-static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *env) {
+static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *env)
+{
 	assert(is_method_entity(entity));
 	assert(result_set);
 	assert(env);
@@ -281,7 +294,8 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 // collect method entities from downwards in the class hierarchy
 // /!\ should normally be called with the owner class of the entity e.g. to start at the static looked up entity
 // it walks down the classes to have the entities with the classes even when the method is inherited
-static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env) {
+static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env)
+{
 	assert(is_method_entity(call_entity));
 	assert(is_Class_type(klass));
 	assert(is_method_entity(entity));
@@ -326,7 +340,8 @@ static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *e
 }
 
 
-static void walk_callgraph_and_analyze(ir_node *node, void *environment) {
+static void walk_callgraph_and_analyze(ir_node *node, void *environment)
+{
 	assert(environment);
 	analyzer_env *env = (analyzer_env*)environment;
 
@@ -442,7 +457,8 @@ typedef struct class_collector_env {
 	cpmap_t *vtable2class;
 } class_collector_env;
 
-static void walk_classes_and_collect(ir_type *klass, void* environment) {
+static void walk_classes_and_collect(ir_type *klass, void* environment)
+{
 	assert(environment);
 	class_collector_env *env = (class_collector_env*)environment;
 
@@ -482,7 +498,8 @@ static void walk_classes_and_collect(ir_type *klass, void* environment) {
  * @param live_methods give pointer to empty uninitialized set for receiving results, This is where all live methods are put (as ir_entity*).
  * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically linked calls if possible. (see also function rta_optimize_dyncalls)
  */
-static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets) {
+static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets)
+{
 	assert(entry_points);
 	assert(live_classes);
 	assert(live_methods);
@@ -656,7 +673,8 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
  * @param live_methods as returned by rta_run
  * @param dyncall_targets as returned by rta_run
  */
-static void rta_dispose_results(cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets) {
+static void rta_dispose_results(cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets)
+{
 	assert(live_classes);
 	assert(live_methods);
 	assert(dyncall_targets);
@@ -686,7 +704,8 @@ typedef struct optimizer_env {
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
 } optimizer_env;
 
-static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
+static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
+{
 	assert(is_method_entity(method));
 	assert(env);
 
@@ -700,7 +719,8 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env) {
 	}
 }
 
-static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
+static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
+{
 	assert(environment);
 	optimizer_env *env = (optimizer_env*)environment;
 
@@ -788,7 +808,8 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment) {
  * @param entry_points same as used with rta_run
  * @param dyncall_targets the result map returned from rta_run
  */
-static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_targets) {
+static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_targets)
+{
 	assert(dyncall_targets);
 
 	pdeq *workqueue = new_pdeq();
@@ -839,7 +860,8 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 }
 
 
-void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes) {
+void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
+{
 	assert(entry_points);
 
 	cpset_t live_classes;
