@@ -291,10 +291,7 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 	}
 }
 
-// collect method entities from downwards in the class hierarchy
-// /!\ should normally be called with the owner class of the entity e.g. to start at the static looked up entity
-// it walks down the classes to have the entities with the classes even when the method is inherited
-static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env)
+static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env)
 {
 	assert(is_method_entity(call_entity));
 	assert(is_Class_type(klass));
@@ -335,10 +332,16 @@ static void collect_methods(ir_entity *call_entity, ir_type *klass, ir_entity *e
 	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
 		ir_type *subclass = get_class_subtype(klass, i);
 
-		collect_methods(call_entity, subclass, current_entity, result_set, env);
+		collect_methods_recursive(call_entity, subclass, current_entity, result_set, env);
 	}
 }
 
+// collect method entities from downwards in the class hierarchy
+// it walks down the classes to have the entities with the classes even when the method is inherited
+static void collect_methods(ir_entity *call_entity, cpset_t *result_set, analyzer_env *env)
+{
+	collect_methods_recursive(call_entity, get_entity_owner(call_entity), call_entity, result_set, env);
+}
 
 static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 {
@@ -433,8 +436,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 
 					// collect all potentially called method entities from downwards the class hierarchy
 					cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
-					ir_type *owner = get_entity_owner(entity);
-					collect_methods(entity, owner, entity, result_set, env);
+					collect_methods(entity, result_set, env);
 
 					// note: we can't check here for a nonempty result set because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
 
