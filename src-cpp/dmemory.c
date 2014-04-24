@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "liboo/dmemory.h"
 #include "liboo/nodes.h"
 

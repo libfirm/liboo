@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "liboo/ddispatch.h"
 #include "liboo/oo.h"
 #include "liboo/rtti.h"

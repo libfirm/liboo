@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "liboo/rtti.h"
 #include "liboo/oo.h"
 #include "liboo/rts_types.h"

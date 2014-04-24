@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "liboo/oo.h"
 
 #include <assert.h>
