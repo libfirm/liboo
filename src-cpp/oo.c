@@ -472,8 +472,22 @@ static void lower_node(ir_node *node, void *env)
 		dmemory_lower_Arraylength(node);
 	} else if (is_InstanceOf(node)) {
 		rtti_lower_InstanceOf(node);
-	} else if (is_Proj(node) && get_irn_mode(node) == mode_X && is_Raise(skip_Proj(node))) {
-		eh_lower_Raise(skip_Proj(node), node);
+	} else if (is_Proj(node)) {
+		ir_node *pred = get_Proj_pred(node);
+		if (is_Raise(pred) && get_Proj_proj(node) == pn_Raise_X) {
+			eh_lower_Raise(pred, node);
+		} else if (is_VptrIsSet(pred)) {
+			long pn = get_Proj_proj(node);
+			switch ((pn_VptrIsSet)pn) {
+			case pn_VptrIsSet_M:
+				exchange(node, get_VptrIsSet_mem(pred));
+				return;
+			case pn_VptrIsSet_res:
+				exchange(node, get_VptrIsSet_ptr(pred));
+				return;
+			}
+			panic("invalid VptrIsSet Proj");
+		}
 	}
 }
 

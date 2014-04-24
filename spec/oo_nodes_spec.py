@@ -56,3 +56,30 @@ class MethodSel:
 	attr_struct = "op_MethodSel_attr_t"
 	flags       = [ "uses_memory" ]
 	pinned      = "no"
+
+@op
+class VptrIsSet:
+	"""Mark that an objects vptr has been set. This node duplicates its pointer
+	input and guarantees that all users of this node have an object of the
+	specified type.
+
+	In practice you would put such a node behind allocation calls in a java-like
+	language or behind an external constructor call in a C++-like language.
+
+	You could think of this as a special case of Confirm node, ensuring a
+	certain object type."""
+	ins = [
+		("mem", "memory dependency"),
+		("ptr", "pointer to an object"),
+	]
+	outs = [
+		("M",   "memory result"),
+		("res", "pointer to object"),
+	]
+	attrs = [
+		Attribute("type", type="ir_type*",
+		          comment="type of the object"),
+	]
+	attr_struct = "op_VptrIsSet_attr_t"
+	flags       = [ "uses_memory" ]
+	pinned      = "no"
