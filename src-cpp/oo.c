@@ -65,7 +65,7 @@ static oo_type_info *get_type_info(ir_type *type)
 		ti->kind = k_oo_type_info;
 		set_type_link(type, ti);
 	} else {
-		assert (ti->kind == k_oo_type_info);
+		assert(ti->kind == k_oo_type_info);
 	}
 	return ti;
 }
@@ -80,7 +80,7 @@ static oo_entity_info *get_entity_info(ir_entity *entity)
 		ei->vtable_index = -1;
 		set_entity_link(entity, ei);
 	} else {
-		assert (ei->kind == k_oo_entity_info);
+		assert(ei->kind == k_oo_entity_info);
 	}
 	return ei;
 }
@@ -95,62 +95,56 @@ static oo_node_info *get_node_info(ir_node *node)
 		ni->bind_statically = false;
 		pmap_insert(oo_node_info_map, node, ni);
 	} else {
-		assert (ni->kind == k_oo_node_info);
+		assert(ni->kind == k_oo_node_info);
 	}
 	return ni;
 }
 
 unsigned oo_get_class_uid(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	return ti->uid;
 }
+
 void oo_set_class_uid(ir_type *classtype, unsigned uid)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->uid = uid;
 }
 
 ir_entity *oo_get_class_vtable_entity(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	return ti->vtable;
 }
+
 void oo_set_class_vtable_entity(ir_type *classtype, ir_entity *vtable)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->vtable = vtable;
 }
 
 unsigned oo_get_class_vtable_size(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (ti->vtable_size == get_class_vtable_size(classtype) && "liboo and core Firm info differs");
-#endif
 
 	return ti->vtable_size;
 }
 void oo_set_class_vtable_size(ir_type *classtype, unsigned vtable_size)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->vtable_size = vtable_size;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_class_vtable_size(classtype, vtable_size);
-#endif
 }
 
 ir_entity *oo_get_class_vptr_entity(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	if (ti->vptr != NULL)
 		return ti->vptr;
@@ -165,124 +159,89 @@ ir_entity *oo_get_class_vptr_entity(ir_type *classtype)
 	}
 	return NULL;
 }
+
 void oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->vptr = vptr;
 }
 
 ir_entity *oo_get_class_rtti_entity(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (ti->rtti == get_class_type_info(classtype) && "liboo and core Firm info differs");
-#endif
-
 	return ti->rtti;
 }
 
 void  oo_set_class_rtti_entity(ir_type *classtype, ir_entity *rtti)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->rtti = rtti;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_class_type_info(classtype, rtti);
-#endif
 }
 
 bool oo_get_class_is_interface(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-
-	bool res = ti->flags & oo_is_interface;
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (res == (bool) is_class_interface(classtype) && "liboo and core Firm info differs");
-#endif
-
-	return res;
+	return ti->flags & oo_is_interface;
 }
+
 void oo_set_class_is_interface(ir_type *classtype, bool is_interface)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	if (is_interface)
 		ti->flags |= oo_is_interface;
 	else
 		ti->flags &= ~oo_is_interface;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_class_interface(classtype, is_interface);
-#endif
 }
 
 bool oo_get_class_is_abstract(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-
-	bool res = ti->flags & oo_is_abstract;
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (res == (bool) is_class_abstract(classtype) && "liboo and core Firm info differs");
-#endif
-
-	return res;
+	return ti->flags & oo_is_abstract;
 }
+
 void oo_set_class_is_abstract(ir_type *classtype, bool is_abstract)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	if (is_abstract)
 		ti->flags |= oo_is_abstract;
 	else
 		ti->flags &= ~oo_is_abstract;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_class_abstract(classtype, is_abstract);
-#endif
 }
 
 bool oo_get_class_is_final(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-
-	bool res = ti->flags & oo_is_final;
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (res == (bool) is_class_final(classtype) && "liboo and core Firm info differs");
-#endif
-
-	return res;
+	return ti->flags & oo_is_final;
 }
+
 void oo_set_class_is_final(ir_type *classtype, bool is_final)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	if (is_final)
 		ti->flags |= oo_is_final;
 	else
 		ti->flags &= ~oo_is_final;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_class_final(classtype, is_final);
-#endif
 }
 
 bool oo_get_class_is_extern(ir_type *classtype)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 
 	return ti->flags & oo_is_extern;
 }
 void oo_set_class_is_extern(ir_type *classtype, bool is_extern)
 {
-	assert (is_Class_type(classtype));
+	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	if (is_extern)
 		ti->flags |= oo_is_extern;
@@ -296,6 +255,7 @@ void *oo_get_type_link(ir_type *type)
 	oo_type_info *ti = get_type_info(type);
 	return ti->link;
 }
+
 void oo_set_type_link(ir_type *type, void* link)
 {
 	oo_type_info *ti = get_type_info(type);
@@ -304,48 +264,42 @@ void oo_set_type_link(ir_type *type, void* link)
 
 bool oo_get_method_exclude_from_vtable(ir_entity *method)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	return ei->exclude_from_vtable;
 }
+
 void oo_set_method_exclude_from_vtable(ir_entity *method, bool exclude_from_vtable)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	ei->exclude_from_vtable = exclude_from_vtable;
 }
 
-int  oo_get_method_vtable_index(ir_entity *method)
+int oo_get_method_vtable_index(ir_entity *method)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (ei->vtable_index == (int) get_entity_vtable_number(method) && "liboo and core Firm info differs");
-#endif
-
 	return ei->vtable_index;
 }
+
 void oo_set_method_vtable_index(ir_entity *method, int vtable_index)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	ei->vtable_index = vtable_index;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_entity_vtable_number(method, vtable_index);
-#endif
 }
 
 bool oo_get_method_is_abstract(ir_entity *method)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	return ei->flags & oo_is_abstract;
 }
+
 void oo_set_method_is_abstract(ir_entity *method, bool is_abstract)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	if (is_abstract)
 		ei->flags |= oo_is_abstract;
@@ -355,65 +309,48 @@ void oo_set_method_is_abstract(ir_entity *method, bool is_abstract)
 
 bool oo_get_method_is_final(ir_entity *method)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
-	bool res = ei->flags & oo_is_final;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (res == (bool) is_entity_final(method) && "liboo and core Firm info differs");
-#endif
-
-	return res;
+	return ei->flags & oo_is_final;
 }
+
 void oo_set_method_is_final(ir_entity *method, bool is_final)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	if (is_final)
 		ei->flags |= oo_is_final;
 	else
 		ei->flags &= ~oo_is_final;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_entity_final(method, is_final);
-#endif
 }
 
 bool oo_get_method_is_inherited(ir_entity *method)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
-	bool res = ei->flags & oo_is_inherited;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	assert (res == (get_entity_peculiarity(method) == peculiarity_inherited) && "liboo and core Firm info differs");
-#endif
-
-	return res;
+	return ei->flags & oo_is_inherited;
 }
+
 void oo_set_method_is_inherited(ir_entity *method, bool is_inherited)
 {
-	assert (is_method_entity(method));
+	assert(is_method_entity(method));
 	oo_entity_info *ei = get_entity_info(method);
 	if (is_inherited)
 		ei->flags |= oo_is_inherited;
 	else
 		ei->flags &= ~oo_is_inherited;
-
-#ifdef OO_ALSO_USE_OLD_FIRM_PROPERTIES
-	set_entity_peculiarity(method, is_inherited ? peculiarity_inherited : peculiarity_existent);
-#endif
 }
 
 bool oo_get_field_is_transient(ir_entity *field)
 {
-	assert (! is_method_entity(field));
+	assert(!is_method_entity(field));
 	oo_entity_info *ei = get_entity_info(field);
 	return ei->flags & oo_is_transient;
 }
+
 void oo_set_field_is_transient(ir_entity *field, bool is_transient)
 {
-	assert (! is_method_entity(field));
+	assert(!is_method_entity(field));
 	oo_entity_info *ei = get_entity_info(field);
 	if (is_transient)
 		ei->flags |= oo_is_transient;
@@ -426,6 +363,7 @@ ddispatch_binding oo_get_entity_binding(ir_entity *entity)
 	oo_entity_info *ei = get_entity_info(entity);
 	return ei->binding;
 }
+
 void oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding)
 {
 	oo_entity_info *ei = get_entity_info(entity);
@@ -434,20 +372,20 @@ void oo_set_entity_binding(ir_entity *entity, ddispatch_binding binding)
 
 void oo_set_call_is_statically_bound(ir_node *call, bool bind_statically)
 {
-	assert (is_Call(call));
+	assert(is_Call(call));
 	oo_node_info *ni = get_node_info(call);
 	ni->bind_statically = bind_statically;
 }
 
 bool oo_get_call_is_statically_bound(ir_node *call)
 {
-	assert (is_Call(call));
+	assert(is_Call(call));
 
 	/* Shortcut to avoid creating a node_info for each call we see.
 	 * Nearly all calls are bound just like their referenced method
 	 * entity specifies, and just very few (like super.method() in
 	 * Java) must be handled specially. */
-	if (! pmap_contains(oo_node_info_map, call))
+	if (!pmap_contains(oo_node_info_map, call))
 		return false;
 
 	oo_node_info *ni = get_node_info(call);
@@ -459,6 +397,7 @@ void *oo_get_entity_link(ir_entity *entity)
 	oo_entity_info *ei = get_entity_info(entity);
 	return ei->link;
 }
+
 void oo_set_entity_link(ir_entity *entity, void* link)
 {
 	oo_entity_info *ei = get_entity_info(entity);
@@ -468,7 +407,7 @@ void oo_set_entity_link(ir_entity *entity, void* link)
 // Filter out supertypes that are interfaces and return the first real superclass.
 ir_type *oo_get_class_superclass(ir_type *klass)
 {
-	assert (is_Class_type(klass));
+	assert(is_Class_type(klass));
 
 	ir_type *superclass = NULL;
 	size_t n_supertyes = get_class_n_supertypes(klass);
@@ -477,7 +416,7 @@ ir_type *oo_get_class_superclass(ir_type *klass)
 		if (oo_get_class_is_interface(st))
 			continue;
 
-		assert (! superclass && "multiple inheritance unsupported");
+		assert(!superclass && "multiple inheritance unsupported");
 
 		superclass = st;
 	}
@@ -487,18 +426,18 @@ ir_type *oo_get_class_superclass(ir_type *klass)
 // Filter out the overwritten entites that belong to interfaces.
 ir_entity *oo_get_entity_overwritten_superclass_entity(ir_entity *entity)
 {
-	assert (is_method_entity(entity));
+	assert(is_method_entity(entity));
 
 	ir_entity *superclass_entity = NULL;
 	size_t n_overwrites = get_entity_n_overwrites(entity);
 	for (size_t s = 0; s < n_overwrites; s++) {
 		ir_entity *se = get_entity_overwrites(entity, s);
 		ir_type *owner = get_entity_owner(se);
-		assert (owner != get_glob_type());
+		assert(owner != get_glob_type());
 		if (oo_get_class_is_interface(owner))
 			continue;
 
-		assert (! superclass_entity && "multiple inheritance unsupported");
+		assert(!superclass_entity && "multiple inheritance unsupported");
 
 		superclass_entity = se;
 	}
@@ -507,29 +446,28 @@ ir_entity *oo_get_entity_overwritten_superclass_entity(ir_entity *entity)
 
 void oo_copy_entity_info(ir_entity *src, ir_entity *dest)
 {
-	assert (is_entity(src) && is_entity(dest));
+	assert(is_entity(src) && is_entity(dest));
 	oo_entity_info *ei_src  = get_entity_info(src);
 	oo_entity_info *ei_dest = get_entity_info(dest);
 
 	memcpy(ei_dest, ei_src, sizeof(oo_entity_info));
 }
 
-
 static void setup_vtable_proxy(ir_type *klass, void *env)
 {
-	(void) env;
+	(void)env;
 	ddispatch_setup_vtable(klass);
 }
 
 static void construct_runtime_typeinfo_proxy(ir_type *klass, void *env)
 {
-	(void) env;
+	(void)env;
 	rtti_construct_runtime_typeinfo(klass);
 }
 
 static void lower_node(ir_node *node, void *env)
 {
-	(void) env;
+	(void)env;
 	if (is_Call(node)) {
 		ddispatch_lower_Call(node);
 	} else if (is_Arraylength(node)) {
@@ -543,8 +481,8 @@ static void lower_node(ir_node *node, void *env)
 
 static void lower_type(ir_type *type, void *env)
 {
-	(void) env;
-	assert (is_Class_type(type));
+	(void)env;
+	assert(is_Class_type(type));
 
 	ir_type *glob = get_glob_type();
 	if (type != glob) {
