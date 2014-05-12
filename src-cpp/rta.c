@@ -163,7 +163,7 @@ static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, analyzer_
 	while ((call_entity = cpset_iterator_next(&iterator)) != NULL) {
 		cpset_t *targets = cpmap_find(env->dyncall_targets, call_entity);
 		assert(targets != NULL);
-		assert(cpset_find(targets, method) == NULL);
+		//assert(cpset_find(targets, method) == NULL); // doesn't make sense!?
 
 		printf("\t\t\t\t\tupdating method %s.%s for call %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method), get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
 		// add to targets set
@@ -554,7 +554,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entry);
-			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			assert(graph && is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
 			// note: omiting to check if already in queue assuming no duplicates in given entry points
 			pdeq_putr(workqueue, graph);
 			cpset_insert(&in_queue, graph);
@@ -574,7 +574,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
-		assert(is_ir_graph(g));
+		assert(g && is_ir_graph(g));
 		cpset_remove(&in_queue, g);
 
 		if (cpset_find(&done_set, g) != NULL) continue;
@@ -834,7 +834,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 		for (size_t i=0; (entry = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entry));
 			ir_graph *graph = get_entity_irg(entry);
-			assert(is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			assert(graph && is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
 			// note: omiting to check if already in queue assuming no duplicates in given entry points
 			pdeq_putr(workqueue, graph);
 			cpset_insert(&in_queue, graph);
@@ -843,7 +843,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
-		assert(is_ir_graph(g));
+		assert(g && is_ir_graph(g));
 		cpset_remove(&in_queue, g);
 
 		if (cpset_find(&done_set, g) != NULL) continue;
