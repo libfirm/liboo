@@ -354,8 +354,8 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 		ir_node *dest =  get_irn_n(node, 1);
 		ir_node *src =  get_irn_n(node, 2);
 		printf("\tstore: %s\n", gdb_node_helper(dest));
-		if (is_Sel(dest)) {
-			ir_entity *entity = get_Sel_entity(dest);
+		if (is_Member(dest)) {
+			ir_entity *entity = get_Member_entity(dest);
 			printf("\t\t%s\n", get_entity_name(entity));
 			if (strncmp(get_entity_name(entity), "@vptr", 5) == 0) {
 				printf("\t\t\t%s\n", gdb_node_helper(src));
