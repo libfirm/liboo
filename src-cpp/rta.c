@@ -81,17 +81,14 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) // missing new 
 }
 */
 
-static ir_type *default_detect_creation(ir_node *call) { (void)call; return NULL; }
+
 static ir_entity *default_detect_call(ir_node *call) { (void)call; return NULL; }
 
-static ir_type *(*detect_creation)(ir_node *call) = &default_detect_creation;
 static ir_entity *(*detect_call)(ir_node *call) = &default_detect_call;
 
-void rta_set_detection_callbacks(ir_type *(*detect_creation_callback)(ir_node *call), ir_entity *(*detect_call_callback)(ir_node *call))
+void rta_set_detection_callbacks(ir_entity *(*detect_call_callback)(ir_node *call))
 {
-	assert(detect_creation_callback);
 	assert(detect_call_callback);
-	detect_creation = detect_creation_callback;
 	detect_call = detect_call_callback;
 }
 
@@ -100,7 +97,6 @@ typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
-	cpmap_t *vtable2class; // map for finding the class to a given vtable entity
 	cpset_t *live_classes; // live classes found by examining object creation (external classes are left out and always considered as live)
 	cpset_t *live_methods; // live method entities
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
@@ -353,33 +349,6 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 	analyzer_env *env = (analyzer_env*)environment;
 
 	switch (get_irn_opcode(node)) {
-	case iro_Store: {
-		// look for store of vptrs to detect object creation
-		ir_node *dest =  get_irn_n(node, 1);
-		ir_node *src =  get_irn_n(node, 2);
-		DEBUGOUT("\tstore: %s\n", gdb_node_helper(dest));
-		if (is_Member(dest)) {
-			ir_entity *entity = get_Member_entity(dest);
-			DEBUGOUT("\t\t%s\n", get_entity_name(entity));
-			if (strncmp(get_entity_name(entity), "@vptr", 5) == 0) {
-				DEBUGOUT("\t\t\t%s\n", gdb_node_helper(src));
-
-				assert(is_Add(src)); // src is usually an Add node in bytecode2firm //TODO write code that correctly parses what liboo function ddispatch_prepare_new_instance creates according to the configured vtable layout
-				ir_node *lhs = get_irn_n(src, 0);
-				assert(is_Address(lhs));
-				ir_entity *vtable_entity = get_Address_entity(lhs);
-				DEBUGOUT("\t\t\t\tLHS: %s -> %s -> owner: %s\n", gdb_node_helper(lhs), get_entity_name(vtable_entity), get_class_name(get_entity_owner(vtable_entity)));
-				ir_type *klass = cpmap_find(env->vtable2class, vtable_entity);
-				assert(is_Class_type(klass));
-				DEBUGOUT("\t\t\t\t\t-> vtable2class: %s\n", get_class_name(klass));
-
-				add_new_live_class(klass, env);
-
-				DEBUGOUT("\t\t\t\tRHS: %s\n", gdb_node_helper(get_irn_n(src, 1))); // rhs
-			}
-		}
-		break;
-	}
 	case iro_Call: {
 		ir_node *callee = get_irn_n(node, 1);
 		if (is_Address(callee)) {
@@ -398,16 +367,9 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 			add_to_workqueue(entity, env);
 
 
-			// hack to detect object creation or calls (like class initialization) that are hidden in frontend-specific nodes
+			// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
 			ir_graph *graph = get_entity_irg(entity);
 			if (!graph) {
-				// ask frontend if there are objects created here (e.g. needed to detect GCJ object creation)
-				ir_type *klass = detect_creation(node); //TODO support for more than one
-				if (klass) {
-					DEBUGOUT("\t\texternal method creates class %s\n", get_class_name(klass));
-					add_new_live_class(klass, env);
-				}
-
 				// ask frontend if there are additional methods called here (e.g. needed to detect class initialization)
 				ir_entity *called_method = detect_call(node); //TODO support for more than one
 				if (called_method) {
@@ -453,42 +415,17 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 		break;
 	}
 	default:
+		if (is_VptrIsSet(node)) {
+			// use new VptrIsSet node for detection of object creation
+			ir_type *klass = get_VptrIsSet_type(node);
+			assert(is_Class_type(klass));
+
+			DEBUGOUT("\tVptrIsSet: %s\n", get_class_name(klass));
+			add_new_live_class(klass, env);
+		}
 		// skip other node types
 		break;
 	}
-}
-
-
-typedef struct class_collector_env {
-	cpmap_t *vtable2class;
-} class_collector_env;
-
-static void walk_classes_and_collect(ir_type *klass, void* environment)
-{
-	assert(environment);
-	class_collector_env *env = (class_collector_env*)environment;
-
-	cpmap_t *vtable2class = env->vtable2class;
-	ir_entity *vtable_entity = oo_get_class_vtable_entity(klass);
-	if (vtable_entity) {
-		//DEBUGOUT(" %s -> %s\n", get_entity_name(vtable_entity), gdb_node_helper(klass));
-		cpmap_set(vtable2class, vtable_entity, klass);
-	}
-	else {
-		//DEBUGOUT(" %s has no vtable\n", gdb_node_helper(klass));
-		//DEBUGOUT("\tis interface: %u\n", oo_get_class_is_interface(klass));
-		//DEBUGOUT("\tis extern: %u\n", oo_get_class_is_extern(klass));
-	}
-
-/*	size_t n = get_class_n_supertypes(klass);
-	DEBUGOUT("\t%u ", n);
-	for (size_t i=0; i<n; i++) {
-		ir_type *super = get_class_supertype(klass, i);
-		DEBUGOUT("%s", get_class_name(super));
-		if (i<n-1) DEBUGOUT(", ");
-	}
-	DEBUGOUT("\n");
-*/
 }
 
 
@@ -515,14 +452,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	cpset_init(live_methods, hash_ptr, ptr_equals);
 	cpmap_init(dyncall_targets, hash_ptr, ptr_equals);
 
-	cpmap_t vtable2class;
-	cpmap_init(&vtable2class, hash_ptr, ptr_equals);
-	{ // walk all classes to fill the vtable2class map
-		class_collector_env env = { .vtable2class = &vtable2class };
-		class_walk_super2sub(walk_classes_and_collect, NULL, &env);
-	}
-	DEBUGOUT("number of classes with vtables: %u\n", cpmap_size(&vtable2class));
-
 	cpmap_t unused_targets;
 	cpmap_init(&unused_targets, hash_ptr, ptr_equals);
 
@@ -541,7 +470,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		.workqueue = workqueue,
 		.in_queue = &in_queue,
 		.done_set = &done_set,
-		.vtable2class = &vtable2class,
 		.live_classes = live_classes,
 		.live_methods = live_methods,
 		.dyncall_targets = dyncall_targets,
@@ -641,7 +569,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	del_pdeq(workqueue);
 	cpset_destroy(&in_queue);
 	cpset_destroy(&done_set);
-	cpmap_destroy(&vtable2class);
 
 	{ // delete the maps and sets in map unused_targets
 		cpmap_iterator_t iterator;
