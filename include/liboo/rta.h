@@ -16,14 +16,14 @@
 
 #include <libfirm/firm.h>
 
-/** sets important callback functions needed to detect object creation or calls (e.g. class intialization) hidden behind frontend-specific nodes
+/** sets important callback functions needed to detect calls (e.g. class intialization) hidden behind frontend-specific nodes
  * @note It's very important for the frontend to implement these callbacks correctly, if anything is missing RTA's assumptions may not hold and it can lead to defective programs!
- * @note Don't give object creation from a generic calloc-like call if VPTR is set explicitly in the graph in conjunction with it. RTA can detect the object creation when VPTR is set. This mechanism is meant for magical functions similar to e.g. _Jv_AllocObjectNoFinalizer and _Jv_InitClass that get an RTTI object and do set VPTR and everything in external code. Also, it doesn't make sense to return entities of native functions or methods.
- * @note The callbacks are only called on statically linked calls that call a function that has no firm graph.
- * @param detect_creation give function that returns the type object (ir_type*) of the class of the object created by the call node or NULL if no object is created //TODO support for more than one
+ * @note This mechanism is meant for functions similar to e.g. _Jv_InitClass.
+ * @note It doesn't make much sense to return entities of native functions or methods. Return methods that can and should be analyzed even if they are called indirectly by other native methods that are called by the method/function in question.
+ * @note The callbacks are only called on statically linked call nodes that call a function that has no firm graph.
  * @param detect_call give function that returns the entity (ir_entity*) of the method called by the call node or NULL if no method is called //TODO support for more than one
  */
-void rta_set_detection_callbacks(ir_type *(*detect_creation)(ir_node *call), ir_entity *(*detect_call)(ir_node *call));
+void rta_set_detection_callbacks(ir_entity *(*detect_call)(ir_node *call));
 
 
 /** runs Rapid Type Analysis and then tries to devirtualize dynamically linked calls and to discard unneeded classes and methods
