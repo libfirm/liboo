@@ -329,7 +329,9 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 	} else
 		DEBUGOUT("\t\t\t%s.%s is abstract\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
 
-	for (size_t i=0; i<get_class_n_subtypes(klass); i++) {
+	size_t n_subtypes = get_class_n_subtypes(klass);
+	DEBUGOUT("\t\t\thas %u subclasses\n", n_subtypes);
+	for (size_t i=0; i<n_subtypes; i++) {
 		ir_type *subclass = get_class_subtype(klass, i);
 
 		collect_methods_recursive(call_entity, subclass, current_entity, result_set, env);
@@ -395,14 +397,14 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 				//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
 				if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
-					// calculate set of method entities that this call could potentially call
+					// calculate set of all method entities that this call could potentially call
 
-					// static lookup upwards in the class hierarchy (gets just one method entity)
-					// The entity from the Sel node is already what the result of a static lookup would be.
+					// static lookup upwards in the class hierarchy for the case of an inherited method
+					// The entity from the MethodSel node is already what the result of s static lookup would be or it is an inherited copy which points to the inherited method.
 
 					// collect all potentially called method entities from downwards the class hierarchy
 					cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
-					collect_methods(entity, result_set, env);
+					collect_methods(entity, result_set, env); // note: This should work correctly with inherited copies and interface methods.
 
 					// note: we can't check here for a nonempty result set because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
 
@@ -487,9 +489,10 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entry);
 			assert(graph && is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
-			// note: omiting to check if already in queue assuming no duplicates in given entry points
-			pdeq_putr(workqueue, graph);
-			cpset_insert(&in_queue, graph);
+			if (cpset_find(&in_queue, graph) == NULL) {
+				pdeq_putr(workqueue, graph);
+				cpset_insert(&in_queue, graph);
+			}
 		}
 		assert(i > 0 && "give at least one entry point");
 	}
@@ -768,9 +771,10 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 			assert(is_method_entity(entry));
 			ir_graph *graph = get_entity_irg(entry);
 			assert(graph && is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
-			// note: omiting to check if already in queue assuming no duplicates in given entry points
-			pdeq_putr(workqueue, graph);
-			cpset_insert(&in_queue, graph);
+			if (cpset_find(&in_queue, graph) == NULL) {
+				pdeq_putr(workqueue, graph);
+				cpset_insert(&in_queue, graph);
+			}
 		}
 	}
 
