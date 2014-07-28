@@ -138,15 +138,15 @@ public class binding_oo {
 
 	public static enum mtp_additional_properties {
 		mtp_no_property(0),
-		mtp_property_const((1 << 0)),
+		mtp_property_no_write((1 << 0)),
 		mtp_property_pure((1 << 1)),
 		mtp_property_noreturn((1 << 2)),
-		mtp_property_nothrow((1 << 3)),
-		mtp_property_naked((1 << 4)),
-		mtp_property_malloc((1 << 5)),
-		mtp_property_returns_twice((1 << 6)),
-		mtp_property_private((1 << 7)),
-		mtp_property_has_loop((1 << 8)),
+		mtp_property_terminates((1 << 3)),
+		mtp_property_nothrow((1 << 4)),
+		mtp_property_naked((1 << 5)),
+		mtp_property_malloc((1 << 6)),
+		mtp_property_returns_twice((1 << 7)),
+		mtp_property_private((1 << 8)),
 		mtp_property_always_inline((1 << 9)),
 		mtp_property_noinline((1 << 10)),
 		mtp_property_inline_recommended((1 << 11)),
@@ -265,6 +265,34 @@ public class binding_oo {
 
 		public static ir_align getEnum(int val) {
 			for (ir_align entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum idtype_t {
+		P_ALL(),
+		P_PID(),
+		P_PGID();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		idtype_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		idtype_t() {
+			this.val = C.next_val++;
+		}
+
+		public static idtype_t getEnum(int val) {
+			for (idtype_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1043,7 +1071,8 @@ public class binding_oo {
 		irop_flag_uses_memory((1 << 8)),
 		irop_flag_dump_noblock((1 << 9)),
 		irop_flag_cse_neutral((1 << 10)),
-		irop_flag_unknown_jump((1 << 11));
+		irop_flag_unknown_jump((1 << 11)),
+		irop_flag_const_memory((1 << 12));
 		public final int val;
 
 		private static class C {
@@ -1106,6 +1135,7 @@ public class binding_oo {
 		iro_Anchor(),
 		iro_And(),
 		iro_Bad(),
+		iro_Bitcast(),
 		iro_Block(),
 		iro_Builtin(),
 		iro_Call(),
@@ -1125,6 +1155,7 @@ public class binding_oo {
 		iro_Id(),
 		iro_Jmp(),
 		iro_Load(),
+		iro_Member(),
 		iro_Minus(),
 		iro_Mod(),
 		iro_Mul(),
@@ -1309,6 +1340,33 @@ public class binding_oo {
 
 		public static n_And getEnum(int val) {
 			for (n_And entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Bitcast {
+		n_Bitcast_op(),
+		n_Bitcast_max(n_Bitcast.n_Bitcast_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Bitcast(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Bitcast() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Bitcast getEnum(int val) {
+			for (n_Bitcast entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1822,6 +1880,33 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Member {
+		n_Member_ptr(),
+		n_Member_max(n_Member.n_Member_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Member(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Member() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Member getEnum(int val) {
+			for (n_Member entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum n_Minus {
 		n_Minus_op(),
 		n_Minus_max(n_Minus.n_Minus_op.val);
@@ -2187,7 +2272,8 @@ public class binding_oo {
 
 	public static enum n_Sel {
 		n_Sel_ptr(),
-		n_Sel_max(n_Sel.n_Sel_ptr.val);
+		n_Sel_index(),
+		n_Sel_max(n_Sel.n_Sel_index.val);
 		public final int val;
 
 		private static class C {
