@@ -6,8 +6,10 @@
 #include <libfirm/irop.h>
 #include <stdbool.h>
 
+#include "adt/error.h"
 #include "adt/util.h"
 #include "liboo/nodes.h"
+#include "liboo/oo.h"
 #include "liboo/opt.h"
 
 static bool is_subtype(ir_type *test, ir_type *type)
@@ -55,7 +57,54 @@ make_tuple:;
 	return new_r_Tuple(block, ARRAY_SIZE(tuple_in), tuple_in);
 }
 
+static ir_node *transform_node_MethodSel(ir_node *methodsel)
+{
+	ir_node   *objptr = get_MethodSel_ptr(methodsel);
+	ir_entity *method = get_MethodSel_entity(methodsel);
+	assert(is_method_entity(method));
+
+	ddispatch_binding binding = oo_get_entity_binding(method);
+	if (binding == bind_static)
+		return methodsel;
+
+	if (!is_Proj(objptr))
+		return methodsel;
+	objptr = get_Proj_pred(objptr);
+	if (!is_VptrIsSet(objptr))
+		return methodsel;
+
+	ir_type   *actual        = get_VptrIsSet_type(objptr);
+	ir_entity *actual_method = NULL;
+	ident     *methid        = get_entity_ident(method);
+	for (ir_type *clazz = actual; clazz != NULL; clazz = oo_get_class_superclass(clazz)) {
+		for (size_t i = 0; i < get_class_n_members(clazz); ++i) {
+			ir_entity *member = get_class_member(clazz, i);
+			if (!is_method_entity(member))
+				continue;
+			ident *id = get_entity_ident(member);
+			if (id == methid) {
+				actual_method = member;
+				goto make_tuple;
+			}
+		}
+	}
+
+	panic("Could not find method implementation");
+
+make_tuple:;
+	ir_graph *irg  = get_irn_irg(methodsel);
+	dbg_info *dbgi = get_irn_dbg_info(methodsel);
+	ir_node  *addr = new_rd_Address(dbgi, irg, actual_method);
+	ir_node *tuple_in[] = {
+		[pn_MethodSel_M]   = get_MethodSel_mem(methodsel),
+		[pn_MethodSel_res] = addr,
+	};
+	ir_node *block = get_nodes_block(methodsel);
+	return new_r_Tuple(block, ARRAY_SIZE(tuple_in), tuple_in);
+}
+
 void oo_register_opt_funcs(void)
 {
 	set_op_transform_node(op_InstanceOf, transform_node_InstanceOf);
+	set_op_transform_node(op_MethodSel, transform_node_MethodSel);
 }
