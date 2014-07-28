@@ -3,6 +3,7 @@ package firm;
 import com.sun.jna.Pointer;
 
 import firm.bindings.binding_oo;
+import firm.bindings.binding_opt;
 import firm.nodes.Node;
 import firm.oo.nodes.Nodes;
 

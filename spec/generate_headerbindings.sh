@@ -5,7 +5,7 @@ set -eu
 
 . ./config
 
-for i in oo nodes ; do
+for i in oo nodes opt ; do
 	RES="../src/firm/bindings/binding_$i.java"
 	TMP="/tmp/tmp.java"
 	TMP2="/tmp/tmp2.java"
