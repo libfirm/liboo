@@ -474,10 +474,10 @@ static void lower_node(ir_node *node, void *env)
 		rtti_lower_InstanceOf(node);
 	} else if (is_Proj(node)) {
 		ir_node *pred = get_Proj_pred(node);
-		if (is_Raise(pred) && get_Proj_proj(node) == pn_Raise_X) {
+		if (is_Raise(pred) && get_Proj_num(node) == pn_Raise_X) {
 			eh_lower_Raise(pred, node);
 		} else if (is_VptrIsSet(pred)) {
-			long pn = get_Proj_proj(node);
+			unsigned pn = get_Proj_num(node);
 			switch ((pn_VptrIsSet)pn) {
 			case pn_VptrIsSet_M:
 				exchange(node, get_VptrIsSet_mem(pred));

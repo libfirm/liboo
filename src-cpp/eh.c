@@ -234,7 +234,7 @@ void eh_lower_Raise(ir_node *raise, ir_node *proj)
 	ir_node  *throw   = new_r_Call(block, cur_mem, c_symc, 1, in, get_entity_type(throw_entity));
 	ir_set_throws_exception(throw, 1);
 	exchange(raise, throw);
-	set_Proj_proj(proj, pn_Call_X_except);
+	set_Proj_num(proj, pn_Call_X_except);
 }
 
 #else
