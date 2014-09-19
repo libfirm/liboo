@@ -23,7 +23,8 @@ ir_node *dmemory_default_get_arraylength(dbg_info *dbgi, ir_node *block,
 	ir_node  *length_addr = new_rd_Add(dbgi, block, objptr, cnst, mode_P);
 
 	ir_node  *cur_mem     = *mem;
-	ir_node  *load        = new_rd_Load(dbgi, block, cur_mem, length_addr, default_arraylength_mode, cons_none);
+	ir_type  *length_type = get_type_for_mode(default_arraylength_mode);
+	ir_node  *load        = new_rd_Load(dbgi, block, cur_mem, length_addr, default_arraylength_mode, length_type, cons_none);
 	cur_mem               = new_r_Proj(load, mode_M, pn_Load_M);
 	ir_node  *len         = new_r_Proj(load, default_arraylength_mode, pn_Load_res);
 	*mem = cur_mem;
