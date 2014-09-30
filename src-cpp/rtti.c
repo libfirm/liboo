@@ -165,7 +165,6 @@ ir_entity *rtti_emit_string_const(const char *string)
 	scp_entry_t *found_scpe = cpset_find(&string_constant_pool, &lookup_scpe);
 	if (found_scpe != NULL) {
 		ir_entity *string_const = found_scpe->entity;
-		assert(is_entity(string_const));
 		return string_const;
 	}
 

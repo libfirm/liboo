@@ -444,10 +444,8 @@ ir_entity *oo_get_entity_overwritten_superclass_entity(ir_entity *entity)
 
 void oo_copy_entity_info(ir_entity *src, ir_entity *dest)
 {
-	assert(is_entity(src) && is_entity(dest));
 	oo_entity_info *ei_src  = get_entity_info(src);
 	oo_entity_info *ei_dest = get_entity_info(dest);
-
 	memcpy(ei_dest, ei_src, sizeof(oo_entity_info));
 }
 
