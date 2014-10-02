@@ -385,10 +385,11 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 
 
 		} else if (is_Proj(callee)) {
-			callee = get_Proj_pred(callee);
-			if (is_MethodSel(callee)) {
+			ir_node *pred = get_Proj_pred(callee);
+			if (is_MethodSel(pred)) {
+				ir_node *methodsel = pred;
 				// handle dynamic call
-				ir_entity *entity = get_MethodSel_entity(callee);
+				ir_entity *entity = get_MethodSel_entity(methodsel);
 				DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 				//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
 				//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
@@ -411,9 +412,9 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 					cpmap_set(env->dyncall_targets, entity, result_set);
 				}
 			} else
-				assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
+				assert("neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
 		} else
-			assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
+			assert("neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
 		break;
 	}
 	default:
@@ -707,13 +708,14 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 					assert(cpset_iterator_next(&it) == NULL);
 
 					DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-					// set an Address node as callee
-					ir_graph *graph = get_irn_irg(callee);
+					// The following code assumes that the MethodSel node is only used by this Call node. (They are usually not shared by more than one Call node and definitely not used by something else, right?)
+					// set an Address node as callee to make the call statically linked
+					ir_graph *graph = get_irn_irg(methodsel);
 					ir_node *address = new_r_Address(graph, target);
 					set_irn_n(call, 1, address);
 					// disconnect MethodSel node from Mem edge
 					ir_node *mem = get_irn_n(methodsel, 0);
-					set_irn_n(callee, 0, get_irg_no_mem(graph));
+					set_irn_n(methodsel, 0, get_irg_no_mem(graph));
 					ir_node *projm = get_irn_n(call, 0);
 					ir_node *pred;
 					while ((pred = get_irn_n(projm, 0)) != methodsel) // find correct ProjM node
@@ -730,9 +732,9 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 					optimizer_add_to_workqueue(target, env);
 				}
 			} else
-				assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
+				assert("neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
 		} else
-			assert(false); // neither Address nor Proj to MethodSel as callee shouldn't happen!?
+			assert("neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
 		break;
 	}
 	default:
