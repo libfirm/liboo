@@ -407,7 +407,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 					cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
 					collect_methods(entity, result_set, env); // note: This should work correctly with inherited copies and interface methods.
 
-					// note: we can't check here for a nonempty result set because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
+					// note: cannot check for nonempty result set here because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
 
 					cpmap_set(env->dyncall_targets, entity, result_set);
 				}
@@ -699,8 +699,9 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 
 				cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
 				assert(targets);
-				assert(cpset_size(targets) > 0 || (oo_get_class_is_extern(owner) && !oo_get_class_is_final(owner) && !oo_get_method_is_final(entity))); // if we found no call targets then something went wrong (except it was a call to a nonfinal method of a nonfinal external class because then there can be unknown external subclasses that overwrite the method)
-				if (cpset_size(targets) == 1 && (!oo_get_class_is_extern(owner) || oo_get_class_is_final(owner) || oo_get_method_is_final(entity))) {
+				// note: cannot check for nonempty target set here because there can be legal programs that have calls with empty target sets although they will probably run into an exception when executed! (e.g. interface call without implementing class and program initializes reference to null, actually same with abstract class or nonlive class)
+
+				if (cpset_size(targets) == 1 && (!oo_get_class_is_extern(owner) || oo_get_class_is_final(owner) || oo_get_method_is_final(entity))) { // exactly one target and not extern nonfinal
 					// devirtualize call
 					cpset_iterator_t it;
 					cpset_iterator_init(&it, targets);
