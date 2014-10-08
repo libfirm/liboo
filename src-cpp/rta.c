@@ -489,7 +489,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entry);
-			assert(graph && is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
 			if (cpset_find(&in_queue, graph) == NULL) {
 				pdeq_putr(workqueue, graph);
 				cpset_insert(&in_queue, graph);
@@ -510,7 +510,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
-		assert(g && is_ir_graph(g));
+		assert(g && get_kind(g) == k_ir_graph);
 		cpset_remove(&in_queue, g);
 
 		if (cpset_find(&done_set, g) != NULL) continue;
@@ -773,7 +773,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 		for (size_t i=0; (entry = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entry));
 			ir_graph *graph = get_entity_irg(entry);
-			assert(graph && is_ir_graph(graph)); // don't give methods without a graph as entry points for the analysis !? TODO
+			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
 			if (cpset_find(&in_queue, graph) == NULL) {
 				pdeq_putr(workqueue, graph);
 				cpset_insert(&in_queue, graph);
@@ -783,7 +783,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 
 	while (!pdeq_empty(workqueue)) {
 		ir_graph *g = pdeq_getl(workqueue);
-		assert(g && is_ir_graph(g));
+		assert(g && get_kind(g) == k_ir_graph);
 		cpset_remove(&in_queue, g);
 
 		if (cpset_find(&done_set, g) != NULL) continue;
