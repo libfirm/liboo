@@ -6,5 +6,6 @@ public class Nodes {
 		Arraylength.init();
 		InstanceOf.init();
 		MethodSel.init();
+		VptrIsSet.init();
 	}
 }

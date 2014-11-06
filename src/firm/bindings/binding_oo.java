@@ -138,15 +138,15 @@ public class binding_oo {
 
 	public static enum mtp_additional_properties {
 		mtp_no_property(0),
-		mtp_property_const((1 << 0)),
+		mtp_property_no_write((1 << 0)),
 		mtp_property_pure((1 << 1)),
 		mtp_property_noreturn((1 << 2)),
-		mtp_property_nothrow((1 << 3)),
-		mtp_property_naked((1 << 4)),
-		mtp_property_malloc((1 << 5)),
-		mtp_property_returns_twice((1 << 6)),
-		mtp_property_private((1 << 7)),
-		mtp_property_has_loop((1 << 8)),
+		mtp_property_terminates((1 << 3)),
+		mtp_property_nothrow((1 << 4)),
+		mtp_property_naked((1 << 5)),
+		mtp_property_malloc((1 << 6)),
+		mtp_property_returns_twice((1 << 7)),
+		mtp_property_private((1 << 8)),
 		mtp_property_always_inline((1 << 9)),
 		mtp_property_noinline((1 << 10)),
 		mtp_property_inline_recommended((1 << 11)),
@@ -189,7 +189,6 @@ public class binding_oo {
 		ir_bk_bswap(),
 		ir_bk_inport(),
 		ir_bk_outport(),
-		ir_bk_inner_trampoline(),
 		ir_bk_saturating_increment(),
 		ir_bk_compare_swap(),
 		ir_bk_may_alias(),
@@ -1036,14 +1035,14 @@ public class binding_oo {
 		irop_flag_cfopcode((1 << 1)),
 		irop_flag_fragile((1 << 2)),
 		irop_flag_forking((1 << 3)),
-		irop_flag_highlevel((1 << 4)),
 		irop_flag_constlike((1 << 5)),
 		irop_flag_keep((1 << 6)),
 		irop_flag_start_block((1 << 7)),
 		irop_flag_uses_memory((1 << 8)),
 		irop_flag_dump_noblock((1 << 9)),
 		irop_flag_cse_neutral((1 << 10)),
-		irop_flag_unknown_jump((1 << 11));
+		irop_flag_unknown_jump((1 << 11)),
+		irop_flag_const_memory((1 << 12));
 		public final int val;
 
 		private static class C {
@@ -1106,6 +1105,7 @@ public class binding_oo {
 		iro_Anchor(),
 		iro_And(),
 		iro_Bad(),
+		iro_Bitcast(),
 		iro_Block(),
 		iro_Builtin(),
 		iro_Call(),
@@ -1125,6 +1125,7 @@ public class binding_oo {
 		iro_Id(),
 		iro_Jmp(),
 		iro_Load(),
+		iro_Member(),
 		iro_Minus(),
 		iro_Mod(),
 		iro_Mul(),
@@ -1309,6 +1310,33 @@ public class binding_oo {
 
 		public static n_And getEnum(int val) {
 			for (n_And entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum n_Bitcast {
+		n_Bitcast_op(),
+		n_Bitcast_max(n_Bitcast.n_Bitcast_op.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Bitcast(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Bitcast() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Bitcast getEnum(int val) {
+			for (n_Bitcast entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -1822,6 +1850,33 @@ public class binding_oo {
 		}
 	}
 
+	public static enum n_Member {
+		n_Member_ptr(),
+		n_Member_max(n_Member.n_Member_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_Member(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_Member() {
+			this.val = C.next_val++;
+		}
+
+		public static n_Member getEnum(int val) {
+			for (n_Member entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum n_Minus {
 		n_Minus_op(),
 		n_Minus_max(n_Minus.n_Minus_op.val);
@@ -2187,7 +2242,8 @@ public class binding_oo {
 
 	public static enum n_Sel {
 		n_Sel_ptr(),
-		n_Sel_max(n_Sel.n_Sel_ptr.val);
+		n_Sel_index(),
+		n_Sel_max(n_Sel.n_Sel_index.val);
 		public final int val;
 
 		private static class C {
@@ -2790,65 +2846,30 @@ public class binding_oo {
 		}
 	}
 
-	public static enum ir_disambuigator_options {
-		aa_opt_no_opt(0),
-		aa_opt_type_based(1),
-		aa_opt_byte_type_may_alias(2),
-		aa_opt_no_alias_args(4),
-		aa_opt_no_alias_args_global(8),
-		aa_opt_no_alias(16),
-		aa_opt_inherited(128);
+	public static enum ir_disambiguator_options {
+		aa_opt_none(0),
+		aa_opt_always_alias((1 << 0)),
+		aa_opt_type_based((1 << 1)),
+		aa_opt_byte_type_may_alias((1 << 2)),
+		aa_opt_no_alias((1 << 3)),
+		aa_opt_inherited((1 << 4));
 		public final int val;
 
 		private static class C {
 			static int next_val;
 		}
 
-		ir_disambuigator_options(int val) {
+		ir_disambiguator_options(int val) {
 			this.val = val;
 			C.next_val = val + 1;
 		}
 
-		ir_disambuigator_options() {
+		ir_disambiguator_options() {
 			this.val = C.next_val++;
 		}
 
-		public static ir_disambuigator_options getEnum(int val) {
-			for (ir_disambuigator_options entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum ir_storage_class_class_t {
-		ir_sc_pointer(0x0),
-		ir_sc_globalvar(0x1),
-		ir_sc_localvar(0x2),
-		ir_sc_tls(0x3),
-		ir_sc_malloced(0x4),
-		ir_sc_globaladdr(0x5),
-		ir_sc_modifier_nottaken(0x80),
-		ir_sc_modifier_argument(0x40),
-		ir_sc_modifiers((ir_storage_class_class_t.ir_sc_modifier_nottaken.val | ir_storage_class_class_t.ir_sc_modifier_argument.val));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		ir_storage_class_class_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		ir_storage_class_class_t() {
-			this.val = C.next_val++;
-		}
-
-		public static ir_storage_class_class_t getEnum(int val) {
-			for (ir_storage_class_class_t entry : values()) {
+		public static ir_disambiguator_options getEnum(int val) {
+			for (ir_disambiguator_options entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}

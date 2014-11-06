@@ -138,15 +138,15 @@ public class binding_nodes {
 
 	public static enum mtp_additional_properties {
 		mtp_no_property(0),
-		mtp_property_const((1 << 0)),
+		mtp_property_no_write((1 << 0)),
 		mtp_property_pure((1 << 1)),
 		mtp_property_noreturn((1 << 2)),
-		mtp_property_nothrow((1 << 3)),
-		mtp_property_naked((1 << 4)),
-		mtp_property_malloc((1 << 5)),
-		mtp_property_returns_twice((1 << 6)),
-		mtp_property_private((1 << 7)),
-		mtp_property_has_loop((1 << 8)),
+		mtp_property_terminates((1 << 3)),
+		mtp_property_nothrow((1 << 4)),
+		mtp_property_naked((1 << 5)),
+		mtp_property_malloc((1 << 6)),
+		mtp_property_returns_twice((1 << 7)),
+		mtp_property_private((1 << 8)),
 		mtp_property_always_inline((1 << 9)),
 		mtp_property_noinline((1 << 10)),
 		mtp_property_inline_recommended((1 << 11)),
@@ -189,7 +189,6 @@ public class binding_nodes {
 		ir_bk_bswap(),
 		ir_bk_inport(),
 		ir_bk_outport(),
-		ir_bk_inner_trampoline(),
 		ir_bk_saturating_increment(),
 		ir_bk_compare_swap(),
 		ir_bk_may_alias(),
@@ -276,8 +275,9 @@ public class binding_nodes {
 		ooo_Arraylength(),
 		ooo_InstanceOf(),
 		ooo_MethodSel(),
+		ooo_VptrIsSet(),
 		ooo_first(oo_opcode.ooo_Arraylength.val),
-		ooo_last(oo_opcode.ooo_MethodSel.val);
+		ooo_last(oo_opcode.ooo_VptrIsSet.val);
 		public final int val;
 
 		private static class C {
@@ -470,6 +470,62 @@ public class binding_nodes {
 		}
 	}
 
+	public static enum n_VptrIsSet {
+		n_VptrIsSet_mem(),
+		n_VptrIsSet_ptr(),
+		n_VptrIsSet_max(n_VptrIsSet.n_VptrIsSet_ptr.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		n_VptrIsSet(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		n_VptrIsSet() {
+			this.val = C.next_val++;
+		}
+
+		public static n_VptrIsSet getEnum(int val) {
+			for (n_VptrIsSet entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum pn_VptrIsSet {
+		pn_VptrIsSet_M(),
+		pn_VptrIsSet_res(),
+		pn_VptrIsSet_max(pn_VptrIsSet.pn_VptrIsSet_res.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		pn_VptrIsSet(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		pn_VptrIsSet() {
+			this.val = C.next_val++;
+		}
+
+		public static pn_VptrIsSet getEnum(int val) {
+			for (pn_VptrIsSet entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 
 	public static native int is_oo_node(Pointer node);
 
@@ -542,4 +598,28 @@ public class binding_nodes {
 	public static native void set_MethodSel_entity(Pointer node, Pointer entity);
 
 	public static native Pointer get_op_MethodSel();
+
+	public static native Pointer new_rd_VptrIsSet(Pointer dbgi, Pointer block, Pointer irn_mem, Pointer irn_ptr, Pointer type);
+
+	public static native Pointer new_r_VptrIsSet(Pointer block, Pointer irn_mem, Pointer irn_ptr, Pointer type);
+
+	public static native Pointer new_d_VptrIsSet(Pointer dbgi, Pointer irn_mem, Pointer irn_ptr, Pointer type);
+
+	public static native Pointer new_VptrIsSet(Pointer irn_mem, Pointer irn_ptr, Pointer type);
+
+	public static native int is_VptrIsSet(Pointer node);
+
+	public static native Pointer get_VptrIsSet_mem(Pointer node);
+
+	public static native void set_VptrIsSet_mem(Pointer node, Pointer mem);
+
+	public static native Pointer get_VptrIsSet_ptr(Pointer node);
+
+	public static native void set_VptrIsSet_ptr(Pointer node, Pointer ptr);
+
+	public static native Pointer get_VptrIsSet_type(Pointer node);
+
+	public static native void set_VptrIsSet_type(Pointer node, Pointer type);
+
+	public static native Pointer get_op_VptrIsSet();
 }
