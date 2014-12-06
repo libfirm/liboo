@@ -488,6 +488,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			cpset_insert(live_methods, entry);
 
 			// add to workqueue
+			DEBUGOUT("%s\n", get_entity_name(entry));
 			ir_graph *graph = get_entity_irg(entry);
 			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
 			if (cpset_find(&in_queue, graph) == NULL) {
@@ -723,6 +724,8 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 						projm = pred;
 					assert(is_Proj(projm));
 					exchange(projm, mem);
+				} else {
+					DEBUGOUT("\t\tnot devirtualizing call %u %u %u %u\n", cpset_size(targets), oo_get_class_is_extern(owner), oo_get_class_is_final(owner), oo_get_method_is_final(entity));
 				}
 
 				// add to workqueue
