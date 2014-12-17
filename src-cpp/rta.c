@@ -4,7 +4,7 @@
 
 /**
  * @file	rta.c
- * @brief	Devirtualization of dynamically linked calls through Rapid Type Analysis
+ * @brief	Devirtualization of dynamically bound calls through Rapid Type Analysis
  * @author	Steffen Knoth
  * @date	2014
  */
@@ -99,8 +99,8 @@ typedef struct analyzer_env {
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpset_t *live_classes; // live classes found by examining object creation (external classes are left out and always considered as live)
 	cpset_t *live_methods; // live method entities
-	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
-	cpmap_t *unused_targets; // map that stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: class -> (Map: method entity -> Set: call entities)) This is needed to patch analysis result when a class becomes live after there were already some dynamically linked calls that would call a method of it.
+	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
+	cpmap_t *unused_targets; // map that stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: class -> (Map: method entity -> Set: call entities)) This is needed to patch analysis result when a class becomes live after there were already some dynamically bound calls that would call a method of it.
 	cpset_t *external_methods; // set that stores already handled external methods (just for not handling the same method more than once)
 } analyzer_env;
 
@@ -433,7 +433,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 
 
 /** run Rapid Type Analysis
- * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically linked call.
+ * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically bound call.
  * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!!
  * @note RTA also won't work with programs that dynamically load classes at run-time! It can lead to defective programs!!
  * @note RTA might also produce incorrect programs if there is some Java Reflections shenanigans in the code (internal or external), especially using java.lang.Class.newInstance()
@@ -442,7 +442,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
  * @param live_classes give pointer to empty uninitialized set for receiving results, This is where all live classes are put (as ir_type*).
  * @param live_methods give pointer to empty uninitialized set for receiving results, This is where all live methods are put (as ir_entity*).
- * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically linked calls if possible. (see also function rta_optimize_dyncalls)
+ * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically bound calls if possible. (see also function rta_optimize_dyncalls)
  */
 static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets)
 {
@@ -641,7 +641,7 @@ typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
-	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically linked call (Map: call entity -> Set: method entities)
+	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
 } optimizer_env;
 
 static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
@@ -711,7 +711,7 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 
 					DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
 					// The following code assumes that the MethodSel node is only used by this Call node. (They are usually not shared by more than one Call node and definitely not used by something else, right?)
-					// set an Address node as callee to make the call statically linked
+					// set an Address node as callee to make the call statically bound
 					ir_graph *graph = get_irn_irg(methodsel);
 					ir_node *address = new_r_Address(graph, target);
 					set_irn_n(call, 1, address);
