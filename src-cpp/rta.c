@@ -709,21 +709,13 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 					ir_entity *target = cpset_iterator_next(&it);
 					assert(cpset_iterator_next(&it) == NULL);
 
-					DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-					// The following code assumes that the MethodSel node is only used by this Call node. (They are usually not shared by more than one Call node and definitely not used by something else, right?)
 					// set an Address node as callee to make the call statically bound
+					DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
 					ir_graph *graph = get_irn_irg(methodsel);
 					ir_node *address = new_r_Address(graph, target);
-					set_irn_n(call, 1, address);
-					// disconnect MethodSel node from Mem edge
 					ir_node *mem = get_irn_n(methodsel, 0);
-					set_irn_n(methodsel, 0, get_irg_no_mem(graph));
-					ir_node *projm = get_irn_n(call, 0);
-					ir_node *pred;
-					while ((pred = get_irn_n(projm, 0)) != methodsel) // find correct ProjM node
-						projm = pred;
-					assert(is_Proj(projm));
-					exchange(projm, mem);
+					ir_node *input[] = { mem, address };
+					turn_into_tuple(methodsel, 2, input);
 				} else {
 					DEBUGOUT("\t\tnot devirtualizing call %u %u %u %u\n", cpset_size(targets), oo_get_class_is_extern(owner), oo_get_class_is_final(owner), oo_get_method_is_final(entity));
 				}
