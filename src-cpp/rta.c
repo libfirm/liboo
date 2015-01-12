@@ -440,10 +440,17 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 					// dynamic call
 					analyzer_handle_dynamic_call(call, entity, env);
 				}
-			} else
-				assert(false && "neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
-		} else
-			assert(false && "neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
+			} else {
+				// function pointers currently not supported
+				DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+				DEBUGOUT("-> %s", gdb_node_helper(callee));
+				DEBUGOUT("-> %s\n", gdb_node_helper(pred));
+			}
+		} else {
+			// function pointers currently not supported
+			DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+			DEBUGOUT("-> %s\n", gdb_node_helper(callee));
+		}
 		break;
 	}
 	default:
@@ -784,10 +791,17 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 					// dynamic call
 					optimizer_handle_dynamic_call(call, entity, methodsel, env);
 				}
-			} else
-				assert(false && "neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
-		} else
-			assert(false && "neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
+			} else {
+				// function pointers currently not supported
+				DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+				DEBUGOUT("-> %s", gdb_node_helper(callee));
+				DEBUGOUT("-> %s\n", gdb_node_helper(pred));
+			}
+		} else {
+			// function pointers currently not supported
+			DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+			DEBUGOUT("-> %s\n", gdb_node_helper(callee));
+		}
 		break;
 	}
 	default:
