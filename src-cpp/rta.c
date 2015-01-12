@@ -345,6 +345,73 @@ static void collect_methods(ir_entity *call_entity, cpset_t *result_set, analyze
 	collect_methods_recursive(call_entity, get_entity_owner(call_entity), call_entity, result_set, env);
 }
 
+static void analyzer_handle_static_call(ir_node *call, ir_entity *entity, analyzer_env *env)
+{
+	assert(call);
+	assert(is_Call(call));
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(env);
+
+	DEBUGOUT("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+	//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+	//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+	//DEBUGOUT("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+	//DEBUGOUT("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+	//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
+
+	// add to live methods
+	cpset_insert(env->live_methods, entity);
+
+	add_to_workqueue(entity, env);
+
+
+	// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
+	ir_graph *graph = get_entity_irg(entity);
+	if (!graph) {
+		// ask frontend if there are additional methods called here (e.g. needed to detect class initialization)
+		ir_entity *called_method = detect_call(call); //TODO support for more than one
+		if (called_method) {
+			assert(is_method_entity(called_method));
+			//assert(get_entity_irg(called_method)); // can be external
+			DEBUGOUT("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+			cpset_insert(env->live_methods, called_method);
+			add_to_workqueue(called_method, env);
+		}
+	}
+}
+
+static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, analyzer_env *env)
+{
+	assert(call);
+	assert(is_Call(call));
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(env);
+
+	DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+	//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
+	//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
+	//DEBUGOUT("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
+	//DEBUGOUT("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
+	//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
+
+	if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
+		// calculate set of all method entities that this call could potentially call
+
+		// first static lookup upwards in the class hierarchy for the case of an inherited method
+		// The entity from the MethodSel node is already what the result of s static lookup would be or it is an inherited copy which points to the inherited method.
+
+		// then collect all potentially called method entities from downwards the class hierarchy
+		cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
+		collect_methods(entity, result_set, env); // note: This should work correctly with inherited copies and interface methods.
+
+		// note: cannot check for nonempty result set here because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
+
+		cpmap_set(env->dyncall_targets, entity, result_set);
+	}
+}
+
 static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 {
 	assert(environment);
@@ -352,64 +419,26 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 
 	switch (get_irn_opcode(node)) {
 	case iro_Call: {
-		ir_node *callee = get_irn_n(node, 1);
+		ir_node *call = node;
+		ir_node *callee = get_irn_n(call, 1);
 		if (is_Address(callee)) {
-			// handle static call
+			// static call
 			ir_entity *entity = get_Address_entity(callee);
-			DEBUGOUT("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-			//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-			//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-			//DEBUGOUT("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-			//DEBUGOUT("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-			//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
-			// add to live methods
-			cpset_insert(env->live_methods, entity);
-
-			add_to_workqueue(entity, env);
-
-
-			// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
-			ir_graph *graph = get_entity_irg(entity);
-			if (!graph) {
-				// ask frontend if there are additional methods called here (e.g. needed to detect class initialization)
-				ir_entity *called_method = detect_call(node); //TODO support for more than one
-				if (called_method) {
-					assert(is_method_entity(called_method));
-					//assert(get_entity_irg(called_method)); // can be external
-					DEBUGOUT("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
-					cpset_insert(env->live_methods, called_method);
-					add_to_workqueue(called_method, env);
-				}
-			}
-
+			analyzer_handle_static_call(call, entity, env);
 
 		} else if (is_Proj(callee)) {
 			ir_node *pred = get_Proj_pred(callee);
 			if (is_MethodSel(pred)) {
 				ir_node *methodsel = pred;
-				// handle dynamic call
 				ir_entity *entity = get_MethodSel_entity(methodsel);
-				DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-				//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-				//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-				//DEBUGOUT("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-				//DEBUGOUT("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-				//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
-				if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
-					// calculate set of all method entities that this call could potentially call
-
-					// static lookup upwards in the class hierarchy for the case of an inherited method
-					// The entity from the MethodSel node is already what the result of s static lookup would be or it is an inherited copy which points to the inherited method.
-
-					// collect all potentially called method entities from downwards the class hierarchy
-					cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
-					collect_methods(entity, result_set, env); // note: This should work correctly with inherited copies and interface methods.
-
-					// note: cannot check for nonempty result set here because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
-
-					cpmap_set(env->dyncall_targets, entity, result_set);
+				if (oo_get_call_is_statically_bound(call)) {
+					// weird case of Call with MethodSel that is marked statically bound
+					analyzer_handle_static_call(call, entity, env);
+				} else {
+					// dynamic call
+					analyzer_handle_dynamic_call(call, entity, env);
 				}
 			} else
 				assert(false && "neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
@@ -659,6 +688,74 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
 	}
 }
 
+static void optimizer_handle_static_call(ir_node *call, ir_entity *entity, optimizer_env *env)
+{
+	assert(call);
+	assert(is_Call(call));
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(env);
+
+	DEBUGOUT("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+
+	optimizer_add_to_workqueue(entity, env);
+
+
+	// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
+	ir_graph *graph = get_entity_irg(entity);
+	if (!graph) {
+		ir_entity *called_method = detect_call(call);
+		if (called_method) {
+			assert(is_method_entity(called_method));
+			//assert(get_entity_irg(called_method)); // can be external
+			DEBUGOUT("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+			optimizer_add_to_workqueue(called_method, env);
+		}
+	}
+}
+
+static void optimizer_handle_dynamic_call(ir_node *call, ir_entity *entity, ir_node *methodsel, optimizer_env *env)
+{
+	assert(call);
+	assert(is_Call(call));
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(methodsel);
+	assert(is_MethodSel(methodsel));
+	assert(env);
+
+	ir_type *owner = get_entity_owner(entity);
+	DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(owner), get_entity_name(entity), gdb_node_helper(entity));
+
+	cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
+	assert(targets);
+	// note: cannot check for nonempty target set here because there can be legal programs that have calls with empty target sets although they will probably run into an exception when executed! (e.g. interface call without implementing class and program initializes reference to null, actually same with abstract class or nonlive class)
+
+	if (cpset_size(targets) == 1 && (!oo_get_class_is_extern(owner) || oo_get_class_is_final(owner) || oo_get_method_is_final(entity))) { // exactly one target and not extern nonfinal
+		// devirtualize call
+		cpset_iterator_t it;
+		cpset_iterator_init(&it, targets);
+		ir_entity *target = cpset_iterator_next(&it);
+		assert(cpset_iterator_next(&it) == NULL);
+
+		// set an Address node as callee to make the call statically bound
+		DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
+		ir_graph *graph = get_irn_irg(methodsel);
+		ir_node *address = new_r_Address(graph, target);
+		ir_node *mem = get_irn_n(methodsel, 0);
+		ir_node *input[] = { mem, address };
+		turn_into_tuple(methodsel, 2, input);
+	}
+
+	// add to workqueue
+	cpset_iterator_t it;
+	cpset_iterator_init(&it, targets);
+	ir_entity *target;
+	while ((target = cpset_iterator_next(&it)) != NULL) {
+		optimizer_add_to_workqueue(target, env);
+	}
+}
+
 static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 {
 	assert(environment);
@@ -669,63 +766,23 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 		ir_node *call = node;
 		ir_node *callee = get_irn_n(call, 1);
 		if (is_Address(callee)) {
-			// handle static call
+			// static call
 			ir_entity *entity = get_Address_entity(callee);
-			DEBUGOUT("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
-			optimizer_add_to_workqueue(entity, env);
-
-
-			// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
-			ir_graph *graph = get_entity_irg(entity);
-			if (!graph) {
-				ir_entity *called_method = detect_call(call);
-				if (called_method) {
-					assert(is_method_entity(called_method));
-					//assert(get_entity_irg(called_method)); // can be external
-					DEBUGOUT("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
-					optimizer_add_to_workqueue(called_method, env);
-				}
-			}
-
+			optimizer_handle_static_call(call, entity, env);
 
 		} else if (is_Proj(callee)) {
 			ir_node *pred = get_Proj_pred(callee);
 			if (is_MethodSel(pred)) {
 				ir_node *methodsel = pred;
-				// handle dynamic call
 				ir_entity *entity = get_MethodSel_entity(methodsel);
-				ir_type *owner = get_entity_owner(entity);
-				DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(owner), get_entity_name(entity), gdb_node_helper(entity));
 
-				cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
-				assert(targets);
-				// note: cannot check for nonempty target set here because there can be legal programs that have calls with empty target sets although they will probably run into an exception when executed! (e.g. interface call without implementing class and program initializes reference to null, actually same with abstract class or nonlive class)
-
-				if (cpset_size(targets) == 1 && (!oo_get_class_is_extern(owner) || oo_get_class_is_final(owner) || oo_get_method_is_final(entity))) { // exactly one target and not extern nonfinal
-					// devirtualize call
-					cpset_iterator_t it;
-					cpset_iterator_init(&it, targets);
-					ir_entity *target = cpset_iterator_next(&it);
-					assert(cpset_iterator_next(&it) == NULL);
-
-					// set an Address node as callee to make the call statically bound
-					DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
-					ir_graph *graph = get_irn_irg(methodsel);
-					ir_node *address = new_r_Address(graph, target);
-					ir_node *mem = get_irn_n(methodsel, 0);
-					ir_node *input[] = { mem, address };
-					turn_into_tuple(methodsel, 2, input);
+				if (oo_get_call_is_statically_bound(call)) {
+					// weird case of Call with MethodSel that is marked statically bound
+					optimizer_handle_static_call(call, entity, env);
 				} else {
-					DEBUGOUT("\t\tnot devirtualizing call %u %u %u %u\n", cpset_size(targets), oo_get_class_is_extern(owner), oo_get_class_is_final(owner), oo_get_method_is_final(entity));
-				}
-
-				// add to workqueue
-				cpset_iterator_t it;
-				cpset_iterator_init(&it, targets);
-				ir_entity *target;
-				while ((target = cpset_iterator_next(&it)) != NULL) {
-					optimizer_add_to_workqueue(target, env);
+					// dynamic call
+					optimizer_handle_dynamic_call(call, entity, methodsel, env);
 				}
 			} else
 				assert(false && "neither Address nor Proj of MethodSel as callee"); // function pointers currently not supported
