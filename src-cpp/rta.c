@@ -130,7 +130,9 @@ static void check_for_external_superclasses_recursive(ir_type *klass, ir_type* s
 		}
 	}
 
-	for (size_t i=0, n=get_class_n_supertypes(superclass); i<n; i++) {
+	size_t n = get_class_n_supertypes(superclass);
+	DEBUGOUT("\t\t\t\t\t\t\t\t%s has %lu superclasses\n", get_class_name(superclass), (unsigned long)n);
+	for (size_t i=0; i<n; i++) {
 		ir_type *sc = get_class_supertype(superclass, i);
 		check_for_external_superclasses_recursive(klass, sc, env);
 	}
@@ -144,7 +146,9 @@ static void check_for_external_superclasses(ir_type *klass, analyzer_env *env)
 	if (oo_get_class_is_extern(klass)) return;
 
 	DEBUGOUT("\t\t\t\t\t\tchecking for external superclasses of %s\n", get_class_name(klass));
-	for (size_t i=0, n=get_class_n_supertypes(klass); i<n; i++) {
+	size_t n = get_class_n_supertypes(klass);
+	DEBUGOUT("\t\t\t\t\t\t\t%s has %lu superclasses\n", get_class_name(klass), (unsigned long)n);
+	for (size_t i=0; i<n; i++) {
 		ir_type *superclass = get_class_supertype(klass, i);
 		check_for_external_superclasses_recursive(klass, superclass, env);
 	}
@@ -242,7 +246,7 @@ static void handle_external_method(ir_entity *method, analyzer_env *env)
 
 	assert(!is_inherited_copy(method));
 	if (cpset_find(env->external_methods, method) == NULL) { // check if not already handled this method
-		DEBUGOUT("\t\thandling external method %s.%s\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+		DEBUGOUT("\t\t\thandling external method %s.%s ( %s )\n", get_class_name(get_entity_owner(method)), get_entity_name(method), get_entity_ld_name(method));
 
 		// something to do?
 
@@ -259,14 +263,14 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env)
 	ir_graph *graph = get_entity_irg(method);
 	if (graph) {
 		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
-			DEBUGOUT("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+			DEBUGOUT("\t\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 			pdeq_putr(env->workqueue, graph);
 			cpset_insert(env->in_queue, graph);
 		}
 	} else {
 		// treat methods without graph as external methods
 		// since we can't analyze it, mark all potentially returned object types as in use (completely down the class hierarchy!)
-		DEBUGOUT("\t\tfound no graph, probably external\n");
+		DEBUGOUT("\t\t\tfound no graph, probably external\n");
 		handle_external_method(method, env);
 	}
 }
@@ -278,7 +282,7 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 	assert(env);
 
 	if (cpset_find(result_set, entity) == NULL) { // take each entity only once (the sets won't mind but the workqueue)
-		DEBUGOUT("\t\ttaking entity %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity));
+		DEBUGOUT("\t\t\ttaking entity %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
 		// add to live methods
 		cpset_insert(env->live_methods, entity);
@@ -323,14 +327,14 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 		if (cpset_find(env->live_classes, klass) != NULL || oo_get_class_is_extern(klass) || JUST_CHA) { // if class is considered in use
 			take_entity(current_entity, result_set, env);
 		} else {
-			DEBUGOUT("\t\t\tclass not in use, memorizing %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
+			DEBUGOUT("\t\t\tclass not in use, memorizing %s.%s %s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), ((get_entity_irg(current_entity)) ? "G" : "N"));
 			memorize_unused_target(klass, current_entity, call_entity, env); // remember entity with this class for patching if this class will become used
 		}
 	} else
 		DEBUGOUT("\t\t\t%s.%s is abstract\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
 
 	size_t n_subtypes = get_class_n_subtypes(klass);
-	DEBUGOUT("\t\t\thas %u subclasses\n", n_subtypes);
+	DEBUGOUT("\t\t\t%s has %lu subclasses\n", get_class_name(klass), (unsigned long)n_subtypes);
 	for (size_t i=0; i<n_subtypes; i++) {
 		ir_type *subclass = get_class_subtype(klass, i);
 
@@ -374,7 +378,7 @@ static void analyzer_handle_static_call(ir_node *call, ir_entity *entity, analyz
 		if (called_method) {
 			assert(is_method_entity(called_method));
 			//assert(get_entity_irg(called_method)); // can be external
-			DEBUGOUT("\t\texternal method calls %s.%s (%s)\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+			DEBUGOUT("\t\texternal method calls %s.%s ( %s )\n", get_class_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
 			cpset_insert(env->live_methods, called_method);
 			add_to_workqueue(called_method, env);
 		}
@@ -519,12 +523,12 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	{ // add all given entry points to live methods and to workqueue
 		ir_entity *entry;
 		size_t i = 0;
+		DEBUGOUT("entrypoints:\n");
 		for (; (entry = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entry));
+			DEBUGOUT("\t%s\n", get_entity_name(entry));
 			cpset_insert(live_methods, entry);
-
 			// add to workqueue
-			DEBUGOUT("%s\n", get_entity_name(entry));
 			ir_graph *graph = get_entity_irg(entry);
 			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
 			if (cpset_find(&in_queue, graph) == NULL) {
@@ -537,9 +541,11 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	// add all given initial live classes to live classes
 	if (initial_live_classes != NULL) {
+		DEBUGOUT("\ninitial live classes:\n");
 		ir_type *entry;
 		for (size_t i=0; (entry = initial_live_classes[i]) != NULL; i++) {
 			assert(is_Class_type(entry));
+			DEBUGOUT("\t%s\n", get_class_name(entry));
 			cpset_insert(live_classes, entry);
 			check_for_external_superclasses(entry, &env);
 		}
