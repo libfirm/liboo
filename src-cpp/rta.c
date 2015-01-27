@@ -269,7 +269,7 @@ static void add_to_workqueue(ir_entity *method, analyzer_env *env)
 		}
 	} else {
 		// treat methods without graph as external methods
-		// since we can't analyze it, mark all potentially returned object types as in use (completely down the class hierarchy!)
+		// cannot distinguish here between real external functions (usually C functions) and other cases in which the entity has no graph
 		DEBUGOUT("\t\t\tfound no graph, probably external\n");
 		handle_external_method(method, env);
 	}
