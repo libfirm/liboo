@@ -1,7 +1,8 @@
 -include config.mak
 
-LIBFIRM_CPPFLAGS ?= -I../libfirm/include -I../libfirm/build/gen/include/libfirm
-LIBFIRM_LFLAGS   ?= -L../libfirm/build/debug -lfirm
+FIRM_HOME        ?= ../libfirm
+LIBFIRM_CPPFLAGS ?= -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
+LIBFIRM_LFLAGS   ?= -L$(FIRM_HOME)/build/debug -lfirm
 INSTALL ?= install
 DLLEXT ?= .so
 CC ?= gcc
@@ -74,19 +75,20 @@ UNUSED := $(shell mkdir -p $(BUILDDIR)/src-cpp/rt $(BUILDDIR)/src-cpp/adt $(RUNT
 -include $(DEPS)
 
 SPEC_GENERATED_HEADERS := include/liboo/nodes.h src-cpp/gen_irnode.h
-IR_SPEC_GENERATOR := spec/gen_ir.py
-IR_SPEC_GENERATOR_DEPS := $(IR_SPEC_GENERATOR) spec/spec_util.py spec/filters.py
+SPECGENDIR := $(FIRM_HOME)/scripts
+IR_SPEC_GENERATOR := $(SPECGENDIR)/gen_ir.py
+IR_SPEC_GENERATOR_DEPS := $(IR_SPEC_GENERATOR) $(SPECGENDIR)/irops.py $(SPECGENDIR)/filters.py $(SPECGENDIR)/jinjautil.py
 SPECFILE := spec/oo_nodes_spec.py
 
 $(SOURCES): $(SPEC_GENERATED_HEADERS)
 
-include/liboo/% : spec/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
+include/liboo/% : $(FIRM_HOME)/scripts/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
 	@echo GEN $@
-	$(Q)$(IR_SPEC_GENERATOR) $(SPECFILE) $< > $@
+	$(Q)$(IR_SPEC_GENERATOR) "$(SPECFILE)" "$<" > "$@"
 
-src-cpp/% : spec/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
+src-cpp/% : $(FIRM_HOME)/scripts/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFILE)
 	@echo GEN $@
-	$(Q)$(IR_SPEC_GENERATOR) $(SPECFILE) $< > $@
+	$(Q)$(IR_SPEC_GENERATOR) "$(SPECFILE)" "$<" > "$@"
 
 $(GOAL): $(OBJECTS)
 	@echo '===> LD $@'

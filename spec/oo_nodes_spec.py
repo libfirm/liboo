@@ -1,4 +1,5 @@
-from spec_util import abstract, op, Attribute
+from irops import op, Attribute, prepare_nodes, Node
+from jinjautil import export
 
 name = "oo"
 external = "liboo"
@@ -6,7 +7,7 @@ java_binding = "firm.bindings.binding_nodes"
 java_package = "firm.oo.nodes"
 
 @op
-class InstanceOf:
+class InstanceOf(Node):
 	"""Check if an object is an instance of a specified type (or a subtype).
 	Passing a null pointer results in undefined behaviour."""
 	ins = [
@@ -25,7 +26,7 @@ class InstanceOf:
 	attr_struct = "op_InstanceOf_attr_t"
 
 @op
-class Arraylength:
+class Arraylength(Node):
 	"""Return the lenght of a (dynamic) array"""
 	ins = [
 		("mem", "memory dependency"),
@@ -39,7 +40,7 @@ class Arraylength:
 	pinned  = "no"
 
 @op
-class MethodSel:
+class MethodSel(Node):
 	"""Performs a vtable lookup for a method (or rtti info)."""
 	ins = [
 		("mem", "memory dependency"),
@@ -58,7 +59,7 @@ class MethodSel:
 	pinned      = "no"
 
 @op
-class VptrIsSet:
+class VptrIsSet(Node):
 	"""Mark that an objects vptr has been set. This node duplicates its pointer
 	input and guarantees that all users of this node have an object of the
 	specified type.
@@ -83,3 +84,8 @@ class VptrIsSet:
 	attr_struct = "op_VptrIsSet_attr_t"
 	flags       = [ "uses_memory" ]
 	pinned      = "no"
+
+(nodes, abstract_nodes) = prepare_nodes(globals())
+export(nodes, "nodes")
+export(abstract_nodes, "abstract_nodes")
+export(globals(), "spec")
