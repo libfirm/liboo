@@ -422,6 +422,21 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 	analyzer_env *env = (analyzer_env*)environment;
 
 	switch (get_irn_opcode(node)) {
+	case iro_Address: {
+		ir_node *address = node;
+		ir_entity *entity = get_Address_entity(address);
+		if (is_method_entity(entity)) {
+			// could be a function whose address is taken (although usually the Address node of a normal call, these cases cannot be distinguished)
+			DEBUGOUT("\tAddress with method entity: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+			DEBUGOUT("\t\tcould be address taken, so it could be called\n");
+
+			// add to live methods
+			cpset_insert(env->live_methods, entity);
+
+			add_to_workqueue(entity, env);
+		}
+		break;
+	}
 	case iro_Call: {
 		ir_node *call = node;
 		ir_node *callee = get_irn_n(call, 1);
