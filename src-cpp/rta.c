@@ -584,7 +584,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	if (DEBUG_RTA) {
 		DEBUGOUT("\n\n==== Results ==============================================\n");
 		{
-			DEBUGOUT("\nlive classes:\n");
+			DEBUGOUT("\nlive classes (%u):\n", cpset_size(live_classes));
 			cpset_iterator_t iterator;
 			cpset_iterator_init(&iterator, live_classes);
 			ir_type *klass;
@@ -593,7 +593,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			}
 		}
 		{
-			DEBUGOUT("\nlive methods:\n");
+			DEBUGOUT("\nlive methods (%u):\n", cpset_size(live_methods));
 			cpset_iterator_t iterator;
 			cpset_iterator_init(&iterator, live_methods);
 			ir_entity *method;
@@ -603,7 +603,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			}
 		}
 		{
-			DEBUGOUT("\ndyncall target sets:\n");
+			DEBUGOUT("\ndyncall target sets (%u):\n", cpmap_size(dyncall_targets));
 			//DEBUGOUT("size %u\n", cpmap_size(dyncall_targets));
 			cpmap_iterator_t iterator;
 			cpmap_iterator_init(&iterator, dyncall_targets);
