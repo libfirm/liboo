@@ -295,25 +295,94 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 	}
 }
 
+static ir_entity *find_implementation_recursive(ir_type *klass, ir_entity *call_entity)
+{
+	assert(klass);
+	assert(is_Class_type(klass));
+	assert(call_entity);
+	assert(is_method_entity(call_entity));
+
+	ir_entity *result = NULL;
+
+	DEBUGOUT("\t\t\t\twalking class %s\n", get_class_name(klass));
+
+	result = get_class_member_by_name(klass, get_entity_ident(call_entity));
+
+	if (result != NULL) {
+		assert(!is_inherited_copy(result)); // detect inconsistent usage of inherited copies
+		if (oo_get_method_is_abstract(result))
+			return NULL;
+		DEBUGOUT("\t\t\t\t\tfound candidate %s.%s\n", get_class_name(get_entity_owner(result)), get_entity_name(result));
+	} else {
+		size_t n_supertypes = get_class_n_supertypes(klass);
+		DEBUGOUT("\t\t\t\t\t%s has %lu superclasses\n", get_class_name(klass), (unsigned long)n_supertypes);
+		for (size_t i=0; i<n_supertypes; i++) {
+			ir_type *superclass = get_class_supertype(klass, i);
+			ir_entity *r = find_implementation_recursive(superclass, call_entity);
+			if (result == NULL) {
+				result = r;
+			} else {
+				if (r != NULL)
+					assert(false && "ambigious interface implementation");
+			}
+		}
+	}
+
+	return result;
+}
+
+static ir_entity *find_inherited_implementation(ir_type *klass, ir_entity *call_entity)
+{
+	assert(klass);
+	assert(is_Class_type(klass));
+	assert(call_entity);
+	assert(is_method_entity(call_entity));
+	assert(oo_get_method_is_abstract(call_entity));
+
+	ir_entity *result = NULL;
+
+	size_t n_supertypes = get_class_n_supertypes(klass);
+	DEBUGOUT("\t\t\t\t%s has %lu superclasses\n", get_class_name(klass), (unsigned long)n_supertypes);
+	for (size_t i=0; i<n_supertypes; i++) {
+		ir_type *superclass = get_class_supertype(klass, i);
+		if (superclass == get_entity_owner(call_entity)) continue;
+		ir_entity *r = find_implementation_recursive(superclass, call_entity);
+		if (result == NULL) {
+			result = r;
+		} else {
+			if (r != NULL)
+				assert(false && "ambigious interface implementation");
+		}
+	}
+
+	return result;
+}
+
 static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set, analyzer_env *env)
 {
+	assert(call_entity);
 	assert(is_method_entity(call_entity));
+	assert(klass);
 	assert(is_Class_type(klass));
+	assert(entity);
 	assert(is_method_entity(entity));
 	assert(result_set);
 	assert(env);
 
-	DEBUGOUT("\t\twalking class %s\n", get_class_name(klass));
+	DEBUGOUT("\t\twalking %s%s %s\n", ((oo_get_class_is_abstract(klass)) ? "abstract " : ""), ((oo_get_class_is_interface(klass)) ? "interface" : "class"), get_class_name(klass));
 	ir_entity *current_entity = entity;
-	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity)); // note: This only works because whole signature is already encoded in entity name!
+
+	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity));
 	if (overwriting_entity != NULL && overwriting_entity != current_entity) { // if has overwriting entity
 		DEBUGOUT("\t\t\t%s.%s overwrites %s.%s\n", get_class_name(get_entity_owner(overwriting_entity)), get_entity_name(overwriting_entity), get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
 
 		current_entity = overwriting_entity;
 	}
-	//else // inherited
+	// else it is inherited
 
-	while (is_inherited_copy(current_entity)) { // use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
+	// support for FIRM usage with entity copies for inherited methods or at least in cases where interface method implementation is inherited from a superclass
+	// use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
+	while (is_inherited_copy(current_entity)) {
 		ir_entity *impl_entity = ddispatch_get_bound_entity(current_entity);
 		assert(impl_entity);
 		assert(!oo_get_class_is_interface(get_entity_owner(impl_entity)));
@@ -321,6 +390,20 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 		DEBUGOUT("\t\t\tfound copied method entity %s.%s -> %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), get_class_name(get_entity_owner(impl_entity)), get_entity_name(impl_entity));
 
 		current_entity = impl_entity;
+	}
+
+	// support for FIRM usage without any entity copies at all (not even for case interface method implemention inherited from a superclass) -> have to assume some usual semantics
+	// for interface calls (or more general abstract calls) there has to be a non-abstract implementation in each non-abstract subclass, if there is no entity copy we have to find the implementation by ourselves (in cases an inherited method implements the abstract method)
+	if (oo_get_method_is_abstract(call_entity) && !oo_get_class_is_abstract(klass) && !oo_get_class_is_interface(klass) && oo_get_method_is_abstract(current_entity)) { // careful: interfaces seem not always to be marked as abstract
+		DEBUGOUT("\t\t\tlooking for inherited implementation of abstract method %s.%s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
+		ir_entity *inherited_impl = find_inherited_implementation(klass, call_entity);
+		if (inherited_impl != NULL) {
+			DEBUGOUT("\t\t\t\tfound %s.%s as inherited implementation\n", get_class_name(get_entity_owner(inherited_impl)), get_entity_name(inherited_impl));
+			current_entity = inherited_impl;
+		} else {
+			DEBUGOUT("\t\t\t\tfound no inherited implementation to abstract call entity\n");
+			assert(false);
+		}
 	}
 
 	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
