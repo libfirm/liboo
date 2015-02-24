@@ -176,6 +176,18 @@ public final class OO {
 		binding_oo.oo_set_class_is_interface(classType.ptr, isInterface);
 	}
 
+	public static boolean getClassIsInterface(ClassType classType) {
+		return binding_oo.oo_get_class_is_interface(classType.ptr);
+	}
+
+	public static void setClassIsAbstract(ClassType classType, boolean isAbstract) {
+		binding_oo.oo_set_class_is_abstract(classType.ptr, isAbstract);
+	}
+
+	public static boolean getClassIsAbstract(ClassType classType) {
+		return binding_oo.oo_get_class_is_abstract(classType.ptr);
+	}
+
 	public static void setClassIsFinal(ClassType classType, boolean isFinal) {
 		binding_oo.oo_set_class_is_final(classType.ptr, isFinal);
 	}
