@@ -239,39 +239,80 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 	cpset_insert(call_entities, call_entity);
 }
 
-static void handle_external_method(ir_entity *method, analyzer_env *env)
-{
-	assert(is_method_entity(method));
-	assert(env);
+static ir_entity *find_entity_by_ldname(const char* ldname) {
+	assert(ldname);
 
-	assert(!is_inherited_copy(method));
-	if (cpset_find(env->external_methods, method) == NULL) { // check if not already handled this method
-		DEBUGOUT("\t\t\thandling external method %s.%s ( %s )\n", get_class_name(get_entity_owner(method)), get_entity_name(method), get_entity_ld_name(method));
-
-		// something to do?
-
-		cpset_insert(env->external_methods, method);
+	size_t n = get_irp_n_irgs();
+	for (size_t i=0; i<n; i++) {
+		ir_graph *graph = get_irp_irg(i);
+		ir_entity *entity = get_irg_entity(graph);
+		if (strcmp(get_entity_ld_name(entity), ldname) == 0) { //TODO can I just compare idents?? are they always unique for same names??
+			return entity;
+		}
 	}
+
+	return NULL;
 }
 
-static void add_to_workqueue(ir_entity *method, analyzer_env *env)
+static ir_entity *get_ldname_redirect(ir_entity *entity)
 {
-	assert(is_method_entity(method));
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(get_entity_irg(entity) == NULL);
+
+	ir_entity *target = NULL;
+
+	// external functions like C functions usually have identical name and ldname
+	// so assumption is if an method entity without graph, has differing name and ldname, and the ldname belongs to another method with graph, it's a redirection
+	const char *name = get_entity_name(entity);
+	const char *ldname = get_entity_ld_name(entity);
+	if (strcmp(name, ldname) != 0) { //TODO can I just compare idents?? are they always unique for same names??
+		target = find_entity_by_ldname(ldname);
+	}
+
+	return target;
+}
+
+static void analyzer_handle_no_graph(ir_entity *entity, analyzer_env *env)
+{
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(get_entity_irg(entity) == NULL);
 	assert(env);
 
-	assert(!is_inherited_copy(method));
-	ir_graph *graph = get_entity_irg(method);
-	if (graph) {
-		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
-			DEBUGOUT("\t\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
-			pdeq_putr(env->workqueue, graph);
-			cpset_insert(env->in_queue, graph);
-		}
-	} else {
-		// treat methods without graph as external methods
-		// cannot distinguish here between real external functions (usually C functions) and other cases in which the entity has no graph
-		DEBUGOUT("\t\t\tfound no graph, probably external\n");
-		handle_external_method(method, env);
+	assert(!is_inherited_copy(entity));
+
+	DEBUGOUT("\t\t\thandling method without graph %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+
+	// check for redirection to different function via the linker name
+	ir_entity *target = get_ldname_redirect(entity);
+	if (target != NULL) { // if redirection target exists
+		DEBUGOUT("\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		cpset_insert(env->live_methods, target);
+		add_to_workqueue(target, env);
+		return; // don't do anything else afterwards in this function
+	}
+
+
+	// assume external
+	DEBUGOUT("\t\t\tprobably external %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+
+	//TODO do something with external function: check whitelist+blacklist, get calls and creations, ... ?
+
+}
+
+static void add_to_workqueue(ir_entity *entity, analyzer_env *env)
+{
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(env);
+
+	assert(!is_inherited_copy(entity));
+
+	if (cpset_find(env->done_set, entity) == NULL && cpset_find(env->in_queue, entity) == NULL) { // only enqueue if not already done or enqueued
+		DEBUGOUT("\t\t\tadding %s.%s ( %s ) [%s] to workqueue\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), ((get_entity_irg(entity)) ? "graph" : "nograph"));
+		pdeq_putr(env->workqueue, entity);
+		cpset_insert(env->in_queue, entity);
 	}
 }
 
@@ -619,19 +660,19 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	};
 
 	{ // add all given entry points to live methods and to workqueue
-		ir_entity *entry;
 		size_t i = 0;
 		DEBUGOUT("entrypoints:\n");
-		for (; (entry = entry_points[i]) != NULL; i++) {
-			assert(is_method_entity(entry));
-			DEBUGOUT("\t%s\n", get_entity_name(entry));
-			cpset_insert(live_methods, entry);
+		ir_entity *entity;
+		for (; (entity = entry_points[i]) != NULL; i++) {
+			assert(is_method_entity(entity));
+			DEBUGOUT("\t%s\n", get_entity_name(entity));
+			cpset_insert(live_methods, entity);
 			// add to workqueue
-			ir_graph *graph = get_entity_irg(entry);
+			ir_graph *graph = get_entity_irg(entity);
 			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
-			if (cpset_find(&in_queue, graph) == NULL) {
-				pdeq_putr(workqueue, graph);
-				cpset_insert(&in_queue, graph);
+			if (cpset_find(&in_queue, entity) == NULL) {
+				pdeq_putr(workqueue, entity);
+				cpset_insert(&in_queue, entity);
 			}
 		}
 		assert(i > 0 && "give at least one entry point");
@@ -640,26 +681,33 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	// add all given initial live classes to live classes
 	if (initial_live_classes != NULL) {
 		DEBUGOUT("\ninitial live classes:\n");
-		ir_type *entry;
-		for (size_t i=0; (entry = initial_live_classes[i]) != NULL; i++) {
-			assert(is_Class_type(entry));
-			DEBUGOUT("\t%s\n", get_class_name(entry));
-			cpset_insert(live_classes, entry);
-			check_for_external_superclasses(entry, &env);
+		ir_type *klass;
+		for (size_t i=0; (klass = initial_live_classes[i]) != NULL; i++) {
+			assert(is_Class_type(klass));
+			DEBUGOUT("\t%s\n", get_class_name(klass));
+			cpset_insert(live_classes, klass);
+			check_for_external_superclasses(klass, &env);
 		}
 	}
 
 	while (!pdeq_empty(workqueue)) {
-		ir_graph *g = pdeq_getl(workqueue);
-		assert(g && get_kind(g) == k_ir_graph);
-		cpset_remove(&in_queue, g);
+		ir_entity *entity = pdeq_getl(workqueue);
+		assert(entity && is_method_entity(entity));
+		cpset_remove(&in_queue, entity);
 
-		if (cpset_find(&done_set, g) != NULL) continue;
+		if (cpset_find(&done_set, entity) != NULL) continue;
 
-		DEBUGOUT("\n== %s.%s (%s)\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)), get_entity_ld_name(get_irg_entity(g)));
+		DEBUGOUT("\n== %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
-		cpset_insert(&done_set, g); // mark as done _before_ walking to not add it again in case of recursive calls
-		irg_walk_graph(g, NULL, walk_callgraph_and_analyze, &env);
+		cpset_insert(&done_set, entity); // mark as done _before_ walking to not add it again in case of recursive calls
+		ir_graph *graph = get_entity_irg(entity);
+		if (graph == NULL) {
+			// handle cases of no graph
+			analyzer_handle_no_graph(entity, &env);
+		} else {
+			// analyze graph
+			irg_walk_graph(graph, NULL, walk_callgraph_and_analyze, &env);
+		}
 	}
 	assert(cpset_size(&in_queue) == 0);
 
@@ -789,13 +837,30 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
 	assert(is_method_entity(method));
 	assert(env);
 
-	ir_graph *graph = get_entity_irg(method);
-	if (graph) {
-		if (cpset_find(env->done_set, graph) == NULL && cpset_find(env->in_queue, graph) == NULL) { // only enqueue if not already done or enqueued
-			DEBUGOUT("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
-			pdeq_putr(env->workqueue, graph);
-			cpset_insert(env->in_queue, graph);
-		}
+	if (cpset_find(env->done_set, method) == NULL && cpset_find(env->in_queue, method) == NULL) { // only enqueue if not already done or enqueued
+		DEBUGOUT("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
+		pdeq_putr(env->workqueue, method);
+		cpset_insert(env->in_queue, method);
+	}
+}
+
+static void optimizer_handle_no_graph(ir_entity *entity, optimizer_env *env)
+{
+	assert(entity);
+	assert(is_method_entity(entity));
+	assert(get_entity_irg(entity) == NULL);
+	assert(env);
+
+	assert(!is_inherited_copy(entity));
+
+	DEBUGOUT("\t\t\thandling method without graph %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+
+	// check for redirection to different function via the linker name
+	ir_entity *target = get_ldname_redirect(entity);
+	if (target != NULL) { // if redirection target exists
+		DEBUGOUT("\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		optimizer_add_to_workqueue(target, env);
+		return; // don't do anything else afterwards in this function
 	}
 }
 
@@ -939,29 +1004,35 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 	};
 
 	{ // add all given entry points to workqueue
-		ir_entity *entry;
-		for (size_t i=0; (entry = entry_points[i]) != NULL; i++) {
-			assert(is_method_entity(entry));
-			ir_graph *graph = get_entity_irg(entry);
+		ir_entity *entity;
+		for (size_t i=0; (entity = entry_points[i]) != NULL; i++) {
+			assert(is_method_entity(entity));
+			ir_graph *graph = get_entity_irg(entity);
 			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
-			if (cpset_find(&in_queue, graph) == NULL) {
-				pdeq_putr(workqueue, graph);
-				cpset_insert(&in_queue, graph);
+			// add to workqueue
+			if (cpset_find(&in_queue, entity) == NULL) {
+				pdeq_putr(workqueue, entity);
+				cpset_insert(&in_queue, entity);
 			}
 		}
 	}
 
 	while (!pdeq_empty(workqueue)) {
-		ir_graph *g = pdeq_getl(workqueue);
-		assert(g && get_kind(g) == k_ir_graph);
-		cpset_remove(&in_queue, g);
+		ir_entity *entity = pdeq_getl(workqueue);
+		assert(entity && is_method_entity(entity));
+		cpset_remove(&in_queue, entity);
 
-		if (cpset_find(&done_set, g) != NULL) continue;
+		if (cpset_find(&done_set, entity) != NULL) continue;
 
-		DEBUGOUT("\n== %s.%s (%s)\n", get_class_name(get_entity_owner(get_irg_entity(g))), get_entity_name(get_irg_entity(g)), get_entity_ld_name(get_irg_entity(g)));
+		DEBUGOUT("\n== %s.%s (%s)\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
-		cpset_insert(&done_set, g); // mark as done _before_ walking to not add it again in case of recursive calls
-		irg_walk_graph(g, NULL, walk_callgraph_and_devirtualize, &env);
+		cpset_insert(&done_set, entity); // mark as done _before_ walking to not add it again in case of recursive calls
+		ir_graph *graph = get_entity_irg(entity);
+		if (graph == NULL) {
+			optimizer_handle_no_graph(entity, &env);
+		} else {
+			irg_walk_graph(graph, NULL, walk_callgraph_and_devirtualize, &env);
+		}
 	}
 	assert(cpset_size(&in_queue) == 0);
 
