@@ -95,7 +95,6 @@ void rta_set_detection_callbacks(ir_entity *(*detect_call_callback)(ir_node *cal
 
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
-	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpset_t *live_classes; // live classes found by examining object creation (external classes are left out and always considered as live)
 	cpset_t *live_methods; // live method entities
@@ -309,10 +308,9 @@ static void add_to_workqueue(ir_entity *entity, analyzer_env *env)
 
 	assert(!is_inherited_copy(entity));
 
-	if (cpset_find(env->done_set, entity) == NULL && cpset_find(env->in_queue, entity) == NULL) { // only enqueue if not already done or enqueued
+	if (cpset_find(env->done_set, entity) == NULL) { // only enqueue if not already done
 		DEBUGOUT("\t\t\tadding %s.%s ( %s ) [%s] to workqueue\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), ((get_entity_irg(entity)) ? "graph" : "nograph"));
 		pdeq_putr(env->workqueue, entity);
-		cpset_insert(env->in_queue, entity);
 	}
 }
 
@@ -642,15 +640,11 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	pdeq *workqueue = new_pdeq();
 
-	cpset_t in_queue;
-	cpset_init(&in_queue, hash_ptr, ptr_equals);
-
 	cpset_t done_set;
 	cpset_init(&done_set, hash_ptr, ptr_equals);
 
 	analyzer_env env = {
 		.workqueue = workqueue,
-		.in_queue = &in_queue,
 		.done_set = &done_set,
 		.live_classes = live_classes,
 		.live_methods = live_methods,
@@ -670,10 +664,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entity);
 			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
-			if (cpset_find(&in_queue, entity) == NULL) {
-				pdeq_putr(workqueue, entity);
-				cpset_insert(&in_queue, entity);
-			}
+			pdeq_putr(workqueue, entity);
 		}
 		assert(i > 0 && "give at least one entry point");
 	}
@@ -693,7 +684,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	while (!pdeq_empty(workqueue)) {
 		ir_entity *entity = pdeq_getl(workqueue);
 		assert(entity && is_method_entity(entity));
-		cpset_remove(&in_queue, entity);
 
 		if (cpset_find(&done_set, entity) != NULL) continue;
 
@@ -709,7 +699,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			irg_walk_graph(graph, NULL, walk_callgraph_and_analyze, &env);
 		}
 	}
-	assert(cpset_size(&in_queue) == 0);
 
 
 	if (DEBUG_RTA) {
@@ -760,7 +749,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	// free data structures
 	del_pdeq(workqueue);
-	cpset_destroy(&in_queue);
 	cpset_destroy(&done_set);
 
 	{ // delete the maps and sets in map unused_targets
@@ -827,7 +815,6 @@ static void rta_dispose_results(cpset_t *live_classes, cpset_t *live_methods, cp
 
 typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
-	cpset_t *in_queue; // set to avoid duplicates in the workqueue
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
 } optimizer_env;
@@ -837,10 +824,9 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
 	assert(is_method_entity(method));
 	assert(env);
 
-	if (cpset_find(env->done_set, method) == NULL && cpset_find(env->in_queue, method) == NULL) { // only enqueue if not already done or enqueued
+	if (cpset_find(env->done_set, method) == NULL) { // only enqueue if not already done
 		DEBUGOUT("\t\tadding %s.%s to workqueue\n", get_class_name(get_entity_owner(method)), get_entity_name(method));
 		pdeq_putr(env->workqueue, method);
-		cpset_insert(env->in_queue, method);
 	}
 }
 
@@ -990,15 +976,11 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 
 	pdeq *workqueue = new_pdeq();
 
-	cpset_t in_queue;
-	cpset_init(&in_queue, hash_ptr, ptr_equals);
-
 	cpset_t done_set;
 	cpset_init(&done_set, hash_ptr, ptr_equals);
 
 	optimizer_env env = {
 		.workqueue = workqueue,
-		.in_queue = &in_queue,
 		.done_set = &done_set,
 		.dyncall_targets = dyncall_targets
 	};
@@ -1010,17 +992,13 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 			ir_graph *graph = get_entity_irg(entity);
 			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
 			// add to workqueue
-			if (cpset_find(&in_queue, entity) == NULL) {
-				pdeq_putr(workqueue, entity);
-				cpset_insert(&in_queue, entity);
-			}
+			pdeq_putr(workqueue, entity);
 		}
 	}
 
 	while (!pdeq_empty(workqueue)) {
 		ir_entity *entity = pdeq_getl(workqueue);
 		assert(entity && is_method_entity(entity));
-		cpset_remove(&in_queue, entity);
 
 		if (cpset_find(&done_set, entity) != NULL) continue;
 
@@ -1034,11 +1012,9 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 			irg_walk_graph(graph, NULL, walk_callgraph_and_devirtualize, &env);
 		}
 	}
-	assert(cpset_size(&in_queue) == 0);
 
 	// free data structures
 	del_pdeq(workqueue);
-	cpset_destroy(&in_queue);
 	cpset_destroy(&done_set);
 }
 
