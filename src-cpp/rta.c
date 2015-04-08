@@ -30,6 +30,10 @@
 #define DEBUG_RTA 0
 #define DEBUGOUT if (DEBUG_RTA) printf
 
+// stats
+#define RTA_STATS 1
+#undef RTA_STATS // comment to activate stats
+
 // override option just for early development to keep going without information about live classes
 #define JUST_CHA 0
 
@@ -582,13 +586,13 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 					analyzer_handle_dynamic_call(call, entity, env);
 				}
 			} else {
-				// function pointers currently not supported
+				// indirect call via function pointers or are there even more types of calls?
 				DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
 				DEBUGOUT("-> %s", gdb_node_helper(callee));
 				DEBUGOUT("-> %s\n", gdb_node_helper(pred));
 			}
 		} else {
-			// function pointers currently not supported
+			// indirect call via function pointers or are there even more types of calls?
 			DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
 			DEBUGOUT("-> %s\n", gdb_node_helper(callee));
 		}
@@ -817,6 +821,14 @@ typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	cpset_t *done_set; // set to mark graphs that were already analyzed
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
+#ifdef RTA_STATS
+	unsigned long long n_staticcalls; // number of static calls
+	unsigned long long n_dyncalls; // number of dynamic calls (without interface calls)
+	unsigned long long n_icalls; // number of interface calls
+	unsigned long long n_devirts; // number of devirtualizations of dynamic calls (without interface calls)
+	unsigned long long n_devirts_icalls; // number of devirtualizations of interface calls
+	unsigned long long n_others; // number of other calls (e.g. indirect calls)
+#endif
 } optimizer_env;
 
 static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
@@ -860,6 +872,10 @@ static void optimizer_handle_static_call(ir_node *call, ir_entity *entity, optim
 
 	DEBUGOUT("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
+#ifdef RTA_STATS
+	env->n_staticcalls++;
+#endif
+
 	optimizer_add_to_workqueue(entity, env);
 
 
@@ -889,6 +905,14 @@ static void optimizer_handle_dynamic_call(ir_node *call, ir_entity *entity, ir_n
 	ir_type *owner = get_entity_owner(entity);
 	DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(owner), get_entity_name(entity), gdb_node_helper(entity));
 
+#ifdef RTA_STATS
+	if (oo_get_class_is_interface(owner))
+		env->n_icalls++;
+	else
+		env->n_dyncalls++;
+#endif
+
+
 	cpset_t *targets = cpmap_find(env->dyncall_targets, entity);
 	assert(targets);
 	// note: cannot check for nonempty target set here because there can be legal programs that have calls with empty target sets although they will probably run into an exception when executed! (e.g. interface call without implementing class and program initializes reference to null, actually same with abstract class or nonlive class)
@@ -899,6 +923,13 @@ static void optimizer_handle_dynamic_call(ir_node *call, ir_entity *entity, ir_n
 		cpset_iterator_init(&it, targets);
 		ir_entity *target = cpset_iterator_next(&it);
 		assert(cpset_iterator_next(&it) == NULL);
+
+#ifdef RTA_STATS
+		if (oo_get_class_is_interface(owner))
+			env->n_devirts_icalls++;
+		else
+			env->n_devirts++;
+#endif
 
 		// set an Address node as callee to make the call statically bound
 		DEBUGOUT("\t\tdevirtualizing call %s.%s -> %s.%s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_class_name(get_entity_owner(target)), get_entity_name(target));
@@ -947,15 +978,21 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void* environment)
 					optimizer_handle_dynamic_call(call, entity, methodsel, env);
 				}
 			} else {
-				// function pointers currently not supported
+				// indirect call via function pointers or are there even more types of calls?
 				DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
 				DEBUGOUT("-> %s", gdb_node_helper(callee));
 				DEBUGOUT("-> %s\n", gdb_node_helper(pred));
+				#ifdef RTA_STATS
+						env->n_others++;
+				#endif
 			}
 		} else {
-			// function pointers currently not supported
+			// indirect call via function pointers or are there even more types of calls?
 			DEBUGOUT("\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
 			DEBUGOUT("-> %s\n", gdb_node_helper(callee));
+			#ifdef RTA_STATS
+					env->n_others++;
+			#endif
 		}
 		break;
 	}
@@ -982,7 +1019,15 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 	optimizer_env env = {
 		.workqueue = workqueue,
 		.done_set = &done_set,
-		.dyncall_targets = dyncall_targets
+		.dyncall_targets = dyncall_targets,
+#ifdef RTA_STATS
+		.n_staticcalls = 0,
+		.n_dyncalls = 0,
+		.n_icalls = 0,
+		.n_devirts = 0,
+		.n_devirts_icalls = 0,
+		.n_others = 0,
+#endif
 	};
 
 	{ // add all given entry points to workqueue
@@ -1012,6 +1057,15 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 			irg_walk_graph(graph, NULL, walk_callgraph_and_devirtualize, &env);
 		}
 	}
+
+#ifdef RTA_STATS
+	printf("static calls: %llu\n", env.n_staticcalls);
+	printf("dynamic calls: %llu\n", env.n_dyncalls);
+	printf("interface calls: %llu\n", env.n_icalls);
+	printf("devirtualizations of dynamic calls: %llu\n", env.n_devirts);
+	printf("devirtualizations of interface calls: %llu\n", env.n_devirts_icalls);
+	printf("other calls: %llu\n", env.n_others);
+#endif
 
 	// free data structures
 	del_pdeq(workqueue);
