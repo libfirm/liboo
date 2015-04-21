@@ -338,6 +338,8 @@ static void take_entity(ir_entity *entity, cpset_t *result_set, analyzer_env *en
 	}
 }
 
+static ir_entity *fir_ascend_into_superclasses_and_merge(ir_type *klass, ir_entity *call_entity, ir_entity* current_result); // forward declaration
+
 static ir_entity *find_implementation_recursive(ir_type *klass, ir_entity *call_entity)
 {
 	assert(klass);
@@ -353,20 +355,50 @@ static ir_entity *find_implementation_recursive(ir_type *klass, ir_entity *call_
 
 	if (result != NULL) {
 		assert(!is_inherited_copy(result)); // detect inconsistent usage of inherited copies
-		if (oo_get_method_is_abstract(result))
-			return NULL;
-		DEBUGOUT("\t\t\t\t\tfound candidate %s.%s\n", get_class_name(get_entity_owner(result)), get_entity_name(result));
+		if (oo_get_method_is_abstract(result)) {
+			result = NULL;
+		} else {
+			DEBUGOUT("\t\t\t\t\tfound candidate %s.%s ( %s ) [%s]\n", get_class_name(get_entity_owner(result)), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
+		}
 	} else {
-		size_t n_supertypes = get_class_n_supertypes(klass);
-		DEBUGOUT("\t\t\t\t\t%s has %lu superclasses\n", get_class_name(klass), (unsigned long)n_supertypes);
-		for (size_t i=0; i<n_supertypes; i++) {
-			ir_type *superclass = get_class_supertype(klass, i);
-			ir_entity *r = find_implementation_recursive(superclass, call_entity);
-			if (result == NULL) {
-				result = r;
-			} else {
-				if (r != NULL)
+		result = fir_ascend_into_superclasses_and_merge(klass, call_entity, result);
+	}
+
+	return result;
+}
+
+static ir_entity *fir_ascend_into_superclasses_and_merge(ir_type *klass, ir_entity *call_entity, ir_entity* current_result)
+{
+	assert(klass);
+	assert(is_Class_type(klass));
+	assert(call_entity);
+	assert(is_method_entity(call_entity));
+
+	ir_entity* result = current_result;
+
+	size_t n_supertypes = get_class_n_supertypes(klass);
+	DEBUGOUT("\t\t\t\t\t%s has %lu superclasses\n", get_class_name(klass), (unsigned long)n_supertypes);
+	for (size_t i=0; i<n_supertypes; i++) {
+		ir_type *superclass = get_class_supertype(klass, i);
+
+		//if (oo_get_class_is_interface(superclass)) continue; // need to ascend in interfaces because of stuff like Java 8 default methods
+
+		ir_entity *r = find_implementation_recursive(superclass, call_entity);
+
+		// merge results
+		// more than one is ambigious, but class methods win against interface default methods (at least in Java 8) !?
+		if (result == NULL) {
+			result = r;
+		} else {
+			if (r != NULL) {
+				bool result_from_interface = oo_get_class_is_interface(get_entity_owner(result));
+				bool r_from_interface = oo_get_class_is_interface(get_entity_owner(r));
+				if (result_from_interface && !r_from_interface) {
+					DEBUGOUT("\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n", get_class_name(get_entity_owner(r)), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"), get_class_name(get_entity_owner(result)), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
+					result = r;
+				} else if (result_from_interface == r_from_interface) { // both true or both false
 					assert(false && "ambigious interface implementation");
+				}
 			}
 		}
 	}
@@ -384,19 +416,7 @@ static ir_entity *find_inherited_implementation(ir_type *klass, ir_entity *call_
 
 	ir_entity *result = NULL;
 
-	size_t n_supertypes = get_class_n_supertypes(klass);
-	DEBUGOUT("\t\t\t\t%s has %lu superclasses\n", get_class_name(klass), (unsigned long)n_supertypes);
-	for (size_t i=0; i<n_supertypes; i++) {
-		ir_type *superclass = get_class_supertype(klass, i);
-		if (superclass == get_entity_owner(call_entity)) continue;
-		ir_entity *r = find_implementation_recursive(superclass, call_entity);
-		if (result == NULL) {
-			result = r;
-		} else {
-			if (r != NULL)
-				assert(false && "ambigious interface implementation");
-		}
-	}
+	result = fir_ascend_into_superclasses_and_merge(klass, call_entity, result);
 
 	return result;
 }
