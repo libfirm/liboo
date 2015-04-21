@@ -242,14 +242,14 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 	cpset_insert(call_entities, call_entity);
 }
 
-static ir_entity *find_entity_by_ldname(const char* ldname) {
+static ir_entity *find_entity_by_ldname(ident *ldname) {
 	assert(ldname);
 
 	size_t n = get_irp_n_irgs();
 	for (size_t i=0; i<n; i++) {
 		ir_graph *graph = get_irp_irg(i);
 		ir_entity *entity = get_irg_entity(graph);
-		if (strcmp(get_entity_ld_name(entity), ldname) == 0) { //TODO can I just compare idents?? are they always unique for same names??
+		if (get_entity_ld_ident(entity) == ldname) {
 			return entity;
 		}
 	}
@@ -267,9 +267,9 @@ static ir_entity *get_ldname_redirect(ir_entity *entity)
 
 	// external functions like C functions usually have identical name and ldname
 	// so assumption is if an method entity without graph, has differing name and ldname, and the ldname belongs to another method with graph, it's a redirection
-	const char *name = get_entity_name(entity);
-	const char *ldname = get_entity_ld_name(entity);
-	if (strcmp(name, ldname) != 0) { //TODO can I just compare idents?? are they always unique for same names??
+	const ident *name = get_entity_ident(entity);
+	const ident *ldname = get_entity_ld_ident(entity);
+	if (name != ldname) {
 		target = find_entity_by_ldname(ldname);
 	}
 
