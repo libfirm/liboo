@@ -386,7 +386,7 @@ static ir_entity *fir_ascend_into_superclasses_and_merge(ir_type *klass, ir_enti
 		ir_entity *r = find_implementation_recursive(superclass, call_entity);
 
 		// merge results
-		// more than one is ambigious, but class methods win against interface default methods (at least in Java 8) !?
+		// more than one is ambiguous, but class methods win against interface default methods (at least in Java 8) !?
 		if (result == NULL) {
 			result = r;
 		} else {
@@ -397,7 +397,7 @@ static ir_entity *fir_ascend_into_superclasses_and_merge(ir_type *klass, ir_enti
 					DEBUGOUT("\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n", get_class_name(get_entity_owner(r)), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"), get_class_name(get_entity_owner(result)), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
 					result = r;
 				} else if (result_from_interface == r_from_interface) { // both true or both false
-					assert(false && "ambigious interface implementation");
+					assert(false && "ambiguous interface implementation");
 				}
 			}
 		}
@@ -465,7 +465,7 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 			current_entity = inherited_impl;
 		} else {
 			DEBUGOUT("\t\t\t\tfound no inherited implementation to abstract call entity\n");
-			assert(false);
+			//assert(false); // there are problems with X10 structs (they don't have interface implementations because their box classes have them) and with missing entities (e.g. String.ixi in test case ArrayTest)
 		}
 	}
 
@@ -476,8 +476,9 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 			DEBUGOUT("\t\t\tclass not in use, memorizing %s.%s %s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), ((get_entity_irg(current_entity)) ? "G" : "N"));
 			memorize_unused_target(klass, current_entity, call_entity, env); // remember entity with this class for patching if this class will become used
 		}
-	} else
+	} else {
 		DEBUGOUT("\t\t\t%s.%s is abstract\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
+	}
 
 	size_t n_subtypes = get_class_n_subtypes(klass);
 	DEBUGOUT("\t\t\t%s has %lu subclasses\n", get_class_name(klass), (unsigned long)n_subtypes);
