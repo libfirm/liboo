@@ -99,12 +99,11 @@ void rta_set_detection_callbacks(ir_entity *(*detect_call_callback)(ir_node *cal
 
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
-	cpset_t *done_set; // set to mark graphs that were already analyzed
+	cpset_t *done_set; // set to mark methods that were already analyzed
 	cpset_t *live_classes; // live classes found by examining object creation (external classes are left out and always considered as live)
 	cpset_t *live_methods; // live method entities
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
-	cpmap_t *unused_targets; // map that stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: class -> (Map: method entity -> Set: call entities)) This is needed to patch analysis result when a class becomes live after there were already some dynamically bound calls that would call a method of it.
-	cpset_t *external_methods; // set that stores already handled external methods (just for not handling the same method more than once)
+	cpmap_t *unused_targets; // map that stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: class -> (Map: method entity -> Set: call entities)) This is needed to update results when a class becomes live after there were already some dynamically bound calls that would call a method of it.
 } analyzer_env;
 
 
@@ -300,7 +299,7 @@ static void analyzer_handle_no_graph(ir_entity *entity, analyzer_env *env)
 	// assume external
 	DEBUGOUT("\t\t\tprobably external %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
-	//TODO do something with external function: check whitelist+blacklist, get calls and creations, ... ?
+	//TODO maybe do something with external function: check whitelist+blacklist, get calls and creations, ... ?
 
 }
 
@@ -505,11 +504,6 @@ static void analyzer_handle_static_call(ir_node *call, ir_entity *entity, analyz
 	assert(env);
 
 	DEBUGOUT("\tstatic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-	//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-	//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-	//DEBUGOUT("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-	//DEBUGOUT("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-	//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
 	// add to live methods
 	cpset_insert(env->live_methods, entity);
@@ -541,11 +535,6 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, analy
 	assert(env);
 
 	DEBUGOUT("\tdynamic call: %s.%s %s\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-	//DEBUGOUT("\t\t\toverwrites: %u\n", get_entity_n_overwrites(entity));
-	//DEBUGOUT("\t\t\toverwrittenby: %u\n", get_entity_n_overwrittenby(entity));
-	//DEBUGOUT("\t\t\tis abstract method: %u\n", oo_get_method_is_abstract(entity));
-	//DEBUGOUT("\t\t\tis interface method: %u\n", oo_get_class_is_interface(get_entity_owner(entity)));
-	//DEBUGOUT("\t\t\tis owner extern: %u\n", oo_get_class_is_extern(get_entity_owner(entity)));
 
 	if (cpmap_find(env->dyncall_targets, entity) == NULL) { // if not already done
 		// calculate set of all method entities that this call could potentially call
@@ -636,10 +625,7 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 
 /** run Rapid Type Analysis
  * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically bound call.
- * @note RTA must know of _all_ definitely executed code parts (main, static sections, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!!
- * @note RTA also won't work with programs that dynamically load classes at run-time! It can lead to defective programs!!
- * @note RTA might also produce incorrect programs if there is some Java Reflections shenanigans in the code (internal or external), especially using java.lang.Class.newInstance()
- * @note Give classes that are instantiated in native methods of a nonexternal standard library or runtime as initial_live_classes, give methods called in these native methods as additional entry points. If something is missing, RTA could produce incorrect programs! This also means that native methods in the program that do arbitrary things are not supported.
+ * @note See the important notes in the documentation of function rta_optimization in the header file!
  * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
  * @param live_classes give pointer to empty uninitialized set for receiving results, This is where all live classes are put (as ir_type*).
@@ -660,9 +646,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	cpmap_t unused_targets;
 	cpmap_init(&unused_targets, hash_ptr, ptr_equals);
 
-	cpset_t external_methods;
-	cpset_init(&external_methods, hash_ptr, ptr_equals);
-
 	pdeq *workqueue = new_pdeq();
 
 	cpset_t done_set;
@@ -675,7 +658,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		.live_methods = live_methods,
 		.dyncall_targets = dyncall_targets,
 		.unused_targets = &unused_targets,
-		.external_methods = &external_methods
 	};
 
 	{ // add all given entry points to live methods and to workqueue
@@ -688,7 +670,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			cpset_insert(live_methods, entity);
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entity);
-			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
+			assert(graph); // don't give methods without a graph as entry points for the analysis
 			pdeq_putr(workqueue, entity);
 		}
 		assert(i > 0 && "give at least one entry point");
@@ -717,7 +699,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		cpset_insert(&done_set, entity); // mark as done _before_ walking to not add it again in case of recursive calls
 		ir_graph *graph = get_entity_irg(entity);
 		if (graph == NULL) {
-			// handle cases of no graph
 			analyzer_handle_no_graph(entity, &env);
 		} else {
 			// analyze graph
@@ -801,9 +782,8 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		}
 	}
 	cpmap_destroy(&unused_targets);
-	cpset_destroy(&external_methods);
 
-	// /!\ live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
+	// note: live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
 
 }
 
@@ -881,6 +861,8 @@ static void optimizer_handle_no_graph(ir_entity *entity, optimizer_env *env)
 		optimizer_add_to_workqueue(target, env);
 		return; // don't do anything else afterwards in this function
 	}
+
+	// currently nothing else to do
 }
 
 static void optimizer_handle_static_call(ir_node *call, ir_entity *entity, optimizer_env *env)
@@ -1056,7 +1038,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 		for (size_t i=0; (entity = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entity));
 			ir_graph *graph = get_entity_irg(entity);
-			assert(graph); // don't give methods without a graph as entry points for the analysis !? TODO
+			assert(graph); // don't give methods without a graph as entry points for the analysis
 			// add to workqueue
 			pdeq_putr(workqueue, entity);
 		}
@@ -1104,6 +1086,6 @@ void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 
 	rta_run(entry_points, initial_live_classes, &live_classes, &live_methods, &dyncall_targets);
 	rta_devirtualize_calls(entry_points, &dyncall_targets);
-	//rta_discard(&live_classes, &live_methods); ??
+	//rta_discard(&live_classes, &live_methods); //TODO
 	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
 }
