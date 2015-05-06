@@ -104,16 +104,6 @@ void ddispatch_init(void)
 		= create_compilerlib_entity(default_li_ident, default_li_type);
 }
 
-ir_entity *ddispatch_get_bound_entity(ir_entity *entity)
-{
-	assert(is_method_entity(entity));
-	ir_node *addr = get_atomic_ent_value(entity);
-	if (addr == NULL)
-		return NULL;
-	assert(is_Address(addr));
-	return get_Address_entity(addr);
-}
-
 void ddispatch_setup_vtable(ir_type *klass)
 {
 	assert(is_Class_type(klass));
@@ -190,13 +180,15 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (is_method_entity(member)) {
 			int member_vtid = oo_get_method_vtable_index(member);
 			if (member_vtid != -1) {
-				ir_entity *bound = ddispatch_get_bound_entity(member);
-				if (bound == NULL) {
-					ident *id = ddispatch_model.abstract_method_ident;
-					bound = create_compilerlib_entity(id, get_entity_type(member));
+				ident *id;
+				if (oo_get_method_is_abstract(member)) {
+					id = ddispatch_model.abstract_method_ident;
+				} else {
+					id = get_entity_ld_ident(member);
 				}
-				ir_node          *symconst_node = new_r_Address(const_code, bound);
-				ir_initializer_t *val           = create_initializer_const(symconst_node);
+				ir_entity *bound = create_compilerlib_entity(id, get_entity_type(member));
+				ir_node *symconst_node = new_r_Address(const_code, bound);
+				ir_initializer_t *val = create_initializer_const(symconst_node);
 				set_initializer_compound_value (init, member_vtid+ddispatch_model.vptr_points_to_index, val);
 			}
 		}

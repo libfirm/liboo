@@ -248,8 +248,7 @@ static ir_entity *create_method_table(ir_type *klass, size_t n_methods)
 		if (oo_get_method_exclude_from_vtable(member))
 			continue;
 
-		ir_entity *bound = ddispatch_get_bound_entity(member);
-		ir_initializer_t *mt_init = create_method_info(bound);
+		ir_initializer_t *mt_init = create_method_info(member);
 		set_initializer_compound_value(initializer, i++, mt_init);
 	}
 	assert(i == n_methods);
