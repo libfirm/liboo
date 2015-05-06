@@ -33,6 +33,7 @@ static ir_entity *string_const_hash;
 static ir_entity *string_const_data;
 
 static ir_entity *default_instanceof_entity;
+static ir_entity *default_abstract_method_error_entity;
 
 static cpset_t string_constant_pool;
 
@@ -155,6 +156,10 @@ static void init_rtti_firm_types(void)
 	set_method_res_type(default_io_type, 0, type_int);
 	ident *default_io_ident = new_id_from_str("oo_rt_instanceof");
 	default_instanceof_entity = create_compilerlib_entity(default_io_ident, default_io_type);
+
+	ir_type *default_abs_err_type = new_type_method(0, 0);
+	ident *default_abs_err_ident = new_id_from_str("oo_rt_abstract_method_error");
+	default_abstract_method_error_entity = create_compilerlib_entity(default_abs_err_ident, default_abs_err_type);
 }
 
 ir_entity *rtti_emit_string_const(const char *string)
@@ -220,7 +225,7 @@ static ir_initializer_t *create_method_info(ir_entity *method)
 
 	ir_initializer_t *method_init;
 	if (oo_get_method_is_abstract(method)) {
-		method_init = get_initializer_null();
+		method_init = new_initializer_reference(default_abstract_method_error_entity);
 	} else {
 		method_init = new_initializer_reference(method);
 	}
