@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "ddispatch.h"
+#include "rta.h"
 
 void oo_init(void);
 void oo_deinit(void);
