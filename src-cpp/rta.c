@@ -38,9 +38,6 @@
 #define JUST_CHA 0
 
 
-#define is_inherited_copy(X) (oo_get_method_is_inherited(X) && ddispatch_get_bound_entity(X) != (X))
-
-
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
 {
 	for (size_t i = 0, n = get_class_n_members(cls); i < n; ++i) {
@@ -125,7 +122,7 @@ static void check_for_external_superclasses_recursive(ir_type *klass, ir_type* s
 			if (!is_method_entity(member)) continue;
 			if (oo_get_method_is_final(member)) continue;
 			ir_entity *overwriting = get_class_member_by_name(klass, get_entity_ident(member)); // note: This only works because whole signature is already encoded in entity name!
-			if (overwriting != NULL && !is_inherited_copy(overwriting)) { //FIXME constructors should be skipped but no frontend independent notion of constructors in liboo
+			if (overwriting != NULL) { //FIXME constructors should be skipped but no frontend independent notion of constructors in liboo
 				cpset_insert(env->live_methods, overwriting);
 				add_to_workqueue(overwriting, env);
 			}
@@ -282,8 +279,6 @@ static void analyzer_handle_no_graph(ir_entity *entity, analyzer_env *env)
 	assert(get_entity_irg(entity) == NULL);
 	assert(env);
 
-	assert(!is_inherited_copy(entity));
-
 	DEBUGOUT("\t\t\thandling method without graph %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
 	// check for redirection to different function via the linker name
@@ -308,8 +303,6 @@ static void add_to_workqueue(ir_entity *entity, analyzer_env *env)
 	assert(entity);
 	assert(is_method_entity(entity));
 	assert(env);
-
-	assert(!is_inherited_copy(entity));
 
 	if (cpset_find(env->done_set, entity) == NULL) { // only enqueue if not already done
 		DEBUGOUT("\t\t\tadding %s.%s ( %s ) [%s] to workqueue\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), ((get_entity_irg(entity)) ? "graph" : "nograph"));
@@ -353,7 +346,6 @@ static ir_entity *find_implementation_recursive(ir_type *klass, ir_entity *call_
 	result = get_class_member_by_name(klass, get_entity_ident(call_entity));
 
 	if (result != NULL) {
-		assert(!is_inherited_copy(result)); // detect inconsistent usage of inherited copies
 		if (oo_get_method_is_abstract(result)) {
 			result = NULL;
 		} else {
@@ -442,17 +434,6 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 	}
 	// else it is inherited
 
-	// support for FIRM usage with entity copies for inherited methods or at least in cases where interface method implementation is inherited from a superclass
-	// use copied entities of inherited methods to find implementations (especially in the case when interface method is implemented by a superclass)
-	while (is_inherited_copy(current_entity)) {
-		ir_entity *impl_entity = ddispatch_get_bound_entity(current_entity);
-		assert(impl_entity);
-		assert(!oo_get_class_is_interface(get_entity_owner(impl_entity)));
-		assert(!oo_get_method_is_abstract(impl_entity));
-		DEBUGOUT("\t\t\tfound copied method entity %s.%s -> %s.%s\n", get_class_name(get_entity_owner(current_entity)), get_entity_name(current_entity), get_class_name(get_entity_owner(impl_entity)), get_entity_name(impl_entity));
-
-		current_entity = impl_entity;
-	}
 
 	// support for FIRM usage without any entity copies at all (not even for case interface method implemention inherited from a superclass) -> have to assume some usual semantics
 	// for interface calls (or more general abstract calls) there has to be a non-abstract implementation in each non-abstract subclass, if there is no entity copy we have to find the implementation by ourselves (in cases an inherited method implements the abstract method)
@@ -540,11 +521,11 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, analy
 		// calculate set of all method entities that this call could potentially call
 
 		// first static lookup upwards in the class hierarchy for the case of an inherited method
-		// The entity from the MethodSel node is already what the result of s static lookup would be or it is an inherited copy which points to the inherited method.
+		// The entity from the MethodSel node is already what the result of a static lookup would be.
 
 		// then collect all potentially called method entities from downwards the class hierarchy
 		cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
-		collect_methods(entity, result_set, env); // note: This should work correctly with inherited copies and interface methods.
+		collect_methods(entity, result_set, env);
 
 		// note: cannot check for nonempty result set here because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
 
@@ -849,8 +830,6 @@ static void optimizer_handle_no_graph(ir_entity *entity, optimizer_env *env)
 	assert(is_method_entity(entity));
 	assert(get_entity_irg(entity) == NULL);
 	assert(env);
-
-	assert(!is_inherited_copy(entity));
 
 	DEBUGOUT("\t\t\thandling method without graph %s.%s ( %s )\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
