@@ -16,6 +16,13 @@
 
 #include <libfirm/firm.h>
 
+
+/** initialize RTA module
+ * called in oo_init
+ */
+void rta_init(void);
+
+
 /** sets important callback functions needed to detect calls (e.g. class intialization) hidden behind frontend-specific nodes
  * @note It's very important for the frontend to implement these callbacks correctly, if anything is missing RTA's assumptions may not hold and it can lead to defective programs!
  * @note This mechanism is meant for functions similar to e.g. _Jv_InitClass that hide calls to analyzable methods in native code.
@@ -29,9 +36,10 @@ void rta_set_detection_callbacks(ir_entity *(*detect_call)(ir_node *call));
 /** runs Rapid Type Analysis and then tries to devirtualize dynamically bound calls and to discard unneeded classes and methods
  * @note RTA requires object creations to be marked with VptrIsSet nodes.
  * @note RTA requires the analyzed code to be typesafe, meaning objects on which dynamically bound calls are invoked have to be of the static type of the reference or a subclass of it, otherwise the results can be incorrect and can lead to defective programs!
- * @note RTA must know of _all_ definitely executed code parts (main, class initializers, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!
+ * @note RTA must know of _all_ executed code parts (main, class initializers, global contructors or all nonprivate functions if it's a library)! It's important to give absolutely _all_ entry points because RTA builds on a closed world assumption. Otherwise the results can be incorrect and can lead to defective programs!
  * @note RTA also won't work with programs that dynamically load classes at runtime or use generic object creation (like Java Class.newInstance)! It can lead to defective programs!
- * @note Give classes that are instantiated in native methods of a nonexternal standard library or runtime as initial_live_classes, give methods called in these native methods as additional entry points. If something is missing, RTA could produce defective programs! This also means that native methods in the program that do arbitrary things are not supported as long as there is no way to tell RTA what classes are instantiated and what methods are called in all those native methods.
+ * @note Give classes that are instantiated in native methods of a nonexternal standard library or runtime as initial_live_classes, give methods called in these native methods as additional entry points. If something is missing, RTA could produce defective programs! This also means that native methods in the program that do arbitrary things are not supported as long as there is no way to tell RTA what classes are instantiated and what methods are called in those native methods.
+ * @note Also give methods as entry points that are integrated into the program _after_ RTA run (e.g. by OO lowering or by a subsequent optimization) to avoid that they will be discarded.
  * @note C++ is currently not supported (C++ constructor semantics, function pointers, ...).
  * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL

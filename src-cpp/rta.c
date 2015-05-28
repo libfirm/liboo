@@ -38,6 +38,16 @@
 #define JUST_CHA 0
 
 
+static ir_entity *discard_error_method = NULL;
+
+void rta_init(void)
+{
+	ident *id = new_id_from_str("oo_rt_method_optimized_away_error");
+	ir_type *methodtype = new_type_method(0,0);
+	discard_error_method = create_compilerlib_entity(id, methodtype);
+}
+
+
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
 {
 	for (size_t i = 0, n = get_class_n_members(cls); i < n; ++i) {
@@ -81,6 +91,22 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) // missing new 
 	return it;
 }
 */
+
+
+static ir_entity *find_compilerlib_entity(ident *id)
+{
+	assert(id);
+
+	ir_type *glob = get_entity_owner(discard_error_method); //HACK because compilerlib entities are somehow in a different globaltype in X10i //get_glob_type();
+	size_t n_members = get_compound_n_members(glob);
+	for (size_t i=0; i<n_members; i++) {
+		ir_entity *member = get_compound_member(glob, i);
+		if (get_entity_ident(member) == id) {
+			return member;
+		}
+	}
+	return NULL;
+}
 
 
 static ir_entity *default_detect_call(ir_node *call) { (void)call; return NULL; }
@@ -238,7 +264,7 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 	cpset_insert(call_entities, call_entity);
 }
 
-static ir_entity *find_entity_by_ldname(ident *ldname) {
+static ir_entity *find_entity_with_irg_by_ldname(ident *ldname) {
 	assert(ldname);
 
 	size_t n = get_irp_n_irgs();
@@ -266,7 +292,7 @@ static ir_entity *get_ldname_redirect(ir_entity *entity)
 	const ident *name = get_entity_ident(entity);
 	const ident *ldname = get_entity_ld_ident(entity);
 	if (name != ldname) {
-		target = find_entity_by_ldname(ldname);
+		target = find_entity_with_irg_by_ldname(ldname);
 	}
 
 	return target;
@@ -702,7 +728,8 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		.unused_targets = &unused_targets,
 	};
 
-	{ // add all given entry points to live methods and to workqueue
+	// add all given entry points to live methods and to workqueue
+	{
 		size_t i = 0;
 		DEBUGOUT("entrypoints:\n");
 		ir_entity *entity;
@@ -716,6 +743,20 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			pdeq_putr(workqueue, entity);
 		}
 		assert(i > 0 && "give at least one entry point");
+	}
+
+	// add liboo runtime methods to live methods and workqueue
+	{
+		char *oo_rt_methods[] = {"oo_rt_method_optimized_away_error", "oo_rt_abstract_method_error", "oo_rt_instanceof", "oo_rt_lookup_interface_method", NULL }; //TODO can't this list be defined somewhere where it is better to find and maintain?
+		char *name;
+		for (size_t i=0; (name = oo_rt_methods[i])!=NULL; i++) {
+			ident *id = new_id_from_str(name);
+			ir_entity *entity = find_compilerlib_entity(id);
+			assert(entity != NULL);
+			DEBUGOUT("adding %s owner %s (0x%lx)\n", get_entity_name(entity), get_class_name(get_entity_owner(entity)), (unsigned long)get_entity_owner(entity));
+			cpset_insert(live_methods, entity);
+			pdeq_putr(workqueue, entity);
+		}
 	}
 
 	// add method entities in initializer values to live methods and workqueue (initial values of function pointers)
@@ -1120,6 +1161,166 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 }
 
 
+typedef struct discarder_env {
+	cpset_t *live_classes;
+	cpset_t *live_methods;
+} discarder_env;
+
+static void walk_classes_and_discard_unused(ir_type *klass, void *environment)
+{
+	assert(klass);
+	assert(is_Class_type(klass));
+	assert(environment);
+	discarder_env *env = environment;
+
+	if (oo_get_class_is_extern(klass)) // skip external classes ?
+		return;
+	// note: not skipping interfaces because there could be default methods like in Java 8
+
+	DEBUGOUT("walking class %s (0x%lx) to discard\n", get_class_name(klass),  (unsigned long)klass);
+	if (DEBUG_RTA) {
+		size_t n_superclasses = get_class_n_supertypes(klass);
+		printf("\tsuperclasses: %lu\n", (unsigned long)n_superclasses);
+		for (size_t i=0; i<n_superclasses; i++) {
+			ir_type *superclass = get_class_supertype(klass, i);
+			printf("\t\t%s\n", get_class_name(superclass));
+		}
+		size_t n_subclasses = get_class_n_subtypes(klass);
+		printf("\tsubclasses: %lu\n", (unsigned long)n_subclasses);
+		for (size_t i=0; i<n_subclasses; i++) {
+			ir_type *subclass = get_class_subtype(klass, i);
+			printf("\t\t%s\n", get_class_name(subclass));
+		}
+		printf("\n");
+	}
+
+	// discard members if possible
+	size_t n_members = get_class_n_members(klass);
+	for (size_t i=0; i<n_members; i++) {
+		ir_entity *member = get_class_member(klass, i);
+
+		if (is_method_entity(member)) {
+			if (cpset_find(env->live_methods, member) == NULL // if never used
+			    && !(klass == get_glob_type() && get_entity_irg(member) == NULL) // workaround? keep all global external references!? FIXME problem we have two globaltypes in x10i!
+				)
+			{
+				if (!oo_get_method_is_abstract(member)) {
+					DEBUGOUT("\tdiscarding method %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
+				} else {
+					DEBUGOUT("\tdiscarding abstract method %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
+				}
+				// delete graph
+				ir_graph *graph = get_entity_irg(member);
+				if (graph) {
+					DEBUGOUT("\t\tdeleting graph\n");
+					free_ir_graph(graph);
+				} else {
+					DEBUGOUT("\t\thas no graph\n");
+				}
+
+				// exclude from vtable if possible, and from overwrite/overwritten hierarchy to be able to continue this process for unused overwritten entities
+				size_t n_overwrites = get_entity_n_overwrites(member);
+				size_t n_overwrittenby = get_entity_n_overwrittenby(member);
+				DEBUGOUT("\t\thas %lu overwrittenby\n", (unsigned long)n_overwrittenby);
+				if (n_overwrittenby == 0) { // make sure it is not needed for vtable index (if there are dynamically bound calls to this entity even though there are never instances of this class)
+					DEBUGOUT("\t\texcluding from vtable\n");
+					oo_set_method_exclude_from_vtable(member, true);
+					oo_set_method_is_inherited(member, false);
+
+					// remove from overwrittenby of overwrites
+					DEBUGOUT("\t\thas %lu overwrites\n", (unsigned long)n_overwrites);
+					for (size_t i=0; i<n_overwrites; i++) {
+						ir_entity *overwrite = get_entity_overwrites(member, i);
+						DEBUGOUT("\t\tremoving from overwrittenby of overwrite %s.%s ( %s )\n", get_class_name(get_entity_owner(overwrite)), get_entity_name(overwrite), get_entity_ld_name(overwrite));
+						remove_entity_overwrittenby(overwrite, member);
+					}
+					// remove all overwrites
+					if (n_overwrites > 0) {
+						// note: collect first then remove to avoid removal during iteration
+						pdeq *queue = new_pdeq();
+						for (size_t i=0; i<n_overwrites; i++) {
+							ir_entity *entity = get_entity_overwrites(member, i);
+							pdeq_putr(queue, entity);
+						}
+						while (!pdeq_empty(queue)) {
+							ir_entity *entity = pdeq_getl(queue);
+							DEBUGOUT("\t\tremoving %s.%s ( %s ) from overwrites\n", get_class_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+							remove_entity_overwrites(member, entity);
+						}
+						del_pdeq(queue);
+					}
+				} else {
+					DEBUGOUT("\t\tkept in vtable because of overwriting entities\n");
+					if (!oo_get_method_is_abstract(member)) {
+						// redirect to error method
+						DEBUGOUT("\t\t\tredirecting to error function\n");
+						set_entity_ld_ident(member, get_entity_ld_ident(discard_error_method)); // redirect to error function
+						set_entity_visibility(member, ir_visibility_external); // set to link externally
+					} else {
+						// note: not redirecting abstract methods to optimize away error function because they should already be redirected to an abtract method error function
+						DEBUGOUT("\t\t\tnot redirecting abstract method\n");
+					}
+				}
+			} else {
+				DEBUGOUT("\tkeeping method %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
+			}
+		}
+	}
+}
+
+static void walk_types_and_discard_unused(ir_type *type, ir_entity *entity, void *env) // glue to use types_walk_super2sub without changing walk_classes_and_discard_unused
+{
+	assert(type);
+	assert(env);
+	(void)entity;
+
+	if (is_frame_type(type)) return; // ignore frametypes
+	walk_classes_and_discard_unused(type, env);
+}
+
+static void rta_discard_unused(cpset_t *live_classes, cpset_t *live_methods)
+{
+	assert(live_classes);
+	assert(live_methods);
+
+	assert(discard_error_method != NULL);
+
+	discarder_env env = {
+		.live_classes = live_classes,
+		.live_methods = live_methods,
+	};
+
+	// discard methods classes
+	//class_walk_super2sub(NULL, walk_classes_and_discard_unused, &env); // postfix of super2sub is sub2super, right? //FIXME class_walk_super2sub is buggy!!
+	type_walk_super2sub(NULL, walk_types_and_discard_unused, &env); // postfix of super2sub is sub2super, right? // note: type_walk_super2sub includes globaltype, class_walk_super2sub does not
+
+	// discard global and static methods
+/*	ir_type *glob = get_glob_type();
+	DEBUGOUT("walking globaltype %s (0x%lx) to discard globals\n", get_class_name(glob), (unsigned long)glob);
+	size_t n_members = get_compound_n_members(glob);
+	for (size_t i=0; i<n_members; i++) {
+		ir_entity *member = get_compound_member(glob, i);
+		if (is_method_entity(member)) {
+			if (cpset_find(live_methods, member) == NULL) { // if never used
+				DEBUGOUT("\tdiscarding method %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
+				// redirect to error method
+				set_entity_ld_ident(member, get_entity_ld_ident(discard_error_method)); // redirect to error function
+				set_entity_visibility(member, ir_visibility_external); // set to link externally
+				// delete graph
+				ir_graph *graph = get_entity_irg(member);
+				if (graph) {
+					DEBUGOUT("\t\tdeleting graph\n");
+					free_ir_graph(graph);
+				} else {
+					DEBUGOUT("\t\thas no graph\n");
+				}
+			}
+		}
+	}
+*/
+}
+
+
 void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 {
 	assert(entry_points);
@@ -1130,6 +1331,6 @@ void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 
 	rta_run(entry_points, initial_live_classes, &live_classes, &live_methods, &dyncall_targets);
 	rta_devirtualize_calls(entry_points, &dyncall_targets);
-	//rta_discard(&live_classes, &live_methods); //TODO
+	rta_discard_unused(&live_classes, &live_methods);
 	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
 }

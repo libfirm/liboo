@@ -522,6 +522,7 @@ void oo_init(void)
 	dmemory_init();
 	rtti_init();
 	eh_init();
+	rta_init();
 }
 
 void oo_deinit(void)
