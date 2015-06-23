@@ -603,6 +603,67 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 	}
 }
 
+static void process_initializer_recursive(ir_initializer_t *initer, analyzer_env *env)
+{
+	assert(initer);
+	assert(env);
+
+	ir_initializer_kind_t kind = get_initializer_kind(initer);
+	DEBUGOUT("\t\t\t\tinitializer kind %s\n", get_initializer_kind_name(kind));
+
+	switch (kind) {
+	case IR_INITIALIZER_CONST: {
+		ir_node *value = get_initializer_const_value(initer);
+		DEBUGOUT("\t\t\t\tconst value: %s\n", gdb_node_helper(value));
+		if (is_Address(value)) {
+			ir_entity *entity = get_Address_entity(value);
+			DEBUGOUT("\t\t\t\t\tentity %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+			if (is_method_entity(entity)) {
+				DEBUGOUT("\t\t\t\t\t\tadding\n");
+				cpset_insert(env->live_methods, entity);
+				pdeq_putr(env->workqueue, entity);
+			}
+		}
+		break;
+	}
+	case IR_INITIALIZER_COMPOUND: {
+		size_t n_entries = get_initializer_compound_n_entries(initer);
+		DEBUGOUT("\t\t\t\tcompound %lu entries\n", (unsigned long)n_entries);
+		for (size_t i=0; i<n_entries; i++) {
+			ir_initializer_t *izer = get_initializer_compound_value(initer, i);
+			assert(izer != NULL);
+			DEBUGOUT("\t\t\t\t\t%lu\n", (unsigned long)i);
+			process_initializer_recursive(izer, env);
+		}
+		break;
+	}
+	default:
+		// do nothing
+		break;
+	}
+}
+
+static void scan_initializer_values(analyzer_env *env)
+{
+	assert(env);
+
+	ir_type *glob = get_glob_type();
+	DEBUGOUT("\twalking globaltype (0x%lx) :\n", (unsigned long)glob);
+	size_t n_members = get_compound_n_members(glob);
+	for (size_t i=0; i<n_members; i++) {
+		ir_entity *member = get_compound_member(glob, i);
+
+		if (is_method_entity(member)) continue;
+
+		DEBUGOUT("\t\t\tentity %s.%s ( %s ) type: %s\n", get_compound_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member), gdb_node_helper(get_entity_type(member)));
+
+		ir_initializer_t *initer = get_entity_initializer(member);
+		if (initer != NULL) {
+			process_initializer_recursive(initer, env);
+		}
+	}
+}
+
 
 /** run Rapid Type Analysis
  * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically bound call.
@@ -656,6 +717,10 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		}
 		assert(i > 0 && "give at least one entry point");
 	}
+
+	// add method entities in initializer values to live methods and workqueue (initial values of function pointers)
+	DEBUGOUT("\nscanning initializer values:\n");
+	scan_initializer_values(&env);
 
 	// add all given initial live classes to live classes
 	if (initial_live_classes != NULL) {
