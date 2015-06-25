@@ -437,7 +437,10 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 
 	// support for FIRM usage without any entity copies at all (not even for case interface method implemention inherited from a superclass) -> have to assume some usual semantics
 	// for interface calls (or more general abstract calls) there has to be a non-abstract implementation in each non-abstract subclass, if there is no entity copy we have to find the implementation by ourselves (in cases an inherited method implements the abstract method)
-	if (oo_get_method_is_abstract(call_entity) && !oo_get_class_is_abstract(klass) && !oo_get_class_is_interface(klass) && oo_get_method_is_abstract(current_entity)) { // careful: interfaces seem not always to be marked as abstract
+	if (oo_get_method_is_abstract(call_entity)
+		&& !oo_get_class_is_abstract(klass) && !oo_get_class_is_interface(klass) // interfaces seem not always to be marked as abstract
+		&& !(oo_get_class_vptr_entity(klass) == NULL) //!oo_get_class_is_struct(klass) // class with struct semantics
+		&& oo_get_method_is_abstract(current_entity)) {
 		DEBUGOUT("\t\t\tlooking for inherited implementation of abstract method %s.%s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
 		ir_entity *inherited_impl = find_inherited_implementation(klass, call_entity);
 		if (inherited_impl != NULL) {
@@ -445,7 +448,7 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 			current_entity = inherited_impl;
 		} else {
 			DEBUGOUT("\t\t\t\tfound no inherited implementation to abstract call entity\n");
-			//assert(false); // there are problems with X10 structs (they don't have interface implementations because their box classes have them) and with missing entities (e.g. String.ixi in test case ArrayTest)
+			assert(false); // there are problems with missing entities (e.g. String.ixi in test case ArrayTest)
 		}
 	}
 
