@@ -144,18 +144,7 @@ ir_entity *oo_get_class_vptr_entity(ir_type *classtype)
 {
 	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
-	if (ti->vptr != NULL)
-		return ti->vptr;
-
-	/* recursively search for vptr entity in supertypes */
-	int n_supertypes = get_class_n_supertypes(classtype);
-	for (int i = 0; i < n_supertypes; ++i) {
-		ir_type *supertype = get_class_supertype(classtype, i);
-		ti = get_type_info(supertype);
-		if (ti->vptr != NULL)
-			return ti->vptr;
-	}
-	return NULL;
+	return ti->vptr;
 }
 
 void oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr)
