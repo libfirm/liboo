@@ -1164,6 +1164,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 typedef struct discarder_env {
 	cpset_t *live_classes;
 	cpset_t *live_methods;
+	cpmap_t *dyncall_targets;
 } discarder_env;
 
 static void walk_classes_and_discard_unused(ir_type *klass, void *environment)
@@ -1222,7 +1223,7 @@ static void walk_classes_and_discard_unused(ir_type *klass, void *environment)
 				size_t n_overwrites = get_entity_n_overwrites(member);
 				size_t n_overwrittenby = get_entity_n_overwrittenby(member);
 				DEBUGOUT("\t\thas %lu overwrittenby\n", (unsigned long)n_overwrittenby);
-				if (n_overwrittenby == 0) { // make sure it is not needed for vtable index (if there are dynamically bound calls to this entity even though there are never instances of this class)
+				if (n_overwrittenby == 0 && cpmap_find(env->dyncall_targets, member) == NULL) { // make sure it is not needed for vtable index (if there are dynamically bound calls to this entity even though there are never instances of this class)
 					DEBUGOUT("\t\texcluding from vtable\n");
 					oo_set_method_exclude_from_vtable(member, true);
 					oo_set_method_is_inherited(member, false);
@@ -1278,7 +1279,7 @@ static void walk_types_and_discard_unused(ir_type *type, ir_entity *entity, void
 	walk_classes_and_discard_unused(type, env);
 }
 
-static void rta_discard_unused(cpset_t *live_classes, cpset_t *live_methods)
+static void rta_discard_unused(cpset_t *live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets)
 {
 	assert(live_classes);
 	assert(live_methods);
@@ -1288,6 +1289,7 @@ static void rta_discard_unused(cpset_t *live_classes, cpset_t *live_methods)
 	discarder_env env = {
 		.live_classes = live_classes,
 		.live_methods = live_methods,
+		.dyncall_targets = dyncall_targets,
 	};
 
 	// discard methods classes
@@ -1331,6 +1333,6 @@ void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 
 	rta_run(entry_points, initial_live_classes, &live_classes, &live_methods, &dyncall_targets);
 	rta_devirtualize_calls(entry_points, &dyncall_targets);
-	rta_discard_unused(&live_classes, &live_methods);
+	rta_discard_unused(&live_classes, &live_methods, &dyncall_targets);
 	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
 }
