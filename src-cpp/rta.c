@@ -93,22 +93,6 @@ static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) // missing new 
 */
 
 
-static ir_entity *find_compilerlib_entity(ident *id)
-{
-	assert(id);
-
-	ir_type *glob = get_entity_owner(discard_error_method); //HACK because compilerlib entities are somehow in a different globaltype in X10i //get_glob_type();
-	size_t n_members = get_compound_n_members(glob);
-	for (size_t i=0; i<n_members; i++) {
-		ir_entity *member = get_compound_member(glob, i);
-		if (get_entity_ident(member) == id) {
-			return member;
-		}
-	}
-	return NULL;
-}
-
-
 static ir_entity *default_detect_call(ir_node *call) { (void)call; return NULL; }
 
 static ir_entity *(*detect_call)(ir_node *call) = &default_detect_call;
@@ -745,20 +729,6 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		assert(i > 0 && "give at least one entry point");
 	}
 
-	// add liboo runtime methods to live methods and workqueue
-	{
-		char *oo_rt_methods[] = {"oo_rt_method_optimized_away_error", "oo_rt_abstract_method_error", "oo_rt_instanceof", "oo_rt_lookup_interface_method", NULL }; //TODO can't this list be defined somewhere where it is better to find and maintain?
-		char *name;
-		for (size_t i=0; (name = oo_rt_methods[i])!=NULL; i++) {
-			ident *id = new_id_from_str(name);
-			ir_entity *entity = find_compilerlib_entity(id);
-			assert(entity != NULL);
-			DEBUGOUT("adding %s owner %s (0x%lx)\n", get_entity_name(entity), get_class_name(get_entity_owner(entity)), (unsigned long)get_entity_owner(entity));
-			cpset_insert(live_methods, entity);
-			pdeq_putr(workqueue, entity);
-		}
-	}
-
 	// add method entities in initializer values to live methods and workqueue (initial values of function pointers)
 	DEBUGOUT("\nscanning initializer values:\n");
 	scan_initializer_values(&env);
@@ -1201,10 +1171,11 @@ static void walk_classes_and_discard_unused(ir_type *klass, void *environment)
 		ir_entity *member = get_class_member(klass, i);
 
 		if (is_method_entity(member)) {
-			if (cpset_find(env->live_methods, member) == NULL // if never used
-			    && !(klass == get_glob_type() && get_entity_irg(member) == NULL) // workaround? keep all global external references!? FIXME problem we have two globaltypes in x10i!
-				)
-			{
+			if (get_entity_irg(member) == NULL && !oo_get_method_is_abstract(member)) {
+				DEBUGOUT("\tkeeping redirection or external reference %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
+				continue; // keep external references
+			}
+			if (cpset_find(env->live_methods, member) == NULL) { // if never used
 				if (!oo_get_method_is_abstract(member)) {
 					DEBUGOUT("\tdiscarding method %s.%s ( %s )\n", get_class_name(get_entity_owner(member)), get_entity_name(member), get_entity_ld_name(member));
 				} else {
