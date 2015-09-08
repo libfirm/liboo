@@ -41,7 +41,7 @@ public class RTA {
 			if (nullterminate)
 				//buffer.put(length-1, (int)Pointer.nativeValue(Pointer.NULL));
 				//buffer.put(length-1, (int)Pointer.NULL.getLong(0));
-				buffer.put(length, (int)0);
+				buffer.put(length, 0);
 			return buffer;
 		} else if (Pointer.SIZE == 8) {
 			LongBuffer buffer = (nullterminate) ? LongBuffer.allocate(length+1) : LongBuffer.allocate(length);
@@ -51,7 +51,7 @@ public class RTA {
 			if (nullterminate)
 				//buffer.put(length-1, (int)Pointer.nativeValue(Pointer.NULL));
 				//buffer.put(length-1, Pointer.NULL.getLong(0));
-				buffer.put(length, (long)0L);
+				buffer.put(length, 0L);
 			return buffer;
 		} else {
 			/* no 32- or 64-bit architecture */
