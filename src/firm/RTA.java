@@ -39,8 +39,6 @@ public class RTA {
 				buffer.put(i, (int) Pointer.nativeValue(array[i].ptr));
 			}
 			if (nullterminate)
-				//buffer.put(length-1, (int)Pointer.nativeValue(Pointer.NULL));
-				//buffer.put(length-1, (int)Pointer.NULL.getLong(0));
 				buffer.put(length, 0);
 			return buffer;
 		} else if (Pointer.SIZE == 8) {
@@ -49,8 +47,6 @@ public class RTA {
 				buffer.put(i, Pointer.nativeValue(array[i].ptr));
 			}
 			if (nullterminate)
-				//buffer.put(length-1, (int)Pointer.nativeValue(Pointer.NULL));
-				//buffer.put(length-1, Pointer.NULL.getLong(0));
 				buffer.put(length, 0L);
 			return buffer;
 		} else {
