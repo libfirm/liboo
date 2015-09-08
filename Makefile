@@ -13,11 +13,6 @@ guessed_target := $(shell $(CC) -dumpmachine)
 TARGET         ?= $(guessed_target)
 TARGET_CC      ?= $(TARGET)-gcc
 
-ifeq ($(findstring x86_64, $(TARGET)), x86_64)
-	# compile library normally but runtime in 32bit mode
-	RT_CFLAGS += -m32
-	RT_LFLAGS += -m32
-endif
 ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 	# compile library normally but runtime in 32bit mode
 	RT_CFLAGS += -m32
