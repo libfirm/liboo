@@ -26,7 +26,6 @@ public class RTA {
 		binding_rta.rta_optimization(getBufferFromArray(entrypoints, true), getBufferFromArray(initialLiveClasses, true));
 	}
 
-	private static Buffer getBufferFromArray(JNAWrapper[] array) { return getBufferFromArray(array, false); }
 	private static Buffer getBufferFromArray(JNAWrapper[] array, boolean nullterminate) {
 		// taken from jFirm source code src/firm/nodes/Node.java and modified it
 		// This should be placed in firm.JNAWrapper or similar!
