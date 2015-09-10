@@ -18,6 +18,13 @@ ifeq ($(findstring darwin11, $(TARGET)), darwin11)
 	RT_CFLAGS += -m32
 	RT_LFLAGS += -m32
 endif
+ifeq ($(findstring x86_64, $(guessed_target)), x86_64)
+ifeq ($(findstring i686, $(TARGET)), i686)
+	# compile library normally but runtime in 32bit mode
+	RT_CFLAGS += -m32
+	RT_LFLAGS += -m32
+endif
+endif
 ifeq ($(findstring i686-invasic, $(TARGET)), i686-invasic)
 	OCTOPOS_BASE=../octopos-app/releases/current/x86guest/default
 	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
