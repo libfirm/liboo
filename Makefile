@@ -34,7 +34,7 @@ endif
 ifeq ($(findstring x86_64-invasic, $(TARGET)), x86_64-invasic)
 	OCTOPOS_BASE=../octopos-app/releases/current/x64native/default
 	GCC_INCLUDE:=$(shell $(TARGET_CC) --print-file-name=include)
-	RT_CFLAGS += -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -ffreestanding
+	RT_CFLAGS += -mno-red-zone -nostdinc -isystem $(GCC_INCLUDE) -I $(OCTOPOS_BASE)/include -ffreestanding
 	RT_LFLAGS += -nostdlib -Wl,-T,$(OCTOPOS_BASE)/lib/sections.x $(OCTOPOS_BASE)/lib/libcsubset.a $(OCTOPOS_BASE)/lib/liboctopos.a
 endif
 ifeq ($(findstring sparc-invasic, $(TARGET)), sparc-invasic)
