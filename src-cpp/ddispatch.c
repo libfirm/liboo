@@ -58,7 +58,7 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 
 	// second, calculate the position of the RTTI ref in relation to the target of vptr and dereference it.
 	int         offset         = (ddispatch_model.index_of_rtti_ptr - ddispatch_model.vptr_points_to_index) * get_type_size_bytes(type_reference);
-	ir_mode    *mode_offset    = get_reference_mode_unsigned_eq(mode_P);
+	ir_mode    *mode_offset    = get_reference_offset_mode(mode_P);
 	ir_node    *ci_offset      = new_r_Const_long(irg, mode_offset, offset);
 	ir_node    *ci_add         = new_r_Add(block, vtable_addr, ci_offset, mode_P);
 	ir_node    *ci_load        = new_r_Load(block, cur_mem, ci_add, mode_P, vptr_type, cons_none);
@@ -253,7 +253,7 @@ void ddispatch_lower_Call(ir_node* call)
 		assert(vtable_id != -1);
 
 		unsigned type_ref_size  = get_type_size_bytes(type_reference);
-		ir_mode *mode_offset    = get_reference_mode_unsigned_eq(mode_reference);
+		ir_mode *mode_offset    = get_reference_offset_mode(mode_reference);
 		ir_node *vtable_offset  = new_r_Const_long(irg, mode_offset, vtable_id * type_ref_size);
 		ir_node *funcptr_addr   = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
 		ir_node *callee_load    = new_r_Load(block, vtable_mem, funcptr_addr, mode_reference, vptr_type, cons_none);
@@ -290,7 +290,7 @@ void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *obj
 	ir_entity *vtable_entity   = oo_get_class_vtable_entity(klass);
 	if (vtable_entity) {
 		ir_node   *vtable_symconst = new_r_Address(irg, vtable_entity);
-		ir_mode   *mode_offset     = get_reference_mode_unsigned_eq(mode_reference);
+		ir_mode   *mode_offset     = get_reference_offset_mode(mode_reference);
 		long       offset          = ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference);
 		ir_node   *const_offset    = new_r_Const_long(irg, mode_offset, offset);
 		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset, mode_reference);

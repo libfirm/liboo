@@ -92,7 +92,7 @@ static void init_rtti_firm_types(void)
 {
 	ir_type *type_reference = get_type_for_mode(mode_P);
 	ir_type *type_uint32_t  = get_type_for_mode(mode_Iu);
-	ir_mode *mode_size_t    = get_reference_mode_unsigned_eq(mode_P);
+	ir_mode *mode_size_t    = get_reference_offset_mode(mode_P);
 	ir_type *type_size_t    = get_type_for_mode(mode_size_t);
 	ir_type *type_char      = get_type_for_mode(mode_Bu);
 	ir_type *type_int       = get_type_for_mode(mode_Is);
@@ -404,7 +404,7 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 
 	// second, calculate the position of the RTTI ref in relation to the target of vptr and dereference it.
 	int         offset       = (ddispatch_get_index_of_rtti_ptr() - ddispatch_get_vptr_points_to_index()) * get_type_size_bytes(type_reference);
-	ir_mode    *mode_offset  = get_reference_mode_unsigned_eq(mode_P);
+	ir_mode    *mode_offset  = get_reference_offset_mode(mode_P);
 	ir_node    *obj_ci_offset= new_r_Const_long(irg, mode_offset, offset);
 	ir_node    *obj_ci_add   = new_r_Add(block, vtable_addr, obj_ci_offset, mode_P);
 	ir_node    *obj_ci_load  = new_r_Load(block, cur_mem, obj_ci_add, mode_P, vptr_type, cons_none);

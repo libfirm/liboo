@@ -1,27 +1,15 @@
 package firm;
 
-
 import firm.bindings.binding_rta;
 
 import com.sun.jna.Pointer;
-import com.sun.jna.Callback;
 import java.nio.Buffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
 import firm.nodes.Node;
 
-
 public class RTA {
-
-	public static interface DetectCallCallback extends Callback {
-		Entity invoke(Node node);
-	}
-
-	public static void setCallback(DetectCallCallback callback) {
-		binding_rta.rta_set_detection_callbacks(callback);
-	}
-
 	public static void runRTA(Entity[] entrypoints, Type[] initialLiveClasses) {
 		binding_rta.rta_optimization(getBufferFromArray(entrypoints, true), getBufferFromArray(initialLiveClasses, true));
 	}

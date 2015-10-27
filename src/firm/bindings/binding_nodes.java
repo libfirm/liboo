@@ -192,7 +192,9 @@ public class binding_nodes {
 		ir_bk_saturating_increment(),
 		ir_bk_compare_swap(),
 		ir_bk_may_alias(),
-		ir_bk_last(ir_builtin_kind.ir_bk_may_alias.val);
+		ir_bk_va_start(),
+		ir_bk_va_arg(),
+		ir_bk_last(ir_builtin_kind.ir_bk_va_arg.val);
 		public final int val;
 
 		private static class C {
