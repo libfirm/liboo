@@ -180,14 +180,7 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (is_method_entity(member)) {
 			int member_vtid = oo_get_method_vtable_index(member);
 			if (member_vtid != -1) {
-				ident *id;
-				if (oo_get_method_is_abstract(member)) {
-					id = ddispatch_model.abstract_method_ident;
-				} else {
-					id = get_entity_ld_ident(member);
-				}
-				ir_entity *bound = create_compilerlib_entity(id, get_entity_type(member));
-				ir_node *symconst_node = new_r_Address(const_code, bound);
+				ir_node *symconst_node = new_r_Address(const_code, member);
 				ir_initializer_t *val = create_initializer_const(symconst_node);
 				set_initializer_compound_value (init, member_vtid+ddispatch_model.vptr_points_to_index, val);
 			}
