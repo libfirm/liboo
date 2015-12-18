@@ -500,7 +500,22 @@ static void lower_type(ir_type *type, void *env)
 		for (int m = n_members-1; m >= 0; m--) {
 			ir_entity *entity = get_class_member(type, m);
 			if (is_method_entity(entity)) {
-				set_entity_owner(entity, glob);
+				ir_entity *ge = ir_get_global(get_entity_ld_ident(entity));
+				if (NULL != ge) {
+					/* There is already an entity in global with this name.
+					 * Assume that it is actually the same.
+					 *
+					 * We need this behavior for x10i, because there is no Object class,
+					 * where every class derives from and which owns methods like
+					 * hashCode. Instead there is an Any interface at the top and
+					 * interfaces cannot own methods. This skipping should happen
+					 * exactly for the Any methods.
+					 */
+					//printf("skip '%s'\n", gdb_node_helper(entity));
+					remove_compound_member(type, entity); // TODO free_entity?
+				} else {
+					set_entity_owner(entity, glob);
+				}
 				/* When changing the entity owner type, the overwrites
 				 * information becomes nonsensical and invalid. */
 				const size_t n_overwrites = get_entity_n_overwrites(entity);
