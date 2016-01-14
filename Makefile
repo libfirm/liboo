@@ -108,7 +108,7 @@ $(GOAL_RT_SHARED): $(OBJECTS_RT_SHARED)
 
 $(GOAL_RT_STATIC): $(OBJECTS_RT_STATIC)
 	@echo '===> AR $@'
-	$(Q)$(AR) -cru $@ $^
+	$(Q)$(AR) -cr $@ $^
 
 $(RUNTIME_BUILDDIR)/shared/%.o: %.c
 	@echo '===> TARGET_CC $@'
