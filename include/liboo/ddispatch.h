@@ -55,13 +55,29 @@ typedef enum {
 	bind_interface
 } ddispatch_binding;
 
+typedef enum {
+	call_runtime_lookup = 0,
+	call_searched_itable = 1,
+	call_itable_indexed = 2,
+	call_move2front = 4
+} ddispatch_interface_call;
+
+
 typedef void     (*init_vtable_slots_t)           (ir_type* klass, ir_initializer_t *vtable_init, unsigned vtable_size);
 typedef ir_node* (*construct_interface_lookup_t)  (ir_node *objptr, ir_type *iface, ir_entity *method, ir_graph *irg, ir_node *block, ir_node **mem);
 
 void ddispatch_init(void);
+void ddispatch_deinit(void);
 void ddispatch_setup_vtable(ir_type *klass);
 void ddispatch_lower_Call(ir_node* call);
 void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *objptr, ir_node **mem, ir_type* klass);
+
+void ddispatch_setup_itable(ir_type *klass);
+int ddispatch_get_itable_method_index(ir_type *interface, ir_entity *method);
+ir_entity *ddispatch_get_itable_id(ir_type *interface);
+unsigned ddispatch_get_itable_index(ir_type *interface);
+ir_type *ddispatch_get_itt_entry_type(void);
+
 
 void ddispatch_set_vtable_layout(unsigned vptr_points_to_index, unsigned index_of_first_method, unsigned index_of_rtti_ptr, init_vtable_slots_t func);
 void ddispatch_set_interface_lookup_constructor(construct_interface_lookup_t func);

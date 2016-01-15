@@ -12,6 +12,13 @@ import firm.oo.nodes.Nodes;
 public final class OO {
 	private static boolean initialized;
 
+	public enum InterfaceCallType {
+		RUNTIME_LOOKUP,
+		SEARCHED_ITABLE,
+		INDEXED_ITABLE,
+		SEARCHED_ITABLE_M2F
+	}
+
 	private OO() {
 	}
 
@@ -39,6 +46,21 @@ public final class OO {
 	 */
 	public static void lowerProgram() {
 		binding_oo.oo_lower();
+	}
+
+	/**
+	 * Sets the call-type for interface methods
+	 * @param callType
+	 */
+	public static void setInterfaceLookup(InterfaceCallType callType) {
+		if (callType == InterfaceCallType.RUNTIME_LOOKUP)
+			binding_oo.oo_set_interface_call_type(0);
+		else if (callType == InterfaceCallType.SEARCHED_ITABLE)
+			binding_oo.oo_set_interface_call_type(1);
+		else if (callType == InterfaceCallType.INDEXED_ITABLE)
+			binding_oo.oo_set_interface_call_type(2);
+		else if (callType == InterfaceCallType.SEARCHED_ITABLE_M2F)
+			binding_oo.oo_set_interface_call_type(1 | 4);
 	}
 
 	/**

@@ -11,6 +11,10 @@ void oo_init(void);
 void oo_deinit(void);
 void oo_lower(void);
 
+void oo_set_interface_call_type(ddispatch_interface_call type);
+ddispatch_interface_call oo_get_interface_call_type(void);
+
+
 unsigned oo_get_class_uid(ir_type *classtype);
 void oo_set_class_uid(ir_type *classtype, unsigned uid);
 ir_entity *oo_get_class_vtable_entity(ir_type *classtype);
@@ -21,6 +25,8 @@ ir_entity *oo_get_class_vptr_entity(ir_type *classtype);
 void oo_set_class_vptr_entity(ir_type *classtype, ir_entity *vptr);
 ir_entity *oo_get_class_rtti_entity(ir_type *classtype);
 void oo_set_class_rtti_entity(ir_type *classtype, ir_entity *rtti);
+ir_entity *oo_get_class_itt_entity(ir_type *classtype);
+void oo_set_class_itt_entity(ir_type *classtype, ir_entity *itt);
 bool oo_get_class_is_interface(ir_type *classtype);
 void oo_set_class_is_interface(ir_type *classtype, bool is_interface);
 bool oo_get_class_is_abstract(ir_type *classtype);

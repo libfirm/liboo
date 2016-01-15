@@ -3031,4 +3031,8 @@ public class binding_oo {
 	public static native Pointer oo_get_entity_overwritten_superclass_entity(Pointer entity);
 
 	public static native void oo_copy_entity_info(Pointer src, Pointer dest);
+
+	public static native void oo_set_interface_call_type(/* ddispatch_interface_call */int type);
+
+	public static native /* ddispatch_interface_call */int oo_get_interface_call_type();
 }

@@ -31,6 +31,7 @@ typedef struct {
 	unsigned      uid;
 	ir_entity    *vptr;
 	ir_entity    *rtti;
+	ir_entity    *itt;
 	ir_entity    *vtable;
 	unsigned      vtable_size;
 	unsigned      flags;
@@ -53,6 +54,8 @@ typedef struct {
 
 static struct obstack  oo_info_obst;
 static pmap           *oo_node_info_map = NULL;
+
+static ddispatch_interface_call interface_call_type;
 
 static oo_type_info *get_type_info(ir_type *type)
 {
@@ -177,6 +180,20 @@ void  oo_set_class_rtti_entity(ir_type *classtype, ir_entity *rtti)
 	assert(is_Class_type(classtype));
 	oo_type_info *ti = get_type_info(classtype);
 	ti->rtti = rtti;
+}
+
+ir_entity *oo_get_class_itt_entity(ir_type *classtype)
+{
+	assert(is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	return ti->itt;
+}
+
+void  oo_set_class_itt_entity(ir_type *classtype, ir_entity *itt)
+{
+	assert(is_Class_type(classtype));
+	oo_type_info *ti = get_type_info(classtype);
+	ti->itt = itt;
 }
 
 bool oo_get_class_is_interface(ir_type *classtype)
@@ -449,6 +466,13 @@ void oo_copy_entity_info(ir_entity *src, ir_entity *dest)
 	memcpy(ei_dest, ei_src, sizeof(oo_entity_info));
 }
 
+static void setup_itable_proxy(ir_type *klass, void *env)
+{
+	(void)env;
+	ddispatch_setup_itable(klass);
+}
+
+
 static void setup_vtable_proxy(ir_type *klass, void *env)
 {
 	(void)env;
@@ -542,6 +566,16 @@ static void lower_type(ir_type *type, void *env)
 	}
 }
 
+void oo_set_interface_call_type(ddispatch_interface_call type)
+{
+	interface_call_type = type;
+}
+
+ddispatch_interface_call oo_get_interface_call_type()
+{
+	return interface_call_type;
+}
+
 void oo_init(void)
 {
 	obstack_init(&oo_info_obst);
@@ -556,6 +590,7 @@ void oo_init(void)
 void oo_deinit(void)
 {
 	rtti_deinit();
+	ddispatch_deinit();
 	eh_deinit();
 	obstack_free(&oo_info_obst, NULL);
 	pmap_destroy(oo_node_info_map);
@@ -563,6 +598,13 @@ void oo_deinit(void)
 
 void oo_lower(void)
 {
+
+	ddispatch_interface_call call_type = oo_get_interface_call_type();
+	if ((call_type & call_searched_itable) == call_searched_itable ||
+		call_type == call_itable_indexed) {
+		class_walk_super2sub(setup_itable_proxy, NULL, NULL);
+	}
+
 	class_walk_super2sub(setup_vtable_proxy, NULL, NULL);
 	class_walk_super2sub(construct_runtime_typeinfo_proxy, NULL, NULL);
 
