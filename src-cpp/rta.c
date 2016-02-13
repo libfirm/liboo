@@ -197,10 +197,10 @@ static void add_new_live_class(ir_type *klass, analyzer_env *env)
 			{
 				cpmap_iterator_t iterator;
 				cpmap_iterator_init(&iterator, methods);
-				cpmap_entry_t *entry;
-				while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
-					ir_entity *method = (ir_entity*)entry->key;
-					cpset_t *call_entities = entry->data;
+				cpmap_entry_t entry;
+				while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+					ir_entity *method = (ir_entity*)entry.key;
+					cpset_t *call_entities = entry.data;
 
 					add_to_dyncalls(method, call_entities, env);
 
@@ -714,13 +714,13 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			//DEBUGOUT("size %u\n", cpmap_size(dyncall_targets));
 			cpmap_iterator_t iterator;
 			cpmap_iterator_init(&iterator, dyncall_targets);
-			cpmap_entry_t *entry;
-			while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
-				const ir_entity *call_entity = entry->key;
+			cpmap_entry_t entry;
+			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+				const ir_entity *call_entity = entry.key;
 				assert(call_entity);
 				DEBUGOUT("\t%s.%s %s\n", get_class_name(get_entity_owner(call_entity)), get_entity_name(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 
-				cpset_t *targets = entry->data;
+				cpset_t *targets = entry.data;
 				assert(targets);
 				cpset_iterator_t it;
 				cpset_iterator_init(&it, targets);
@@ -741,16 +741,16 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	{ // delete the maps and sets in map unused_targets
 		cpmap_iterator_t iterator;
 		cpmap_iterator_init(&iterator, &unused_targets);
-		cpmap_entry_t *entry;
-		while ((entry = cpmap_iterator_next(&iterator))->key != NULL || entry->data != NULL) {
-			cpmap_t* map = entry->data;
+		cpmap_entry_t entry;
+		while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+			cpmap_t* map = entry.data;
 			assert(map);
 
 			cpmap_iterator_t inner_iterator;
 			cpmap_iterator_init(&inner_iterator, map);
-			cpmap_entry_t *inner_entry;
-			while ((inner_entry = cpmap_iterator_next(&inner_iterator))->key != NULL || inner_entry->data != NULL) {
-				cpset_t *set = inner_entry->data;
+			cpmap_entry_t inner_entry;
+			while ((inner_entry = cpmap_iterator_next(&inner_iterator)).key != NULL || inner_entry.data != NULL) {
+				cpset_t *set = inner_entry.data;
 				assert(set);
 
 				cpmap_remove_iterator(map, &inner_iterator);
@@ -787,9 +787,9 @@ static void rta_dispose_results(cpset_t *live_classes, cpset_t *live_methods, cp
 	// delete the sets in map dyncall_targets
 	cpmap_iterator_t it;
 	cpmap_iterator_init(&it, dyncall_targets);
-	cpmap_entry_t *entry;
-	while ((entry = cpmap_iterator_next(&it))->key != NULL || entry->data != NULL) {
-		cpset_t* set = entry->data;
+	cpmap_entry_t entry;
+	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
+		cpset_t* set = entry.data;
 		cpmap_remove_iterator(dyncall_targets, &it);
 		assert(set);
 		cpset_destroy(set);
