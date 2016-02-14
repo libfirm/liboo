@@ -521,23 +521,14 @@ static void lower_type(ir_type *type, void *env)
 	ir_type *glob = get_glob_type();
 	if (type != glob) {
 		int n_members = get_class_n_members(type);
-		ident *err_name = new_id_from_str("oo_rt_abstract_method_error");
-		ir_entity *error_proc = ir_get_global(err_name);
 
 		for (int m = n_members-1; m >= 0; m--) {
 			ir_entity *entity = get_class_member(type, m);
 			ident *ld_name = get_entity_ld_ident(entity);
 			if (is_method_entity(entity)) {
-				ir_entity *ge = ir_get_global(ld_name);
-				if (oo_get_method_is_abstract(entity)) {
-					/* abstract methods are special, because they are not generated in the assembly
-					 * and we would trigger 'undefined reference' errors in the linker */
-					assert (NULL == ge);
-					ir_type *type = get_entity_type(entity);
-					ir_visibility vis = get_entity_visibility(entity);
-					new_alias_entity(glob, ld_name, error_proc, type, vis);
+				if (oo_get_method_is_abstract(entity))
 					continue;
-				}
+				ir_entity *ge = ir_get_global(ld_name);
 				if (NULL != ge) {
 					/* There is already an entity in global with this name.
 					 * Assume that it is actually the same.

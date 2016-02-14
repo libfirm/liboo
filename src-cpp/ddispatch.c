@@ -31,7 +31,7 @@ struct ddispatch_model_t {
 	unsigned                      index_of_itt_ptr;
 	unsigned                      index_of_first_method;
 	init_vtable_slots_t           init_vtable_slots;
-	ident                        *abstract_method_ident;
+	ir_entity                    *abstract_method_entity;
 	construct_interface_lookup_t  construct_interface_lookup;
 } ddispatch_model;
 
@@ -329,12 +329,17 @@ void ddispatch_init(void)
 
 	obstack_init(&ddispatch_obst);
 
-	ddispatch_model.vptr_points_to_index        = 0;
-	ddispatch_model.index_of_first_method       = 2;
-	ddispatch_model.index_of_rtti_ptr           = 0;
-	ddispatch_model.index_of_itt_ptr            = 1;
-	ddispatch_model.init_vtable_slots           = default_init_vtable_slots;
-	ddispatch_model.abstract_method_ident       = new_id_from_str("oo_rt_abstract_method_error");
+	ir_type   *abstract_type   = new_type_method(0, 0);
+	ident     *abstract_ident  = new_id_from_str("oo_rt_abstract_method_error");
+	ir_entity *abstract_entity
+		= create_compilerlib_entity(abstract_ident, abstract_type);
+
+	ddispatch_model.vptr_points_to_index   = 0;
+	ddispatch_model.index_of_first_method  = 2;
+	ddispatch_model.index_of_rtti_ptr      = 0;
+	ddispatch_model.index_of_itt_ptr       = 1;
+	ddispatch_model.init_vtable_slots      = default_init_vtable_slots;
+	ddispatch_model.abstract_method_entity = abstract_entity;
 	if ((oo_get_interface_call_type() & call_searched_itable) == call_searched_itable)
 		ddispatch_model.construct_interface_lookup = interface_lookup_searched_itable;
 	else if (oo_get_interface_call_type() == call_itable_indexed)
@@ -540,19 +545,16 @@ static ir_entity *find_method_in_hierachy(ir_entity *method, ir_type *klass)
 }
 
 // Search klass for implementation of method and insert into itable
-static void add_method_to_itable(ir_type *klass, ir_type *interface, ir_entity *method, ir_initializer_t *init, int offset)
+static void add_method_to_itable(ir_type *klass, ir_type *interface,
+                                 ir_entity *method, ir_initializer_t *init,
+                                 int offset)
 {
 	ir_entity *implementation = find_method_in_hierachy(method, klass);
 
-	ir_graph *const_code = get_const_code_irg();
-	ident *id;
-	if (oo_get_method_is_abstract(implementation)) {
-		id = ddispatch_model.abstract_method_ident;
-	} else {
-		id = get_entity_ld_ident(implementation);
-	}
-
-	ir_entity *bound = create_compilerlib_entity(id, get_entity_type(implementation));
+	ir_graph  *const_code = get_const_code_irg();
+	ir_entity *bound = oo_get_method_is_abstract(implementation)
+	                 ? ddispatch_model.abstract_method_entity
+	                 : implementation;
 	ir_node *symconst_node = new_r_Address(const_code, bound);
 	ir_initializer_t *val = create_initializer_const(symconst_node);
 	set_initializer_compound_value(init, offset, val);
@@ -921,7 +923,10 @@ void ddispatch_setup_vtable(ir_type *klass)
 		if (is_method_entity(member)) {
 			int member_vtid = oo_get_method_vtable_index(member);
 			if (member_vtid != -1) {
-				ir_node *symconst_node = new_r_Address(const_code, member);
+				ir_entity *dest = oo_get_method_is_abstract(member)
+				                ? ddispatch_model.abstract_method_entity
+				                : member;
+				ir_node *symconst_node = new_r_Address(const_code, dest);
 				ir_initializer_t *val = create_initializer_const(symconst_node);
 				set_initializer_compound_value (init, member_vtid+ddispatch_model.vptr_points_to_index, val);
 			}
@@ -1055,10 +1060,10 @@ void ddispatch_set_interface_lookup_constructor(construct_interface_lookup_t fun
 	ddispatch_model.construct_interface_lookup = func;
 }
 
-void ddispatch_set_abstract_method_ident(ident* ami)
+void ddispatch_set_abstract_method_entity(ir_entity *entity)
 {
-	assert (ami);
-	ddispatch_model.abstract_method_ident = ami;
+	assert(entity != NULL);
+	ddispatch_model.abstract_method_entity = entity;
 }
 
 unsigned ddispatch_get_vptr_points_to_index(void)
