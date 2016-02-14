@@ -183,7 +183,7 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	            cur_mem        = new_r_Proj(vptr_load, mode_M, pn_Load_M);
 
 	// second, calculate the position of the RTTI ref in relation to the target of vptr and dereference it.
-	int         offset         = (ddispatch_model.index_of_rtti_ptr - ddispatch_model.vptr_points_to_index) * get_type_size_bytes(type_reference);
+	int         offset         = (ddispatch_model.index_of_rtti_ptr - ddispatch_model.vptr_points_to_index) * get_type_size(type_reference);
 	ir_mode    *mode_offset    = get_reference_offset_mode(mode_P);
 	ir_node    *ci_offset      = new_r_Const_long(irg, mode_offset, offset);
 	ir_node    *ci_add         = new_r_Add(block, vtable_addr, ci_offset, mode_P);
@@ -231,7 +231,7 @@ static ir_node *interface_lookup_indexed(ir_node *objptr, ir_type *iface, ir_ent
 	ir_type   *type_unknown = get_unknown_type();
 	ir_type   *itt_type     = type_unknown;
 
-	unsigned type_ref_size  = get_type_size_bytes(type_reference);
+	unsigned type_ref_size  = get_type_size(type_reference);
 	ir_mode *mode_offset    = get_reference_offset_mode(mode_reference);
 
 	// Load vtable
@@ -249,7 +249,7 @@ static ir_node *interface_lookup_indexed(ir_node *objptr, ir_type *iface, ir_ent
 	ir_node   *itt_mem      = new_r_Proj(itt_load, mode_M, pn_Load_M);
 
 	// Compute and load itable address
-	unsigned   entry_size   = get_type_size_bytes(ddispatch_get_itt_entry_type());
+	unsigned   entry_size   = get_type_size(ddispatch_get_itt_entry_type());
 	unsigned   it_id        = ddispatch_get_itable_index(iface);
 	ir_node   *it_offset    = new_r_Const_long(irg, mode_offset, it_id * entry_size);
 	ir_node   *it_ptr_addr  = new_r_Add(block, itt_addr, it_offset, mode_reference);
@@ -567,11 +567,11 @@ static ir_entity* create_itable(ir_type *klass, ir_type *interface) {
 
 	// Create itable and initializer
 	ident *itable_ident = id_unique("itable_%u");
-	unsigned type_reference_size = get_type_size_bytes(type_reference);
+	unsigned type_reference_size = get_type_size(type_reference);
 	ir_type *itable_type = new_type_array(type_reference);
 	size_t itable_ent_size = itable_size;
 	set_array_size_int(itable_type, itable_ent_size);
-	set_type_size_bytes(itable_type, type_reference_size * itable_ent_size);
+	set_type_size(itable_type, type_reference_size * itable_ent_size);
 	set_type_state(itable_type, layout_fixed);
 
 	ir_type    *unknown      = get_unknown_type();
@@ -617,10 +617,10 @@ static ir_initializer_t *create_itt(ir_type *klass, size_t size)
 {
 	// Create ITT and initializer
 	ir_type *entry_type = ddispatch_get_itt_entry_type();
-	unsigned type_reference_size = get_type_size_bytes(entry_type);
+	unsigned type_reference_size = get_type_size(entry_type);
 	ir_type *itt_type = new_type_array(entry_type);
 	set_array_size_int(itt_type, size);
-	set_type_size_bytes(itt_type, type_reference_size * size);
+	set_type_size(itt_type, type_reference_size * size);
 	set_type_state(itt_type, layout_fixed);
 
 	ir_type    *glob         = get_glob_type();
@@ -890,11 +890,11 @@ void ddispatch_setup_vtable(ir_type *klass)
 	oo_set_class_vtable_size(klass, vtable_size);
 
 	// the vtable currently is an array of pointers
-	unsigned type_reference_size = get_type_size_bytes(type_reference);
+	unsigned type_reference_size = get_type_size(type_reference);
 	ir_type *vtable_type = new_type_array(type_reference);
 	size_t vtable_ent_size = vtable_size + ddispatch_model.vptr_points_to_index;
 	set_array_size_int(vtable_type, vtable_ent_size);
-	set_type_size_bytes(vtable_type, type_reference_size * vtable_ent_size);
+	set_type_size(vtable_type, type_reference_size * vtable_ent_size);
 	set_type_state(vtable_type, layout_fixed);
 	set_entity_type(vtable, vtable_type);
 	set_entity_alignment(vtable, 32);
@@ -991,7 +991,7 @@ void ddispatch_lower_Call(ir_node* call)
 		int        vtable_id    = oo_get_method_vtable_index(method);
 		assert(vtable_id != -1);
 
-		unsigned type_ref_size  = get_type_size_bytes(type_reference);
+		unsigned type_ref_size  = get_type_size(type_reference);
 		ir_mode *mode_offset    = get_reference_offset_mode(mode_reference);
 		ir_node *vtable_offset  = new_r_Const_long(irg, mode_offset, vtable_id * type_ref_size);
 		ir_node *funcptr_addr   = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
@@ -1030,7 +1030,7 @@ void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *obj
 	if (vtable_entity) {
 		ir_node   *vtable_symconst = new_r_Address(irg, vtable_entity);
 		ir_mode   *mode_offset     = get_reference_offset_mode(mode_reference);
-		long       offset          = ddispatch_model.vptr_points_to_index * get_type_size_bytes(type_reference);
+		long       offset          = ddispatch_model.vptr_points_to_index * get_type_size(type_reference);
 		ir_node   *const_offset    = new_r_Const_long(irg, mode_offset, offset);
 		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset, mode_reference);
 	} else {

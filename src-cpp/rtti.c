@@ -120,7 +120,7 @@ static void init_rtti_firm_types(void)
 	/* I'd really like to use the following assert, unfortunately it is
 	 * useless when we are cross-compiling. And I see no easy way at the
 	 * moment to check wether we are.
-	 * assert(get_type_size_bytes(class_info) == sizeof(class_info_t));
+	 * assert(get_type_size(class_info) == sizeof(class_info_t));
 	 */
 
 	id = new_id_from_str("method_info$");
@@ -130,7 +130,7 @@ static void init_rtti_firm_types(void)
 	id = new_id_from_str("method_info_funcptr");
 	method_info_funcptr = new_entity(method_info, id, type_reference);
 	default_layout_compound_type(method_info);
-	/* assert(get_type_size_bytes(method_info) == sizeof(method_info_t)); */
+	/* assert(get_type_size(method_info) == sizeof(method_info_t)); */
 
 	method_info_array = new_type_array(method_info);
 	set_array_variable_size(method_info_array, 1);
@@ -145,7 +145,7 @@ static void init_rtti_firm_types(void)
 	string_const_data = new_entity(string_const, id, type_char_array);
 	set_compound_variable_size(string_const, 1);
 	default_layout_compound_type(string_const);
-	/* assert(get_type_size_bytes(string_const) == sizeof(string_const_t)); */
+	/* assert(get_type_size(string_const) == sizeof(string_const_t)); */
 
 	reference_array = new_type_array(type_reference);
 	set_array_variable_size(reference_array, 1);
@@ -403,7 +403,7 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 	            cur_mem      = new_r_Proj(vptr_load, mode_M, pn_Load_M);
 
 	// second, calculate the position of the RTTI ref in relation to the target of vptr and dereference it.
-	int         offset       = (ddispatch_get_index_of_rtti_ptr() - ddispatch_get_vptr_points_to_index()) * get_type_size_bytes(type_reference);
+	int         offset       = (ddispatch_get_index_of_rtti_ptr() - ddispatch_get_vptr_points_to_index()) * get_type_size(type_reference);
 	ir_mode    *mode_offset  = get_reference_offset_mode(mode_P);
 	ir_node    *obj_ci_offset= new_r_Const_long(irg, mode_offset, offset);
 	ir_node    *obj_ci_add   = new_r_Add(block, vtable_addr, obj_ci_offset, mode_P);
