@@ -47,6 +47,7 @@ endif
 BUILDDIR=build
 RUNTIME_BUILDDIR=$(BUILDDIR)/$(TARGET)
 GOAL = $(BUILDDIR)/liboo$(DLLEXT)
+GOAL_STATIC = $(BUILDDIR)/liboo.a
 GOAL_RT_SHARED = $(RUNTIME_BUILDDIR)/liboo_rt$(DLLEXT)
 GOAL_RT_STATIC = $(RUNTIME_BUILDDIR)/liboo_rt.a
 # We only need a static runtime lib for invasic targets
@@ -73,7 +74,7 @@ Q ?= @
 
 .PHONY: all runtime clean
 
-all: $(GOAL) runtime
+all: $(GOAL) $(GOAL_STATIC) runtime
 
 runtime: $(GOAL_RT_SHARED) $(GOAL_RT_STATIC)
 
@@ -101,6 +102,10 @@ src-cpp/% : $(FIRM_HOME)/scripts/templates/% $(IR_SPEC_GENERATOR_DEPS) $(SPECFIL
 $(GOAL): $(OBJECTS)
 	@echo '===> LD $@'
 	$(Q)$(CC) -shared -o $@ $^ $(LFLAGS) $(LIBFIRM_LFLAGS)
+
+$(GOAL_STATIC): $(OBJECTS)
+	@echo '===> AR $@'
+	$(Q)$(AR) -cr $@ $^
 
 $(GOAL_RT_SHARED): $(OBJECTS_RT_SHARED)
 	@echo '===> LD $@'
