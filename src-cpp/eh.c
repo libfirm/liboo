@@ -67,6 +67,12 @@ void eh_deinit(void)
 	obstack_free(&lpads, NULL);
 }
 
+static void add_handler_header_block_pred(lpad_t *lpad, ir_node *pred)
+{
+	add_immBlock_pred(lpad->handler_header_block, pred);
+	lpad->used = true;
+}
+
 void eh_start_method(void)
 {
 	assert (irg_is_constrained(get_current_ir_graph(), IR_GRAPH_CONSTRAINT_CONSTRUCTION));
@@ -142,15 +148,13 @@ ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type*
 	cur_mem               = new_Proj(call, mode_M, pn_Call_M);
 	set_store(cur_mem);
 
-	add_immBlock_pred(top->handler_header_block, proj_except);
+	add_handler_header_block_pred(top, proj_except);
 
 	ir_node *proj_regular = new_Proj(call, mode_X, pn_Call_X_regular);
 	ir_node *new_block    = new_immBlock();
 	add_immBlock_pred(new_block, proj_regular);
 	mature_immBlock(new_block);
 	set_cur_block(new_block);
-
-	top->used = true;
 
 	return call;
 }
@@ -161,8 +165,7 @@ void eh_throw(ir_node *exo_ptr)
 
 	ir_node *throw = new_Jmp();
 
-	add_immBlock_pred(top->handler_header_block, throw);
-	top->used = true;
+	add_handler_header_block_pred(top, throw);
 	set_cur_block(NULL);
 }
 
@@ -180,8 +183,8 @@ void eh_pop_lpad(void)
 		ir_node *saved_block = get_cur_block();
 		set_cur_block(top->cur_block);
 
-		ir_node *jmp         = new_Jmp();
-		add_immBlock_pred(prev->handler_header_block, jmp);
+		ir_node *jmp = new_Jmp();
+		add_handler_header_block_pred(prev, jmp);
 
 		set_cur_block(saved_block);
 	}
