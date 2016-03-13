@@ -7,7 +7,7 @@ INSTALL ?= install
 DLLEXT ?= .so
 CC ?= gcc
 AR ?= ar
-CFLAGS ?= -O0 -g3
+CFLAGS ?= -O0 -g3 -fexceptions
 
 guessed_target := $(shell $(CC) -dumpmachine)
 TARGET         ?= $(guessed_target)
@@ -55,7 +55,7 @@ ifeq ($(findstring invasic, $(TARGET)), invasic)
 	GOAL_RT_SHARED =
 endif
 CPPFLAGS = -I. -I./include/ $(LIBFIRM_CPPFLAGS) $(LIBUNWIND_CPPFLAGS)
-CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic -DLIBOO_EXCEPTION_SUPPORT
 # disabled the following warnings for now. They fail on OS/X Snow Leopard:
 # the first one gives false positives because of system headers, the later one
 # doesn't exist in the old gcc there
