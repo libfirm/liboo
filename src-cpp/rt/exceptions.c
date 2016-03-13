@@ -29,8 +29,8 @@ static void oo_rt_unwind(void)
 
 		if (pi.lsda != 0 && (void (*)(void*))pi.handler == firm_personality) {
 			lsda_t *lsda = (lsda_t*) pi.lsda;
-			for (unsigned i = 0; i < lsda->n_entries; i++) {
-				if (ip == (unsigned)lsda->entries[i].ip) {
+			for (uint64_t i = 0; i < lsda->n_entries; i++) {
+				if (ip == lsda->entries[i].ip) {
 					unw_set_reg(&cursor, UNW_REG_IP, (unw_word_t)lsda->entries[i].handler);
 					unw_resume(&cursor);
 				}
@@ -45,9 +45,10 @@ void firm_personality(void *exception_object)
 	__oo_rt_exception_object__ = exception_object;
 	oo_rt_unwind();
 
-	fprintf(stderr, "UNCAUGHT EXCEPTION 0x%p\n", exception_object);
+	fprintf(stderr, "UNCAUGHT EXCEPTION %p\n", exception_object);
 	abort();
 }
+
 #else
 extern void liboo_dummy_func(void);
 void liboo_dummy_func(void)
