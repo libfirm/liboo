@@ -35,12 +35,12 @@ struct class_info_t {
 typedef struct class_info_t class_info_t;
 
 typedef struct {
-	void *ip;
-	void *handler;
+	uint64_t ip;
+	uint64_t handler;
 } lsda_entry_t;
 
 typedef struct {
-	uint32_t n_entries;
+	uint64_t n_entries;
 	lsda_entry_t entries[1];
 } lsda_t;
 
