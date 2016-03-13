@@ -12,7 +12,7 @@
 
 extern void firm_personality(void *exception_object);
 
-extern __thread void *__oo_rt_exception_object__;
+extern void *__oo_rt_exception_object__;
 
 static void oo_rt_unwind(void)
 {
