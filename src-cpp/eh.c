@@ -27,26 +27,24 @@ static ir_entity *throw_entity;
 
 ir_node *eh_get_exception_object(void)
 {
-	ir_node *cur_mem = get_store();
-
-	ir_node *ex_symc = new_Address(exception_object_entity);
-	ir_node *ex_load = new_Load(cur_mem, ex_symc, mode_P, cons_none);
-	cur_mem          = new_Proj(ex_load, mode_M, pn_Load_M);
-	ir_node *ex_obj  = new_Proj(ex_load, mode_P, pn_Load_res);
-
-	set_store(cur_mem);
+	ir_node *const cur_mem  = get_store();
+	ir_node *const ex_addr  = new_Address(exception_object_entity);
+	ir_type *const void_ptr = new_type_pointer(new_type_primitive(mode_ANY));
+	ir_node *const ex_load  = new_Load(cur_mem, ex_addr, mode_P, void_ptr, cons_none);
+	ir_node *const new_mem  = new_Proj(ex_load, mode_M, pn_Load_M);
+	ir_node *const ex_obj   = new_Proj(ex_load, mode_P, pn_Load_res);
+	set_store(new_mem);
 	return ex_obj;
 }
 
 static void store_exception_object(ir_node *exo_ptr)
 {
-	ir_node *cur_mem  = get_store();
-
-	ir_node *ex_symc  = new_Address(exception_object_entity);
-	ir_node *ex_store = new_Store(cur_mem, ex_symc, exo_ptr, cons_none);
-	cur_mem           = new_Proj(ex_store, mode_M, pn_Store_M);
-
-	set_store(cur_mem);
+	ir_node *const cur_mem  = get_store();
+	ir_node *const ex_addr  = new_Address(exception_object_entity);
+	ir_type *const void_ptr = new_type_pointer(new_type_primitive(mode_ANY));
+	ir_node *const ex_store = new_Store(cur_mem, ex_addr, exo_ptr, void_ptr, cons_none);
+	ir_node *const new_mem  = new_Proj(ex_store, mode_M, pn_Store_M);
+	set_store(new_mem);
 }
 
 void eh_init(void)
@@ -223,18 +221,21 @@ void eh_lower_Raise(ir_node *raise, ir_node *proj)
 {
 	assert (is_Raise(raise) && is_Proj(proj));
 
-	ir_node  *ex_obj  = get_Raise_exo_ptr(raise);
-	ir_node  *block   = get_nodes_block(raise);
-	ir_graph *irg     = get_irn_irg(raise);
-	ir_node  *cur_mem = get_Raise_mem(raise);
+	ir_graph *const irg     = get_irn_irg(raise);
+	ir_node  *const block   = get_nodes_block(raise);
 
-	ir_node  *c_symc  = new_r_SymConst(irg, throw_entity);
-	ir_node  *in[1]   = { ex_obj };
+	/* Call "firm_personality(exception_object)" */
+	ir_node  *const ex_obj  = get_Raise_exo_ptr(raise);
+	ir_node  *const cur_mem = get_Raise_mem(raise);
+	ir_node  *const throw_entity_addr  = new_r_Address(irg, throw_entity);
+	ir_node  *const in[1]   = { ex_obj };
+	ir_node  *const throw   = new_r_Call(block, cur_mem, throw_entity_addr, 1, in, get_entity_type(throw_entity));
+	ir_set_needs_reloaded_callee_saves(throw, true);
 
-	ir_node  *throw   = new_r_Call(block, cur_mem, c_symc, 1, in, get_entity_type(throw_entity));
-	ir_set_throws_exception(throw, 1);
 	exchange(raise, throw);
+	ir_set_throws_exception(throw, 1);
 	set_Proj_num(proj, pn_Call_X_except);
+
 }
 
 #else
