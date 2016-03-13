@@ -1,21 +1,26 @@
 #ifdef LIBOO_EXCEPTION_SUPPORT
-#define UNW_LOCAL_ONLY
+
 /* Workaround for buggy glibcs. */
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#undef _DEFAULT_SOURCE
+#include <stdlib.h>
+#include <assert.h>
+
+#define UNW_LOCAL_ONLY
 #include <libunwind.h>
-#undef _BSD_SOURCE
 
 #include "liboo/rts_types.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
 
 extern void firm_personality(void *exception_object);
 
 extern void *__oo_rt_exception_object__;
 
-static void oo_rt_unwind(void)
+__attribute__ ((unused))
+void firm_personality(void *exception_object)
 {
+	__oo_rt_exception_object__ = exception_object;
+
 	unw_cursor_t cursor; unw_context_t uc;
 	unw_word_t ip;
 	unw_proc_info_t pi;
@@ -37,13 +42,6 @@ static void oo_rt_unwind(void)
 			}
 		}
 	}
-}
-
-__attribute__ ((unused))
-void firm_personality(void *exception_object)
-{
-	__oo_rt_exception_object__ = exception_object;
-	oo_rt_unwind();
 
 	fprintf(stderr, "UNCAUGHT EXCEPTION %p\n", exception_object);
 	abort();
