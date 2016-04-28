@@ -7,8 +7,6 @@ import java.nio.Buffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
-import firm.nodes.Node;
-
 public class RTA {
 	public static void runRTA(Entity[] entrypoints, Type[] initialLiveClasses) {
 		binding_rta.rta_optimization(getBufferFromArray(entrypoints, true), getBufferFromArray(initialLiveClasses, true));
