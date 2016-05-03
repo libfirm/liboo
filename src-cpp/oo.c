@@ -539,7 +539,6 @@ static void lower_type(ir_type *type, void *env)
 					 * interfaces cannot own methods. This skipping should happen
 					 * exactly for the Any methods.
 					 */
-					//printf("skip '%s'\n", gdb_node_helper(entity));
 					remove_compound_member(type, entity); // TODO free_entity?
 				} else {
 					assert (!oo_get_method_is_abstract(entity));
