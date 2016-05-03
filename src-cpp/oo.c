@@ -519,39 +519,39 @@ static void lower_type(ir_type *type, void *env)
 	assert(is_Class_type(type));
 
 	ir_type *glob = get_glob_type();
-	if (type != glob) {
-		int n_members = get_class_n_members(type);
+	if (type == glob)
+		return;
 
-		for (int m = n_members-1; m >= 0; m--) {
-			ir_entity *entity = get_class_member(type, m);
-			ident *ld_name = get_entity_ld_ident(entity);
-			if (is_method_entity(entity)) {
-				if (oo_get_method_is_abstract(entity))
-					continue;
-				ir_entity *ge = ir_get_global(ld_name);
-				if (NULL != ge) {
-					/* There is already an entity in global with this name.
-					 * Assume that it is actually the same.
-					 *
-					 * We need this behavior for x10i, because there is no Object class,
-					 * where every class derives from and which owns methods like
-					 * hashCode. Instead there is an Any interface at the top and
-					 * interfaces cannot own methods. This skipping should happen
-					 * exactly for the Any methods.
-					 */
-					remove_compound_member(type, entity); // TODO free_entity?
-				} else {
-					assert (!oo_get_method_is_abstract(entity));
-					set_entity_owner(entity, glob);
-				}
-				/* When changing the entity owner type, the overwrites
-				 * information becomes nonsensical and invalid. */
-				const size_t n_overwrites = get_entity_n_overwrites(entity);
-				for (size_t i = 0; i < n_overwrites; ++i) {
-					ir_entity *over = get_entity_overwrites(entity, 0);
-					remove_entity_overwrites(entity, over);
-				}
-			}
+	int n_members = get_class_n_members(type);
+	for (int m = n_members-1; m >= 0; m--) {
+		ir_entity *entity = get_class_member(type, m);
+		if (!is_method_entity(entity))
+			continue;
+		if (oo_get_method_is_abstract(entity))
+			continue;
+		ident     *ld_name = get_entity_ld_ident(entity);
+		ir_entity *ge      = ir_get_global(ld_name);
+		if (NULL != ge) {
+			/* There is already an entity in global with this name.
+			 * Assume that it is actually the same.
+			 *
+			 * We need this behavior for x10i, because there is no Object class,
+			 * where every class derives from and which owns methods like
+			 * hashCode. Instead there is an Any interface at the top and
+			 * interfaces cannot own methods. This skipping should happen
+			 * exactly for the Any methods.
+			 */
+			remove_compound_member(type, entity); // TODO free_entity?
+		} else {
+			assert (!oo_get_method_is_abstract(entity));
+			set_entity_owner(entity, glob);
+		}
+		/* When changing the entity owner type, the overwrites
+		 * information becomes nonsensical and invalid. */
+		const size_t n_overwrites = get_entity_n_overwrites(entity);
+		for (size_t i = 0; i < n_overwrites; ++i) {
+			ir_entity *over = get_entity_overwrites(entity, 0);
+			remove_entity_overwrites(entity, over);
 		}
 	}
 }
