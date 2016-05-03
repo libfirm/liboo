@@ -527,8 +527,6 @@ static void lower_type(ir_type *type, void *env)
 		ir_entity *entity = get_class_member(type, m);
 		if (!is_method_entity(entity))
 			continue;
-		if (oo_get_method_is_abstract(entity))
-			continue;
 		ident     *ld_name = get_entity_ld_ident(entity);
 		ir_entity *ge      = ir_get_global(ld_name);
 		if (NULL != ge) {
@@ -543,7 +541,6 @@ static void lower_type(ir_type *type, void *env)
 			 */
 			remove_compound_member(type, entity); // TODO free_entity?
 		} else {
-			assert (!oo_get_method_is_abstract(entity));
 			set_entity_owner(entity, glob);
 		}
 		/* When changing the entity owner type, the overwrites
