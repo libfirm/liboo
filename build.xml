@@ -10,6 +10,9 @@
 	<property name="libfirm.location" value="${basedir}/../libfirm"/>
 	<property name="make.exe" value="make"/>
 	<property name="liboo.location" value="${x10.home}/liboo"/>
+	<condition property="buildvariant" value="${VARIANT}" else="debug">
+		<isset property="VARIANT"/>
+	</condition>
 
 	<path id="project.classpath">
 		<path refid="jfirm.classpath"/>
@@ -30,7 +33,7 @@
 		<echo file="${basedir}/config.mak">
 			FIRM_HOME        = ../libfirm
 			LIBFIRM_CPPFLAGS = -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
-			LIBFIRM_LFLAGS   = -L$(FIRM_HOME)/build/debug -lfirm
+			LIBFIRM_LFLAGS   = -L$(FIRM_HOME)/build/$(variant) -lfirm
 		</echo>
 	</target>
 
@@ -40,21 +43,26 @@
 	<target name="clean-default" unless="TARGET">
 		<exec executable="${make.exe}" failonerror="false" dir="${basedir}">
 			<arg value="clean"/>
+			<arg value="variant=${buildvariant}"/>
 		</exec>
 	</target>
 	<target name="clean-target" if="TARGET">
 		<exec executable="${make.exe}" failonerror="false" dir="${basedir}">
 			<arg line="TARGET=${TARGET} clean"/>
+			<arg value="variant=${buildvariant}"/>
 		</exec>
 	</target>
 
 	<target name="c-build" depends="c-build-default, c-build-target"/>
 	<target name="c-build-default" depends="c-build-init" unless="TARGET">
-		<exec executable="${make.exe}" failonerror="true" dir="${basedir}"/>
+		<exec executable="${make.exe}" failonerror="true" dir="${basedir}">
+			<arg value="variant=${buildvariant}"/>
+		</exec>
 	</target>
 	<target name="c-build-target" depends="c-build-init" if="TARGET">
 		<exec executable="${make.exe}" failonerror="true" dir="${basedir}">
 			<arg value="TARGET=${TARGET}"/>
+			<arg value="variant=${buildvariant}"/>
 		</exec>
 	</target>
 

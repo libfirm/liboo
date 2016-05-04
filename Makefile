@@ -1,8 +1,10 @@
+variant ?= debug
+
 -include config.mak
 
 FIRM_HOME        ?= ../libfirm
 LIBFIRM_CPPFLAGS ?= -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
-LIBFIRM_LFLAGS   ?= -L$(FIRM_HOME)/build/debug -lfirm
+LIBFIRM_LFLAGS   ?= -L$(FIRM_HOME)/build/$(variant) -lfirm
 INSTALL ?= install
 DLLEXT ?= .so
 CC ?= gcc
