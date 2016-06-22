@@ -4,7 +4,7 @@ package firm.bindings;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 
-public class binding_oo {
+public class binding_eh {
 	static {
 		Native.register("oo");
 	}
@@ -2912,158 +2912,26 @@ public class binding_oo {
 		}
 	}
 
-	public static enum ddispatch_binding {
-		bind_unknown(),
-		bind_static(),
-		bind_dynamic(),
-		bind_interface();
-		public final int val;
 
-		private static class C {
-			static int next_val;
-		}
+	public static native void eh_init();
 
-		ddispatch_binding(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
+	public static native void eh_deinit();
 
-		ddispatch_binding() {
-			this.val = C.next_val++;
-		}
+	public static native void eh_start_method();
 
-		public static ddispatch_binding getEnum(int val) {
-			for (ddispatch_binding entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
+	public static native void eh_new_lpad();
 
-	public static enum ddispatch_interface_call {
-		call_runtime_lookup(0),
-		call_searched_itable(1),
-		call_itable_indexed(2),
-		call_move2front(4);
-		public final int val;
+	public static native void eh_add_handler(Pointer catch_type, Pointer block);
 
-		private static class C {
-			static int next_val;
-		}
+	public static native void eh_pop_lpad();
 
-		ddispatch_interface_call(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
+	public static native void eh_end_method();
 
-		ddispatch_interface_call() {
-			this.val = C.next_val++;
-		}
+	public static native Pointer eh_get_exception_object();
 
-		public static ddispatch_interface_call getEnum(int val) {
-			for (ddispatch_interface_call entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
+	public static native Pointer eh_new_Call(Pointer irn_ptr, int arity, java.nio.Buffer in, Pointer catch_type);
 
+	public static native void eh_throw(Pointer exo_ptr);
 
-	public static native void oo_init();
-
-	public static native void oo_deinit();
-
-	public static native void oo_lower();
-
-	public static native void oo_set_interface_call_type(/* ddispatch_interface_call */int type);
-
-	public static native /* ddispatch_interface_call */int oo_get_interface_call_type();
-
-	public static native int oo_get_class_uid(Pointer classtype);
-
-	public static native void oo_set_class_uid(Pointer classtype, int uid);
-
-	public static native Pointer oo_get_class_vtable_entity(Pointer classtype);
-
-	public static native void oo_set_class_vtable_entity(Pointer classtype, Pointer vtable);
-
-	public static native int oo_get_class_vtable_size(Pointer classtype);
-
-	public static native void oo_set_class_vtable_size(Pointer classtype, int vtable_size);
-
-	public static native Pointer oo_get_class_vptr_entity(Pointer classtype);
-
-	public static native void oo_set_class_vptr_entity(Pointer classtype, Pointer vptr);
-
-	public static native Pointer oo_get_class_rtti_entity(Pointer classtype);
-
-	public static native void oo_set_class_rtti_entity(Pointer classtype, Pointer rtti);
-
-	public static native Pointer oo_get_class_itt_entity(Pointer classtype);
-
-	public static native void oo_set_class_itt_entity(Pointer classtype, Pointer itt);
-
-	public static native boolean oo_get_class_is_interface(Pointer classtype);
-
-	public static native void oo_set_class_is_interface(Pointer classtype, boolean is_interface);
-
-	public static native boolean oo_get_class_is_abstract(Pointer classtype);
-
-	public static native void oo_set_class_is_abstract(Pointer classtype, boolean is_abstract);
-
-	public static native boolean oo_get_class_is_final(Pointer classtype);
-
-	public static native void oo_set_class_is_final(Pointer classtype, boolean is_final);
-
-	public static native boolean oo_get_class_is_extern(Pointer classtype);
-
-	public static native void oo_set_class_is_extern(Pointer classtype, boolean is_extern);
-
-	public static native Pointer oo_get_type_link(Pointer type);
-
-	public static native void oo_set_type_link(Pointer type, Pointer link);
-
-	public static native boolean oo_get_method_exclude_from_vtable(Pointer method);
-
-	public static native void oo_set_method_exclude_from_vtable(Pointer method, boolean exclude_from_vtable);
-
-	public static native int oo_get_method_vtable_index(Pointer method);
-
-	public static native void oo_set_method_vtable_index(Pointer method, int vtable_slot);
-
-	public static native boolean oo_get_method_is_abstract(Pointer method);
-
-	public static native void oo_set_method_is_abstract(Pointer method, boolean is_abstract);
-
-	public static native boolean oo_get_method_is_final(Pointer method);
-
-	public static native void oo_set_method_is_final(Pointer method, boolean is_final);
-
-	public static native boolean oo_get_method_is_inherited(Pointer method);
-
-	public static native void oo_set_method_is_inherited(Pointer method, boolean is_inherited);
-
-	public static native boolean oo_get_field_is_transient(Pointer field);
-
-	public static native void oo_set_field_is_transient(Pointer field, boolean is_transient);
-
-	public static native /* ddispatch_binding */int oo_get_entity_binding(Pointer entity);
-
-	public static native void oo_set_entity_binding(Pointer entity, /* ddispatch_binding */int binding);
-
-	public static native Pointer oo_get_entity_link(Pointer entity);
-
-	public static native void oo_set_entity_link(Pointer entity, Pointer link);
-
-	public static native void oo_set_call_is_statically_bound(Pointer call, boolean bind_statically);
-
-	public static native boolean oo_get_call_is_statically_bound(Pointer call);
-
-	public static native Pointer oo_get_class_superclass(Pointer klass);
-
-	public static native Pointer oo_get_entity_overwritten_superclass_entity(Pointer entity);
-
-	public static native void oo_copy_entity_info(Pointer src, Pointer dest);
+	public static native void eh_lower_Raise(Pointer raise, Pointer proj);
 }
