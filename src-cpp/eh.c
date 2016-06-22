@@ -52,6 +52,7 @@ void eh_init(void)
 	obstack_init(&lpads);
 	ir_type *type_reference = new_type_primitive(mode_P);
 	exception_object_entity = new_entity(get_glob_type(), new_id_from_str("__oo_rt_exception_object__"), type_reference);
+	set_entity_visibility(exception_object_entity, ir_visibility_external);
 	set_entity_initializer(exception_object_entity, get_initializer_null());
 
 	ir_type *throw_type = new_type_method(1, 0);
