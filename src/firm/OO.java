@@ -2,7 +2,9 @@ package firm;
 
 import com.sun.jna.Pointer;
 
+import firm.bindings.binding_eh;
 import firm.bindings.binding_oo;
+import firm.nodes.Block;
 import firm.nodes.Node;
 import firm.oo.nodes.Nodes;
 
@@ -216,5 +218,33 @@ public final class OO {
 
 	public static boolean getClassIsFinal(ClassType classType) {
 		return binding_oo.oo_get_class_is_final(classType.ptr);
+	}
+
+	public static void startCatchableMethod() {
+		binding_eh.eh_start_method();
+	}
+
+	public static void pushNewLandingPad() {
+		binding_eh.eh_new_lpad();
+	}
+
+	public static void popLandingPad() {
+		binding_eh.eh_pop_lpad();
+	}
+
+	public static void endCatchableMethod() {
+		binding_eh.eh_end_method();
+	}
+
+	public static void addCatchHandler(ClassType classType, Block block) {
+		binding_eh.eh_add_handler(classType.ptr, block.ptr);
+	}
+
+	public static void endBlockWithThrow(Node excObj) {
+		binding_eh.eh_throw(excObj.ptr);
+	}
+
+	public static Node getExceptionObjectForCurrentLandingPad() {
+		return Node.createWrapper(binding_eh.eh_get_exception_object());
 	}
 }
