@@ -236,8 +236,12 @@ public final class OO {
 		binding_eh.eh_end_method();
 	}
 
-	public static void addCatchHandler(ClassType classType, Block block) {
+	public static void addTypedCatchHandler(ClassType classType, Block block) {
 		binding_eh.eh_add_handler(classType.ptr, block.ptr);
+	}
+
+	public static void addCatchAllHandler(Block block) {
+		binding_eh.eh_add_handler(null, block.ptr);
 	}
 
 	public static void endBlockWithThrow(Node excObj) {
