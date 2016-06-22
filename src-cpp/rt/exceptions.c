@@ -14,12 +14,12 @@
 
 extern void firm_personality(void *exception_object);
 
-extern void *__oo_rt_exception_object__;
+//extern void *__oo_rt_exception_object__;
 
 __attribute__ ((unused))
 void firm_personality(void *exception_object)
 {
-	__oo_rt_exception_object__ = exception_object;
+	//__oo_rt_exception_object__ = exception_object;
 
 	unw_cursor_t cursor; unw_context_t uc;
 	unw_word_t ip;
