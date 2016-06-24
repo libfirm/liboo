@@ -566,7 +566,7 @@ static ir_entity* create_itable(ir_type *klass, ir_type *interface) {
 	size_t itable_size = count_interface_methods(interface);
 
 	// Create itable and initializer
-	ident *itable_ident = id_unique("itable_%u");
+	ident *itable_ident = id_unique("itable_");
 	unsigned type_reference_size = get_type_size(type_reference);
 	ir_type *itable_type = new_type_array(type_reference);
 	size_t itable_ent_size = itable_size;
@@ -624,7 +624,7 @@ static ir_initializer_t *create_itt(ir_type *klass, size_t size)
 	set_type_state(itt_type, layout_fixed);
 
 	ir_type    *glob         = get_glob_type();
-	ir_entity  *itable_table = new_entity(glob, id_unique("itt_%u"), type_char);
+	ir_entity  *itable_table = new_entity(glob, id_unique("itt_"), type_char);
 
 	set_entity_type(itable_table, itt_type);
 	set_entity_alignment(itable_table, 32);
@@ -764,7 +764,7 @@ void ddispatch_setup_itable(ir_type *klass)
 		ir_initializer_t *init = get_initializer_null();
 		ir_entity *node = new_entity(
 				get_glob_type(),
-				id_unique("itable_table_name_%u"),
+				id_unique("itable_table_name_"),
 				type_char);
 		entry->comdat_node = node;
 		add_entity_linkage(node, IR_LINKAGE_MERGE | IR_LINKAGE_GARBAGE_COLLECT);

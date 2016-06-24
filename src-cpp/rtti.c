@@ -194,7 +194,7 @@ ir_entity *rtti_emit_string_const(const char *string)
 	set_initializer_compound_value(initializer, i++, data_init);
 	assert(i == n_members);
 
-	ident     *id     = id_unique("rtti_string_%u");
+	ident     *id     = id_unique("rtti_string_");
 	ir_type   *glob   = get_glob_type();
 	ir_entity *entity = new_entity(glob, id, string_const);
 	set_entity_visibility(entity, ir_visibility_private);
@@ -253,7 +253,7 @@ static ir_entity *create_method_table(ir_type *klass, size_t n_methods)
 	}
 	assert(i == n_methods);
 
-	ident     *id     = id_unique("rtti_mt_%u");
+	ident     *id     = id_unique("rtti_mt_");
 	ir_type   *glob   = get_glob_type();
 	ir_entity *entity = new_entity(glob, id, method_info_array);
 	set_entity_visibility(entity, ir_visibility_private);
@@ -280,7 +280,7 @@ static ir_entity *create_interface_table(ir_type *klass, size_t n_interfaces)
 	}
 	assert(i == n_interfaces);
 
-	ident     *id     = id_unique("rtti_it_%u");
+	ident     *id     = id_unique("rtti_it_");
 	ir_type   *glob   = get_glob_type();
 	ir_entity *entity = new_entity(glob, id, reference_array);
 	set_entity_visibility(entity, ir_visibility_private);
