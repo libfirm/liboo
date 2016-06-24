@@ -406,7 +406,7 @@ ir_node *rtti_default_construct_instanceof(ir_node *objptr, ir_type *klass, ir_g
 	int         offset       = (ddispatch_get_index_of_rtti_ptr() - ddispatch_get_vptr_points_to_index()) * get_type_size(type_reference);
 	ir_mode    *mode_offset  = get_reference_offset_mode(mode_P);
 	ir_node    *obj_ci_offset= new_r_Const_long(irg, mode_offset, offset);
-	ir_node    *obj_ci_add   = new_r_Add(block, vtable_addr, obj_ci_offset, mode_P);
+	ir_node    *obj_ci_add   = new_r_Add(block, vtable_addr, obj_ci_offset);
 	ir_node    *obj_ci_load  = new_r_Load(block, cur_mem, obj_ci_add, mode_P, vptr_type, cons_none);
 	ir_node    *obj_ci_ref   = new_r_Proj(obj_ci_load, mode_P, pn_Load_res);
 	            cur_mem      = new_r_Proj(obj_ci_load, mode_M, pn_Load_M);

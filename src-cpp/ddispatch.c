@@ -186,7 +186,7 @@ static ir_node *default_interface_lookup_method(ir_node *objptr, ir_type *iface,
 	int         offset         = (ddispatch_model.index_of_rtti_ptr - ddispatch_model.vptr_points_to_index) * get_type_size(type_reference);
 	ir_mode    *mode_offset    = get_reference_offset_mode(mode_P);
 	ir_node    *ci_offset      = new_r_Const_long(irg, mode_offset, offset);
-	ir_node    *ci_add         = new_r_Add(block, vtable_addr, ci_offset, mode_P);
+	ir_node    *ci_add         = new_r_Add(block, vtable_addr, ci_offset);
 	ir_node    *ci_load        = new_r_Load(block, cur_mem, ci_add, mode_P, vptr_type, cons_none);
 	ir_node    *ci_ref         = new_r_Proj(ci_load, mode_P, pn_Load_res);
 	            cur_mem        = new_r_Proj(ci_load, mode_M, pn_Load_M);
@@ -242,7 +242,7 @@ static ir_node *interface_lookup_indexed(ir_node *objptr, ir_type *iface, ir_ent
 
 	// Compute and load ITT address
 	ir_node   *itt_offset   = new_r_Const_long(irg, mode_offset, 1 * type_ref_size);
-	ir_node   *itt_ptr_addr = new_r_Add(block, vtable_addr, itt_offset, mode_reference);
+	ir_node   *itt_ptr_addr = new_r_Add(block, vtable_addr, itt_offset);
 
 	ir_node   *itt_load     = new_r_Load(block, vtable_mem, itt_ptr_addr, mode_reference, itt_type, cons_none);
 	ir_node   *itt_addr     = new_r_Proj(itt_load, mode_reference, pn_Load_res);
@@ -252,7 +252,7 @@ static ir_node *interface_lookup_indexed(ir_node *objptr, ir_type *iface, ir_ent
 	unsigned   entry_size   = get_type_size(ddispatch_get_itt_entry_type());
 	unsigned   it_id        = ddispatch_get_itable_index(iface);
 	ir_node   *it_offset    = new_r_Const_long(irg, mode_offset, it_id * entry_size);
-	ir_node   *it_ptr_addr  = new_r_Add(block, itt_addr, it_offset, mode_reference);
+	ir_node   *it_ptr_addr  = new_r_Add(block, itt_addr, it_offset);
 
 	ir_node   *it_load      = new_r_Load(block, itt_mem, it_ptr_addr, mode_reference, vptr_type, cons_none);
 	ir_node   *it_addr      = new_r_Proj(it_load, mode_reference, pn_Load_res);
@@ -260,7 +260,7 @@ static ir_node *interface_lookup_indexed(ir_node *objptr, ir_type *iface, ir_ent
 
 	// Call method
 	ir_node *vtable_offset  = new_r_Const_long(irg, mode_offset, itable_id * type_ref_size);
-	ir_node *funcptr_addr   = new_r_Add(block, it_addr, vtable_offset, mode_reference);
+	ir_node *funcptr_addr   = new_r_Add(block, it_addr, vtable_offset);
 	ir_node *callee_load    = new_r_Load(block, it_mem, funcptr_addr, mode_reference, vptr_type, cons_none);
 	new_res                 = new_r_Proj(callee_load, mode_reference, pn_Load_res);
 	new_mem                 = new_r_Proj(callee_load, mode_M, pn_Load_M);
@@ -985,7 +985,7 @@ void ddispatch_lower_Call(ir_node* call)
 		unsigned type_ref_size  = get_type_size(type_reference);
 		ir_mode *mode_offset    = get_reference_offset_mode(mode_reference);
 		ir_node *vtable_offset  = new_r_Const_long(irg, mode_offset, vtable_id * type_ref_size);
-		ir_node *funcptr_addr   = new_r_Add(block, vtable_addr, vtable_offset, mode_reference);
+		ir_node *funcptr_addr   = new_r_Add(block, vtable_addr, vtable_offset);
 		ir_node *callee_load    = new_r_Load(block, vtable_mem, funcptr_addr, mode_reference, vptr_type, cons_none);
 		new_res                 = new_r_Proj(callee_load, mode_reference, pn_Load_res);
 		new_mem                 = new_r_Proj(callee_load, mode_M, pn_Load_M);
@@ -1023,7 +1023,7 @@ void ddispatch_prepare_new_instance(dbg_info *dbgi, ir_node *block, ir_node *obj
 		ir_mode   *mode_offset     = get_reference_offset_mode(mode_reference);
 		long       offset          = ddispatch_model.vptr_points_to_index * get_type_size(type_reference);
 		ir_node   *const_offset    = new_r_Const_long(irg, mode_offset, offset);
-		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset, mode_reference);
+		vptr_target                = new_rd_Add(dbgi, block, vtable_symconst, const_offset);
 	} else {
 		vptr_target                = new_r_Const_long(irg, mode_P, 0);
 	}

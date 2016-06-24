@@ -20,7 +20,7 @@ ir_node *dmemory_default_get_arraylength(dbg_info *dbgi, ir_node *block,
 	ir_graph *irg         = get_irn_irg(block);
 	int       length_len  = get_mode_size_bytes(default_arraylength_mode);
 	ir_node  *cnst        = new_r_Const_long(irg, mode_P, -length_len);
-	ir_node  *length_addr = new_rd_Add(dbgi, block, objptr, cnst, mode_P);
+	ir_node  *length_addr = new_rd_Add(dbgi, block, objptr, cnst);
 
 	ir_node  *cur_mem     = *mem;
 	ir_type  *length_type = get_type_for_mode(default_arraylength_mode);
