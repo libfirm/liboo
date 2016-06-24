@@ -527,8 +527,7 @@ public class binding_rta {
 		cc_this_call(0x08000000),
 		cc_compound_ret(0x10000000),
 		cc_frame_on_caller_stk(0x20000000),
-		cc_fpreg_param(0x40000000),
-		cc_bits((0xFF << 24));
+		cc_fpreg_param(0x40000000);
 		public final int val;
 
 		private static class C {
@@ -850,7 +849,6 @@ public class binding_rta {
 		dbg_read_after_write(),
 		dbg_read_after_read(),
 		dbg_read_a_const(),
-		dbg_rem_poly_call(),
 		dbg_dead_code(),
 		dbg_opt_confirm(),
 		dbg_gvn_pre(),
@@ -2536,23 +2534,22 @@ public class binding_rta {
 
 	public static enum ir_dump_flags_t {
 		ir_dump_flag_blocks_as_subgraphs((1 << 0)),
-		ir_dump_flag_with_typegraph((1 << 2)),
-		ir_dump_flag_disable_edge_labels((1 << 3)),
-		ir_dump_flag_consts_local((1 << 4)),
-		ir_dump_flag_idx_label((1 << 5)),
-		ir_dump_flag_number_label((1 << 6)),
-		ir_dump_flag_keepalive_edges((1 << 7)),
-		ir_dump_flag_out_edges((1 << 8)),
-		ir_dump_flag_dominance((1 << 9)),
-		ir_dump_flag_loops((1 << 10)),
-		ir_dump_flag_back_edges((1 << 11)),
-		ir_dump_flag_iredges((1 << 13)),
-		ir_dump_flag_node_addresses((1 << 14)),
-		ir_dump_flag_all_anchors((1 << 15)),
-		ir_dump_flag_show_marks((1 << 16)),
-		ir_dump_flag_no_entity_values((1 << 20)),
-		ir_dump_flag_ld_names((1 << 21)),
-		ir_dump_flag_entities_in_hierarchy((1 << 22));
+		ir_dump_flag_with_typegraph((1 << 1)),
+		ir_dump_flag_disable_edge_labels((1 << 2)),
+		ir_dump_flag_consts_local((1 << 3)),
+		ir_dump_flag_idx_label((1 << 4)),
+		ir_dump_flag_number_label((1 << 5)),
+		ir_dump_flag_keepalive_edges((1 << 6)),
+		ir_dump_flag_out_edges((1 << 7)),
+		ir_dump_flag_dominance((1 << 8)),
+		ir_dump_flag_loops((1 << 9)),
+		ir_dump_flag_back_edges((1 << 10)),
+		ir_dump_flag_iredges((1 << 11)),
+		ir_dump_flag_all_anchors((1 << 12)),
+		ir_dump_flag_show_marks((1 << 13)),
+		ir_dump_flag_no_entity_values((1 << 14)),
+		ir_dump_flag_ld_names((1 << 15)),
+		ir_dump_flag_entities_in_hierarchy((1 << 16));
 		public final int val;
 
 		private static class C {

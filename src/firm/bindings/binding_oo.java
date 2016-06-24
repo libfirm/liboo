@@ -527,8 +527,7 @@ public class binding_oo {
 		cc_this_call(0x08000000),
 		cc_compound_ret(0x10000000),
 		cc_frame_on_caller_stk(0x20000000),
-		cc_fpreg_param(0x40000000),
-		cc_bits((0xFF << 24));
+		cc_fpreg_param(0x40000000);
 		public final int val;
 
 		private static class C {
@@ -850,7 +849,6 @@ public class binding_oo {
 		dbg_read_after_write(),
 		dbg_read_after_read(),
 		dbg_read_a_const(),
-		dbg_rem_poly_call(),
 		dbg_dead_code(),
 		dbg_opt_confirm(),
 		dbg_gvn_pre(),
@@ -2536,23 +2534,22 @@ public class binding_oo {
 
 	public static enum ir_dump_flags_t {
 		ir_dump_flag_blocks_as_subgraphs((1 << 0)),
-		ir_dump_flag_with_typegraph((1 << 2)),
-		ir_dump_flag_disable_edge_labels((1 << 3)),
-		ir_dump_flag_consts_local((1 << 4)),
-		ir_dump_flag_idx_label((1 << 5)),
-		ir_dump_flag_number_label((1 << 6)),
-		ir_dump_flag_keepalive_edges((1 << 7)),
-		ir_dump_flag_out_edges((1 << 8)),
-		ir_dump_flag_dominance((1 << 9)),
-		ir_dump_flag_loops((1 << 10)),
-		ir_dump_flag_back_edges((1 << 11)),
-		ir_dump_flag_iredges((1 << 13)),
-		ir_dump_flag_node_addresses((1 << 14)),
-		ir_dump_flag_all_anchors((1 << 15)),
-		ir_dump_flag_show_marks((1 << 16)),
-		ir_dump_flag_no_entity_values((1 << 20)),
-		ir_dump_flag_ld_names((1 << 21)),
-		ir_dump_flag_entities_in_hierarchy((1 << 22));
+		ir_dump_flag_with_typegraph((1 << 1)),
+		ir_dump_flag_disable_edge_labels((1 << 2)),
+		ir_dump_flag_consts_local((1 << 3)),
+		ir_dump_flag_idx_label((1 << 4)),
+		ir_dump_flag_number_label((1 << 5)),
+		ir_dump_flag_keepalive_edges((1 << 6)),
+		ir_dump_flag_out_edges((1 << 7)),
+		ir_dump_flag_dominance((1 << 8)),
+		ir_dump_flag_loops((1 << 9)),
+		ir_dump_flag_back_edges((1 << 10)),
+		ir_dump_flag_iredges((1 << 11)),
+		ir_dump_flag_all_anchors((1 << 12)),
+		ir_dump_flag_show_marks((1 << 13)),
+		ir_dump_flag_no_entity_values((1 << 14)),
+		ir_dump_flag_ld_names((1 << 15)),
+		ir_dump_flag_entities_in_hierarchy((1 << 16));
 		public final int val;
 
 		private static class C {
@@ -2943,12 +2940,45 @@ public class binding_oo {
 		}
 	}
 
+	public static enum ddispatch_interface_call {
+		call_runtime_lookup(0),
+		call_searched_itable(1),
+		call_itable_indexed(2),
+		call_move2front(4);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ddispatch_interface_call(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ddispatch_interface_call() {
+			this.val = C.next_val++;
+		}
+
+		public static ddispatch_interface_call getEnum(int val) {
+			for (ddispatch_interface_call entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 
 	public static native void oo_init();
 
 	public static native void oo_deinit();
 
 	public static native void oo_lower();
+
+	public static native void oo_set_interface_call_type(/* ddispatch_interface_call */int type);
+
+	public static native /* ddispatch_interface_call */int oo_get_interface_call_type();
 
 	public static native int oo_get_class_uid(Pointer classtype);
 
@@ -2969,6 +2999,10 @@ public class binding_oo {
 	public static native Pointer oo_get_class_rtti_entity(Pointer classtype);
 
 	public static native void oo_set_class_rtti_entity(Pointer classtype, Pointer rtti);
+
+	public static native Pointer oo_get_class_itt_entity(Pointer classtype);
+
+	public static native void oo_set_class_itt_entity(Pointer classtype, Pointer itt);
 
 	public static native boolean oo_get_class_is_interface(Pointer classtype);
 
@@ -3031,8 +3065,4 @@ public class binding_oo {
 	public static native Pointer oo_get_entity_overwritten_superclass_entity(Pointer entity);
 
 	public static native void oo_copy_entity_info(Pointer src, Pointer dest);
-
-	public static native void oo_set_interface_call_type(/* ddispatch_interface_call */int type);
-
-	public static native /* ddispatch_interface_call */int oo_get_interface_call_type();
 }
