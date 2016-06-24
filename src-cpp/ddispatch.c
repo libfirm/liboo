@@ -567,11 +567,8 @@ static ir_entity* create_itable(ir_type *klass, ir_type *interface) {
 
 	// Create itable and initializer
 	ident *itable_ident = id_unique("itable_");
-	unsigned type_reference_size = get_type_size(type_reference);
-	ir_type *itable_type = new_type_array(type_reference);
 	size_t itable_ent_size = itable_size;
-	set_array_size_int(itable_type, itable_ent_size);
-	set_type_size(itable_type, type_reference_size * itable_ent_size);
+	ir_type *itable_type = new_type_array(type_reference, itable_ent_size);
 	set_type_state(itable_type, layout_fixed);
 
 	ir_type    *unknown      = get_unknown_type();
@@ -617,10 +614,7 @@ static ir_initializer_t *create_itt(ir_type *klass, size_t size)
 {
 	// Create ITT and initializer
 	ir_type *entry_type = ddispatch_get_itt_entry_type();
-	unsigned type_reference_size = get_type_size(entry_type);
-	ir_type *itt_type = new_type_array(entry_type);
-	set_array_size_int(itt_type, size);
-	set_type_size(itt_type, type_reference_size * size);
+	ir_type *itt_type = new_type_array(entry_type, size);
 	set_type_state(itt_type, layout_fixed);
 
 	ir_type    *glob         = get_glob_type();
@@ -890,11 +884,8 @@ void ddispatch_setup_vtable(ir_type *klass)
 	oo_set_class_vtable_size(klass, vtable_size);
 
 	// the vtable currently is an array of pointers
-	unsigned type_reference_size = get_type_size(type_reference);
-	ir_type *vtable_type = new_type_array(type_reference);
 	size_t vtable_ent_size = vtable_size + ddispatch_model.vptr_points_to_index;
-	set_array_size_int(vtable_type, vtable_ent_size);
-	set_type_size(vtable_type, type_reference_size * vtable_ent_size);
+	ir_type *vtable_type = new_type_array(type_reference, vtable_ent_size);
 	set_type_state(vtable_type, layout_fixed);
 	set_entity_type(vtable, vtable_type);
 	set_entity_alignment(vtable, 32);
