@@ -150,14 +150,14 @@ static void init_rtti_firm_types(void)
 	reference_array = new_type_array(type_reference, 0);
 	set_array_variable_size(reference_array, 1);
 
-	ir_type *default_io_type = new_type_method(2, 1);
+	ir_type *default_io_type = new_type_method(2, 1, false);
 	set_method_param_type(default_io_type, 0, type_reference);
 	set_method_param_type(default_io_type, 1, type_reference);
 	set_method_res_type(default_io_type, 0, type_int);
 	ident *default_io_ident = new_id_from_str("oo_rt_instanceof");
 	default_instanceof_entity = create_compilerlib_entity(default_io_ident, default_io_type);
 
-	ir_type *default_abs_err_type = new_type_method(0, 0);
+	ir_type *default_abs_err_type = new_type_method(0, 0, false);
 	ident *default_abs_err_ident = new_id_from_str("oo_rt_abstract_method_error");
 	default_abstract_method_error_entity = create_compilerlib_entity(default_abs_err_ident, default_abs_err_type);
 }

@@ -329,7 +329,7 @@ void ddispatch_init(void)
 
 	obstack_init(&ddispatch_obst);
 
-	ir_type   *abstract_type   = new_type_method(0, 0);
+	ir_type   *abstract_type   = new_type_method(0, 0, false);
 	ident     *abstract_ident  = new_id_from_str("oo_rt_abstract_method_error");
 	ir_entity *abstract_entity
 		= create_compilerlib_entity(abstract_ident, abstract_type);
@@ -348,7 +348,7 @@ void ddispatch_init(void)
 		ddispatch_model.construct_interface_lookup  = default_interface_lookup_method;
 
 	// Default Lookup
-	ir_type *default_li_type = new_type_method(2, 1);
+	ir_type *default_li_type = new_type_method(2, 1, false);
 	set_method_param_type(default_li_type, 0, type_reference);
 	set_method_param_type(default_li_type, 1, type_reference);
 	set_method_res_type(default_li_type, 0, type_reference);
@@ -357,7 +357,7 @@ void ddispatch_init(void)
 		= create_compilerlib_entity(default_li_ident, default_li_type);
 
 	// Searched Itable Lookup
-	ir_type *si_li_type = new_type_method(3, 1);
+	ir_type *si_li_type = new_type_method(3, 1, false);
 	set_method_param_type(si_li_type, 0, type_reference);
 	set_method_param_type(si_li_type, 1, type_reference);
 	set_method_param_type(si_li_type, 2, type_offset);
