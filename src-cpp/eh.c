@@ -2,6 +2,7 @@
 #include "liboo/nodes.h"
 #include "adt/error.h"
 #include "adt/obst.h"
+#include "libfirm/adt/pmap.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -19,11 +20,32 @@ struct _lpad_t {
 	lpad_t  *prev;
 };
 
-static struct obstack lpads;
-static lpad_t *top;
+struct _method_info;
+typedef struct _method_info method_info_t;
+struct _method_info {
+	lpad_t *top;
+};
+
+static struct obstack mem_obst;
+static pmap *method_infos = NULL;
+static method_info_t *obst_bottom = NULL;
+
+static method_info_t *get_method_info(ir_graph *irg)
+{
+	method_info_t *info = pmap_get(method_info_t, method_infos, irg);
+	assert(info || !"no info for method found! Call eh_start_r_method before!");
+	return info;
+}
 
 static ir_entity *exception_object_entity;
 static ir_entity *throw_entity;
+
+#define SAVE_PUSH(type, name) type _saved_##name = get_##name();
+#define SAVE_PUSH_SET(type, name, to) SAVE_PUSH(type, name); set_##name(to);
+#define SAVE_POP(name) set_##name(_saved_##name);
+#define NODE_PUSH(name) SAVE_PUSH(ir_node*, name)
+#define NODE_PUSH_SET(name, to) SAVE_PUSH_SET(ir_node*, name, to);
+#define NODE_POP(name) SAVE_POP(name);
 
 ir_node *eh_get_exception_object(void)
 {
@@ -49,7 +71,9 @@ static void store_exception_object(ir_node *exo_ptr)
 
 void eh_init(void)
 {
-	obstack_init(&lpads);
+	obstack_init(&mem_obst);
+	method_infos = pmap_create();
+
 	ir_type *type_reference = new_type_primitive(mode_P);
 	exception_object_entity = new_entity(get_glob_type(), new_id_from_str("__oo_rt_exception_object__"), type_reference);
 	set_entity_visibility(exception_object_entity, ir_visibility_external);
@@ -59,13 +83,12 @@ void eh_init(void)
 	set_method_param_type(throw_type, 0, type_reference);
 	throw_entity = new_entity(get_glob_type(), new_id_from_str("firm_personality"), throw_type);
 	set_entity_visibility(throw_entity, ir_visibility_external);
-
-	top = NULL;
 }
 
 void eh_deinit(void)
 {
-	obstack_free(&lpads, NULL);
+	obstack_free(&mem_obst, NULL);
+	pmap_destroy(method_infos);
 }
 
 static void add_handler_header_block_pred(lpad_t *lpad, ir_node *pred)
@@ -76,37 +99,47 @@ static void add_handler_header_block_pred(lpad_t *lpad, ir_node *pred)
 
 void eh_start_method(void)
 {
-	assert (irg_is_constrained(get_current_ir_graph(), IR_GRAPH_CONSTRAINT_CONSTRUCTION));
-	assert (obstack_object_size(&lpads) == 0);
+	ir_graph *irg = get_current_ir_graph();
+	assert (irg_is_constrained(irg, IR_GRAPH_CONSTRAINT_CONSTRUCTION));
+	assert (!pmap_contains(method_infos, irg) || !"Method already has an info entry!");
+
+	method_info_t *new_info = (method_info_t*) obstack_alloc(&mem_obst, sizeof(*new_info));
+	new_info->top = NULL;
+	pmap_insert(method_infos, irg, new_info);
+
+	if(!obst_bottom) {
+		obst_bottom = new_info;
+	}
 	eh_new_lpad();
 }
 
 void eh_new_lpad(void)
 {
-	lpad_t *new_pad = (lpad_t*) obstack_alloc(&lpads, sizeof(lpad_t));
-	new_pad->handler_header_block = new_immBlock();
-	new_pad->cur_block            = new_pad->handler_header_block;
-	new_pad->exception_object     = NULL;
+	ir_graph *irg = get_current_ir_graph();
+	method_info_t *info = get_method_info(irg);
+	lpad_t *new_pad = (lpad_t*) obstack_alloc(&mem_obst, sizeof(*new_pad));
+	ir_node *block = new_r_immBlock(irg);
+	new_pad->handler_header_block = block;
+	new_pad->cur_block            = block;
 	new_pad->used                 = false;
-	new_pad->prev                 = top;
+	new_pad->prev                 = info->top;
 
-	top = new_pad;
+	NODE_PUSH_SET(cur_block, new_pad->cur_block);
+	new_pad->exception_object     = eh_get_exception_object();
+	NODE_POP(cur_block);
 
-	ir_node *saved_block  = get_cur_block();
-	set_cur_block(new_pad->cur_block);
-
-	top->exception_object = eh_get_exception_object();
-
-	set_cur_block(saved_block);
+	info->top = new_pad;
 }
 
 void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 {
+	ir_graph *irg = get_current_ir_graph();
+	method_info_t* info = get_method_info(irg);
+	lpad_t* top = info->top;
 	assert (top->prev); //e.g., not the default handler
 	assert (top->cur_block && "Cannot add handler after an catch all was registered");
 
-	ir_node *saved_block = get_cur_block();
-	set_cur_block(top->cur_block);
+	NODE_PUSH_SET(cur_block, top->cur_block);
 
 	if (catch_type) {
 		ir_node *cur_mem     = get_store();
@@ -131,11 +164,15 @@ void eh_add_handler(ir_type *catch_type, ir_node *catch_block)
 		top->cur_block = NULL;
 	}
 
-	set_cur_block(saved_block);
+	NODE_POP(cur_block);
 }
 
 ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* type)
 {
+	ir_graph *irg = get_current_ir_graph();
+	method_info_t* info = get_method_info(irg);
+	lpad_t* top = info->top;
+
 	ir_node *jmp          = new_Jmp();
 	ir_node *call_block   = new_immBlock();
 	add_immBlock_pred(call_block, jmp);
@@ -162,6 +199,10 @@ ir_node *eh_new_Call(ir_node * irn_ptr, int arity, ir_node *const * in, ir_type*
 
 void eh_throw(ir_node *exo_ptr)
 {
+	ir_graph *irg = get_current_ir_graph();
+	method_info_t* info = get_method_info(irg);
+	lpad_t* top = info->top;
+
 	store_exception_object(exo_ptr);
 
 	ir_node *throw = new_Jmp();
@@ -172,6 +213,10 @@ void eh_throw(ir_node *exo_ptr)
 
 void eh_pop_lpad(void)
 {
+	ir_graph *irg = get_current_ir_graph();
+	method_info_t* info = get_method_info(irg);
+	lpad_t* top = info->top;
+
 	mature_immBlock(top->handler_header_block);
 
 	//assert (top->used && "No exception is ever thrown");
@@ -181,21 +226,23 @@ void eh_pop_lpad(void)
 
 	if (top->cur_block) {
 		// the popped lpad didn't have a catch all handler and therefore is still "open".
-		ir_node *saved_block = get_cur_block();
-		set_cur_block(top->cur_block);
+		NODE_PUSH_SET(cur_block, top->cur_block);
 
 		ir_node *jmp = new_Jmp();
 		add_handler_header_block_pred(prev, jmp);
 
-		set_cur_block(saved_block);
+		NODE_POP(cur_block);
 	}
 
-	obstack_free(&lpads, top);
-	top = prev;
+	info->top = prev;
 }
 
 void eh_end_method(void)
 {
+	ir_graph *irg = get_current_ir_graph();
+	method_info_t* info = get_method_info(irg);
+	lpad_t* top = info->top;
+
 	assert (! top->prev); // the explicit stuff is gone, we have the default handler
 
 	if (top->used) {
@@ -203,22 +250,25 @@ void eh_end_method(void)
 
 		assert (top->cur_block); // would fail if front end adds an catch all handler to the default handler
 
-		ir_node *saved_block = get_cur_block();
-		set_cur_block(top->cur_block);
+		NODE_PUSH_SET(cur_block, top->cur_block);
 		ir_node *cur_mem     = get_store();
 		ir_node *raise       = new_Raise(cur_mem, top->exception_object);
 		ir_node *proj        = new_Proj(raise, mode_X, pn_Raise_X);
 		cur_mem              = new_Proj(raise, mode_M, pn_Raise_M);
 		set_store(cur_mem);
 
-		ir_node *end_block   = get_irg_end_block(get_current_ir_graph());
+		ir_node *end_block   = get_irg_end_block(irg);
 		add_immBlock_pred(end_block, proj);
 
-		set_cur_block(saved_block);
+		NODE_POP(cur_block);
 	}
 
-	obstack_free(&lpads, top);
-	top = NULL;
+	if(info == obst_bottom) {
+		obstack_free(&mem_obst, info);
+		obst_bottom = NULL;
+	}
+
+	//pmap_remove() ??????
 }
 
 void eh_lower_Raise(ir_node *raise, ir_node *proj)
