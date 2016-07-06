@@ -251,4 +251,9 @@ public final class OO {
 	public static Node getExceptionObjectForCurrentLandingPad() {
 		return Node.createWrapper(binding_eh.eh_get_exception_object());
 	}
+
+	public static Node newThrowingCall(Node _ptr, Node[] ins, firm.Type type) {
+		final Pointer result_ptr = binding_eh.eh_new_Call(_ptr.ptr, ins.length, Node.getBufferFromNodeList(ins), type.ptr);
+		return Node.createWrapper(result_ptr);
+	}
 }
