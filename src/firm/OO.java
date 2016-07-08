@@ -256,4 +256,41 @@ public final class OO {
 		final Pointer result_ptr = binding_eh.eh_new_Call(_ptr.ptr, ins.length, Node.getBufferFromNodeList(ins), type.ptr);
 		return Node.createWrapper(result_ptr);
 	}
+
+	public static void startCatchableMethod(Graph g) {
+		binding_eh.eh_start_r_method(g.ptr);
+	}
+
+	public static void pushNewLandingPad(Graph g) {
+		binding_eh.eh_new_r_lpad(g.ptr);
+	}
+
+	public static void popLandingPad(Graph g) {
+		binding_eh.eh_pop_r_lpad(g.ptr);
+	}
+
+	public static void endCatchableMethod(Graph g) {
+		binding_eh.eh_end_r_method(g.ptr);
+	}
+
+	public static void addTypedCatchHandler(Graph g, ClassType classType, Block block) {
+		binding_eh.eh_add_r_handler(g.ptr, classType.ptr, block.ptr);
+	}
+
+	public static void addCatchAllHandler(Graph g, Block block) {
+		binding_eh.eh_add_r_handler(g.ptr, null, block.ptr);
+	}
+
+	public static void endBlockWithThrow(Graph g, Node excObj) {
+		binding_eh.eh_r_throw(g.ptr, excObj.ptr);
+	}
+
+	public static Node getExceptionObjectForCurrentLandingPad(Graph g) {
+		return Node.createWrapper(binding_eh.eh_get_r_exception_object(g.ptr));
+	}
+
+	public static Node newThrowingCall(Graph g, Node _ptr, Node[] ins, firm.Type type) {
+		final Pointer result_ptr = binding_eh.eh_new_r_Call(g.ptr, _ptr.ptr, ins.length, Node.getBufferFromNodeList(ins), type.ptr);
+		return Node.createWrapper(result_ptr);
+	}
 }

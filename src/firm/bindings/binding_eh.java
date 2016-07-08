@@ -2917,6 +2917,22 @@ public class binding_eh {
 
 	public static native void eh_deinit();
 
+	public static native void eh_start_r_method(Pointer irg);
+
+	public static native void eh_end_r_method(Pointer irg);
+
+	public static native void eh_new_r_lpad(Pointer irg);
+
+	public static native void eh_pop_r_lpad(Pointer irg);
+
+	public static native void eh_add_r_handler(Pointer irg, Pointer catch_type, Pointer block);
+
+	public static native Pointer eh_get_r_exception_object(Pointer irg);
+
+	public static native Pointer eh_new_r_Call(Pointer irg, Pointer irn_ptr, int arity, java.nio.Buffer in, Pointer catch_type);
+
+	public static native void eh_r_throw(Pointer irg, Pointer exo_ptr);
+
 	public static native void eh_start_method();
 
 	public static native void eh_new_lpad();
