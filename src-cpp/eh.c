@@ -356,3 +356,48 @@ void eh_lower_Raise(ir_node *raise, ir_node *proj)
 	panic("liboo compiled without exception support");
 }
 #endif
+
+#define GRAPH_PUSH								SAVE_PUSH_SET(ir_graph*, current_ir_graph, irg);
+#define GRAPH_POP								SAVE_POP(current_ir_graph);
+#define GRAPH_SAVED_DO(method, ...)				GRAPH_PUSH; method(__VA_ARGS__); GRAPH_POP;
+#define GRAPH_SAVED_DO_RET_NODE(method, ...)	GRAPH_PUSH; ir_node *const ret = method(__VA_ARGS__); GRAPH_POP; return ret;
+
+void eh_start_r_method(ir_graph *irg)
+{
+	GRAPH_SAVED_DO(eh_start_method,);
+}
+
+void eh_end_r_method(ir_graph *irg)
+{
+	GRAPH_SAVED_DO(eh_end_method,);
+}
+
+void eh_new_r_lpad(ir_graph *irg)
+{
+	GRAPH_SAVED_DO(eh_new_lpad,);
+}
+
+void eh_pop_r_lpad(ir_graph *irg)
+{
+	GRAPH_SAVED_DO(eh_pop_lpad,);
+}
+
+void eh_add_r_handler(ir_graph *irg, ir_type *catch_type, ir_node *block)
+{
+	GRAPH_SAVED_DO(eh_add_handler, catch_type, block);
+}
+
+ir_node *eh_get_r_exception_object(ir_graph *irg)
+{
+	GRAPH_SAVED_DO_RET_NODE(eh_get_exception_object,);
+}
+
+ir_node *eh_new_r_Call(ir_graph *irg, ir_node * irn_ptr, int arity, ir_node *const * in, ir_type* catch_type)
+{
+	GRAPH_SAVED_DO_RET_NODE(eh_new_Call, irn_ptr, arity, in, catch_type);
+}
+
+void eh_r_throw(ir_graph *irg, ir_node *exo_ptr)
+{
+	GRAPH_SAVED_DO(eh_throw, exo_ptr);
+}
