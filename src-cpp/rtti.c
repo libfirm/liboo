@@ -297,7 +297,7 @@ void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 	ir_initializer_t *initializer = create_initializer_compound(n_init);
 	size_t            i           = 0;
 
-	ident            *tname_id   = get_class_ident(klass);
+	ident            *tname_id   = get_compound_ident(klass);
 	ir_entity        *tname_ent  = rtti_emit_string_const(get_id_str(tname_id));
 	ir_initializer_t *tname_init = new_initializer_reference(tname_ent);
 	set_initializer_compound_value(initializer, i++, tname_init);
