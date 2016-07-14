@@ -133,22 +133,18 @@ static void init_rtti_firm_types(void)
 	/* assert(get_type_size(method_info) == sizeof(method_info_t)); */
 
 	method_info_array = new_type_array(method_info, 0);
-	set_array_variable_size(method_info_array, 1);
 
 	id = new_id_from_str("string_const$");
 	string_const = new_type_struct(id);
 	id = new_id_from_str("hash");
 	string_const_hash = new_entity(string_const, id, type_uint32_t);
 	ir_type *type_char_array = new_type_array(type_char, 0);
-	set_array_variable_size(type_char_array, 1);
 	id = new_id_from_str("data");
 	string_const_data = new_entity(string_const, id, type_char_array);
-	set_compound_variable_size(string_const, 1);
 	default_layout_compound_type(string_const);
 	/* assert(get_type_size(string_const) == sizeof(string_const_t)); */
 
 	reference_array = new_type_array(type_reference, 0);
-	set_array_variable_size(reference_array, 1);
 
 	ir_type *default_io_type = new_type_method(2, 1, false);
 	set_method_param_type(default_io_type, 0, type_reference);
