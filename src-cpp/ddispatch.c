@@ -315,9 +315,9 @@ void ddispatch_init(void)
 {
 	mode_reference = mode_P;
 	type_reference = new_type_primitive(mode_reference);
-	ir_mode *mode_char = new_int_mode("C", irma_twos_complement, 16, 0, 16);
+	ir_mode *mode_char = new_int_mode("C", 16, 0, 16);
 	type_char = new_type_primitive(mode_char);
-	mode_int = new_int_mode("I", irma_twos_complement, 32, 1, 32);
+	mode_int = new_int_mode("I", 32, 1, 32);
 	type_int = new_type_primitive(mode_int);
 	ir_mode *mode_offset = get_reference_offset_mode(mode_reference);
 	ir_type *type_offset = new_type_primitive(mode_offset);
