@@ -79,7 +79,7 @@ void eh_init(void)
 	set_entity_visibility(exception_object_entity, ir_visibility_external);
 	set_entity_initializer(exception_object_entity, get_initializer_null());
 
-	ir_type *throw_type = new_type_method(1, 0);
+	ir_type *throw_type = new_type_method(1, 0, false, cc_cdecl_set, mtp_no_property);
 	set_method_param_type(throw_type, 0, type_reference);
 	throw_entity = new_entity(get_glob_type(), new_id_from_str("firm_personality"), throw_type);
 	set_entity_visibility(throw_entity, ir_visibility_external);
