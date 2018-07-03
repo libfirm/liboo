@@ -27,7 +27,7 @@
 
 
 // debug setting
-#define DEBUG_XTA 0
+#define DEBUG_XTA 1
 #define DEBUGOUT if (DEBUG_XTA) printf
 #define DEBUGCALL if (DEBUG_XTA)
 // stats
@@ -105,9 +105,15 @@ typedef struct analyzer_env {
 	cpmap_t *unused_targets; // map that stores a map for evert call site which stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: call site ->(Map: class -> (Map: method entity -> Set: call entities)) This is needed to update results when a class becomes live after there were already some dynamically bound calls that would call a method of it.
 } analyzer_env;
 
+typedef struct iteration_set {
+	cpset_t *propagated;
+	cpset_t *current;
+	cpset_t *new;
+} iteration_set;
+
 typedef struct method_info {
 	cpset_t *callers; //callers of this method
-	cpset_t *live_classes; //classes which are marked as live in this method
+	iteration_set *live_classes; //classes which are marked as live in this method
 	cpset_t *parameter_subtypes; //parameter types and subtypes
 	cpset_t *return_subtypes; //return types and subtypes
 	cpset_t *field_writes; //entities of fields that are written to in this method
@@ -120,7 +126,27 @@ typedef struct method_env {
 	method_info *info; //the metadata struct of the method entity
 } method_env;
 
-static inline method_info *new_method_info()
+static inline iteration_set *new_iteration_set(void)
+{
+
+	iteration_set *i_set = (iteration_set *) malloc(sizeof(iteration_set));
+
+	cpset_t *propagated = (cpset_t *) malloc(sizeof(cpset_t));
+	cpset_init(propagated, hash_ptr, ptr_equals);
+	i_set->propagated = propagated;
+
+	cpset_t *current = (cpset_t *) malloc(sizeof(cpset_t));
+	cpset_init(current, hash_ptr, ptr_equals);
+	i_set->current = current;
+
+	cpset_t *new = (cpset_t *) malloc(sizeof(cpset_t));
+	cpset_init(new, hash_ptr, ptr_equals);
+	i_set->new = new;
+
+	return i_set;
+}
+
+static inline method_info *new_method_info(void)
 {
 	method_info *info = (method_info *) malloc(sizeof(method_info));
 
@@ -128,9 +154,7 @@ static inline method_info *new_method_info()
 	cpset_init(callers, hash_ptr, ptr_equals);
 	info->callers = callers;
 
-	cpset_t *live_classes = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(live_classes, hash_ptr, ptr_equals);
-	info->live_classes = live_classes;
+	info->live_classes = new_iteration_set();
 
 	cpset_t *parameter_subtypes = (cpset_t *) malloc(sizeof(cpset_t));
 	cpset_init(parameter_subtypes, hash_ptr, ptr_equals);
@@ -258,16 +282,23 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 	}
 }
 
+static bool is_in_iteration_set(iteration_set *set, void *element)
+{
+	return cpset_find(set->new, element) != NULL || cpset_find(set->current, element) != NULL
+	       || cpset_find(set->propagated, element) != NULL;
+}
+
 static void add_new_live_class(ir_type *klass, method_env *env)
 {
 	assert(is_Class_type(klass));
 	assert(env);
 
 	method_info *info = env->info;
-	if (cpset_find(info->live_classes, klass) == NULL // if it had not already been added
+	iteration_set *i_set = info->live_classes;
+	if (!is_in_iteration_set(i_set, klass) // if it had not already been added
 	        && !oo_get_class_is_extern(klass) && !oo_get_class_is_abstract(klass)) { // if not extern and not abstract
 		// add to live classes
-		cpset_insert(info->live_classes, klass);
+		cpset_insert(i_set->current, klass);
 		DEBUGOUT("\t\t\t\t\tadded new live class %s\n", get_compound_name(klass));
 
 		// update existing results
@@ -376,7 +407,8 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 		method_env *entity_menv = (method_env *) malloc(sizeof(method_env));
 		entity_menv->entity = entity;
 		method_info *info = new_method_info();
-		cpset_insert(info->live_classes, get_entity_owner(entity));
+		iteration_set *i_set = info->live_classes;
+		cpset_insert(i_set->current, get_entity_owner(entity));
 		entity_menv->info = info;
 		entity_menv->analyzer_env = a_env;
 		cpset_insert(info->callers, env->entity);
@@ -530,7 +562,7 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 	}
 	method_info *m_info = env->info;
 	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
-		if (cpset_find(m_info->live_classes, klass) != NULL || oo_get_class_is_extern(klass)) { // if class is considered in use
+		if (is_in_iteration_set(m_info->live_classes, klass) || oo_get_class_is_extern(klass)) { // if class is considered in use
 			take_entity(current_entity, result_set, env);
 		}
 		else {
@@ -769,9 +801,20 @@ static void debug_print_info(method_info *info)
 	}
 	printf("\n");
 
-	set = info->live_classes;
-	cpset_iterator_init(&iterator, set);
+	iteration_set *i_set = info->live_classes;
 	printf("======LIVE CLASSES=====\n");
+	cpset_iterator_init(&iterator, i_set->propagated);
+	printf("p: ");
+	while ((type = cpset_iterator_next(&iterator)) != NULL) {
+		printf("%s, ", get_compound_name(type));
+	}
+	cpset_iterator_init(&iterator, i_set->current);
+	printf("c: ");
+	while ((type = cpset_iterator_next(&iterator)) != NULL) {
+		printf("%s, ", get_compound_name(type));
+	}
+	cpset_iterator_init(&iterator, i_set->new);
+	printf("n: ");
 	while ((type = cpset_iterator_next(&iterator)) != NULL) {
 		printf("%s, ", get_compound_name(type));
 	}
@@ -865,36 +908,12 @@ static bool add_live_classes_to_field(analyzer_env *env, ir_entity *field, cpset
 	assert(field);
 	assert(klasses);
 
-	cpset_t *live_classes = cpmap_find(env->live_classes_fields, field);
-	if (live_classes == NULL) {
-		live_classes = new_cpset(hash_ptr, ptr_equals);
-		cpmap_set(env->live_classes_fields, field, live_classes);
+	iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
+	if (field_i_set == NULL) {
+		field_i_set = new_iteration_set();
+		cpmap_set(env->live_classes_fields, field, field_i_set);
 	}
-	return make_subset(live_classes, klasses);
-}
-
-/**
- * Make b subset of a
- **/
-static bool make_subset_handle_changed_classes(cpset_t *a, cpset_t *b, method_env *env)
-{
-	assert(a);
-	assert(b);
-	assert(env);
-
-	cpset_iterator_t iterator;
-	cpset_iterator_init(&iterator, b);
-	ir_type  *element;
-	bool change = false;
-	while ((element = cpset_iterator_next(&iterator)) != NULL) {
-		if (!cpset_find(a, element)) {
-			cpset_insert(a, element);
-			check_for_external_superclasses(element, env);
-			update_unused_targets(env, element);
-			change = true;
-		}
-	}
-	return change;
+	return make_subset(field_i_set->new, klasses);
 }
 
 static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b)
@@ -917,6 +936,57 @@ static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b)
 	}
 }
 
+static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *env)
+{
+	cpset_iterator_t iterator;
+	cpset_iterator_init(&iterator, i_set->current);
+	ir_type  *element;
+	while ((element = cpset_iterator_next(&iterator)) != NULL) {
+		if (cpset_find(i_set->propagated, element)) {
+			cpset_remove_iterator(i_set->current, &iterator);
+		}
+		else {
+			check_for_external_superclasses(element, env);
+			update_unused_targets(env, element);
+		}
+	}
+}
+
+static bool update_iteration_sets(analyzer_env *env)
+{
+	cpmap_iterator_t iterator;
+	cpmap_iterator_init(&iterator, env->live_classes_fields);
+	cpmap_entry_t entry;
+	bool change = false;
+	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+		iteration_set *i_set = entry.data;
+		make_subset(i_set->propagated, i_set->current);
+		cpset_destroy(i_set->current);
+		free(i_set->current);
+		i_set->current = i_set->new;
+		i_set->new = new_cpset(hash_ptr, ptr_equals);
+		change = change || cpset_size(i_set->current) != 0;
+	}
+	cpmap_iterator_init(&iterator, env->done_map);
+	method_env m_env;
+	m_env.analyzer_env = env;
+	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+		method_info *info = entry.data;
+		ir_entity *entity = entry.key;
+		m_env.entity = entity;
+		m_env.info = info;
+		iteration_set *i_set = info->live_classes;
+		make_subset(i_set->propagated, i_set->current);
+		cpset_destroy(i_set->current);
+		free(i_set->current);
+		i_set->current = i_set->new;
+		i_set->new = new_cpset(hash_ptr, ptr_equals);
+		handle_new_classes_in_current_set(i_set, &m_env);
+		change = change || cpset_size(i_set->current) != 0;
+	}
+	return change;
+}
+
 static bool propagate_live_classes(analyzer_env *env)
 {
 	assert(env);
@@ -927,9 +997,9 @@ static bool propagate_live_classes(analyzer_env *env)
 	cpmap_entry_t entry;
 	bool change = false;
 	while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
-		bool entry_change = false;
-		ir_entity *entity = (ir_entity *) entry.key;
+		//ir_entity *entity = (ir_entity *) entry.key;
 		method_info *info = (method_info *) entry.data;
+		iteration_set *callee_i_set = info->live_classes;
 		cpset_iterator_t set_iterator;
 		//Method calls
 		cpset_iterator_init(&set_iterator, info->callers);
@@ -938,20 +1008,13 @@ static bool propagate_live_classes(analyzer_env *env)
 			method_info *caller_info = cpmap_find(done_map, caller);
 			cpset_t cut;
 			cpset_init(&cut, hash_ptr, ptr_equals);
-			method_env m_env;
-			m_env.analyzer_env = env;
-			m_env.entity = entity;
-			m_env.info = info;
 			//Parameters
-			cut_sets(&cut, caller_info->live_classes, info->parameter_subtypes);
-			bool res = make_subset_handle_changed_classes(info->live_classes, &cut, &m_env);
-			entry_change = entry_change || res;
+			iteration_set *caller_i_set = caller_info->live_classes;
+			cut_sets(&cut, caller_i_set->current, info->parameter_subtypes);
+			make_subset(callee_i_set->new, &cut);
 			//Return
-			m_env.entity = caller;
-			m_env.info = caller_info;
-			cut_sets(&cut, info->return_subtypes, info->live_classes);
-			res = make_subset_handle_changed_classes(caller_info->live_classes, &cut, &m_env);
-			entry_change = entry_change || res;
+			cut_sets(&cut, info->return_subtypes, callee_i_set->current);
+			make_subset(caller_i_set->new, &cut);
 
 			cpset_destroy(&cut);
 		}
@@ -959,14 +1022,9 @@ static bool propagate_live_classes(analyzer_env *env)
 		cpset_iterator_init(&set_iterator, info->field_reads);
 		ir_entity *field;
 		while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
-			cpset_t *field_set = cpmap_find(env->live_classes_fields, field);
-			if (field_set) {
-				method_env m_env;
-				m_env.analyzer_env = env;
-				m_env.entity = entity;
-				m_env.info = info;
-				bool res = make_subset_handle_changed_classes(info->live_classes, field_set, &m_env);
-				entry_change = entry_change || res;
+			iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
+			if (field_i_set) {
+				make_subset(callee_i_set->new, field_i_set->current);
 			}
 		}
 		//Field Writes
@@ -978,17 +1036,29 @@ static bool propagate_live_classes(analyzer_env *env)
 			get_subclasses_from_type(get_entity_type(field), &subtypes);
 			cpset_t cut;
 			cpset_init(&cut, hash_ptr, ptr_equals);
-			cut_sets(&cut, &subtypes, info->live_classes);
+			cut_sets(&cut, &subtypes, callee_i_set->current);
 			bool res = add_live_classes_to_field(env, field, &cut);
-			entry_change = entry_change || res;
+			change = change || res;
 
 #if DEBUG_XTA
 			if (res) {
 				printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
-				cpset_iterator_t it;
-				cpset_iterator_init(&it, cpmap_find(env->live_classes_fields, field));
+				iteration_set *i_set = cpmap_find(env->live_classes_fields, field);
+				cpset_iterator_t iterator;
+				cpset_iterator_init(&iterator, i_set->propagated);
+				printf("p: ");
 				ir_type *type;
-				while ((type = cpset_iterator_next(&it)) != NULL) {
+				while ((type = cpset_iterator_next(&iterator)) != NULL) {
+					printf("%s, ", get_compound_name(type));
+				}
+				cpset_iterator_init(&iterator, i_set->current);
+				printf("c: ");
+				while ((type = cpset_iterator_next(&iterator)) != NULL) {
+					printf("%s, ", get_compound_name(type));
+				}
+				cpset_iterator_init(&iterator, i_set->new);
+				printf("n: ");
+				while ((type = cpset_iterator_next(&iterator)) != NULL) {
 					printf("%s, ", get_compound_name(type));
 				}
 				printf("\n");
@@ -998,21 +1068,20 @@ static bool propagate_live_classes(analyzer_env *env)
 			cpset_destroy(&subtypes);
 			cpset_destroy(&cut);
 		}
-		change = change || entry_change;
 #if DEBUG_XTA
-		if (entry_change) {
+		/*if (change) {
 			DEBUGOUT("UPDATED METHOD INFO FROM %s.%s TO\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
 			debug_print_info(info);
-		}
+		}*/
 #endif
 	}
-	return change;
+	return update_iteration_sets(env) || change;
 }
 
 static void del_done_map(cpmap_t *done_map)
 {
 	assert(done_map);
-	
+
 	cpmap_iterator_t iterator;
 	cpmap_iterator_init(&iterator, done_map);
 	cpmap_entry_t entry;
@@ -1021,16 +1090,42 @@ static void del_done_map(cpmap_t *done_map)
 		cpset_destroy(info->field_writes);
 		cpset_destroy(info->field_reads);
 		cpset_destroy(info->parameter_subtypes);
-		cpset_destroy(info->live_classes);
+		iteration_set *i_set = info->live_classes;
+		cpset_destroy(i_set->new);
+		cpset_destroy(i_set->propagated);
+		cpset_destroy(i_set->current);
+		free(i_set->propagated);
+		free(i_set->current);
+		free(i_set->new);
+		free(i_set);
 		cpset_destroy(info->callers);
 		free(info->field_writes);
 		free(info->field_reads);
 		free(info->parameter_subtypes);
-		free(info->live_classes);
 		free(info->callers);
 		free(info);
 	}
 	cpmap_destroy(done_map);
+}
+
+static void del_live_classes_fields(cpmap_t *live_classes_fields)
+{
+	assert(live_classes_fields);
+
+	cpmap_iterator_t iterator;
+	cpmap_iterator_init(&iterator, live_classes_fields);
+	cpmap_entry_t entry;
+	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+		iteration_set *i_set = entry.data;
+		cpset_destroy(i_set->new);
+		cpset_destroy(i_set->propagated);
+		cpset_destroy(i_set->current);
+		free(i_set->current);
+		free(i_set->new);
+		free(i_set->propagated);
+		free(i_set);
+	}
+	cpmap_destroy(live_classes_fields);
 }
 
 /** run Rapid Type Analysis
@@ -1096,7 +1191,8 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				for (size_t i = 0; (klass = initial_live_classes[i]) != NULL; i++) {
 					assert(is_Class_type(klass));
 					DEBUGOUT("\t%s\n", get_compound_name(klass));
-					cpset_insert(info->live_classes, klass);
+					iteration_set *i_set = info->live_classes;
+					cpset_insert(i_set->current, klass);
 					check_for_external_superclasses(klass, meth_env);
 				}
 			}
@@ -1174,7 +1270,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	// free data structures
 	del_pdeq(workqueue);
 	del_done_map(&done_map);
-	cpmap_destroy(&live_classes_fields);
+	del_live_classes_fields(&live_classes_fields);
 
 	{
 		// delete the maps and sets in map unused_targets
