@@ -382,13 +382,28 @@ static ir_entity *fir_ascend_into_superclasses_and_merge(ir_type *klass, ir_enti
 			result = r;
 		} else {
 			if (r != NULL) {
-				bool result_from_interface = oo_get_class_is_interface(get_entity_owner(result));
-				bool r_from_interface = oo_get_class_is_interface(get_entity_owner(r));
-				if (result_from_interface && !r_from_interface) {
-					DEBUGOUT("\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n", get_compound_name(get_entity_owner(r)), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"), get_compound_name(get_entity_owner(result)), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
+				ir_type *result_owner          = get_entity_owner(result);
+				ir_type *r_owner               = get_entity_owner(r);
+				bool     result_from_interface = oo_get_class_is_interface(result_owner);
+				bool     r_from_interface      = oo_get_class_is_interface(r_owner);
+				bool     r_overrides_result    = is_class_trans_subtype(result_owner, r_owner);
+				bool     result_overrides_r    = is_class_trans_subtype(r_owner, result_owner);
+
+				if (result_owner == r_owner) {
+					// Nothing to do, we reached the same class by two ways
+				} else if (result_overrides_r || (r_from_interface && !result_from_interface)) {
+					DEBUGOUT("\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n",
+					         get_compound_name(result_owner), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"),
+					         get_compound_name(r_owner), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"));
+				} else if (r_overrides_result || (result_from_interface && !r_from_interface)) {
+					DEBUGOUT("\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n",
+					         get_compound_name(r_owner), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"),
+					         get_compound_name(result_owner), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
 					result = r;
 				} else if (result_from_interface == r_from_interface) { // both true or both false
 					assert(false && "ambiguous interface implementation");
+				} else {
+					assert(false && "Missing case");
 				}
 			}
 		}
@@ -623,6 +638,8 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	cpset_init(live_classes, hash_ptr, ptr_equals);
 	cpset_init(live_methods, hash_ptr, ptr_equals);
 	cpmap_init(dyncall_targets, hash_ptr, ptr_equals);
+
+	compute_inh_transitive_closure();
 
 	cpmap_t unused_targets;
 	cpmap_init(&unused_targets, hash_ptr, ptr_equals);
