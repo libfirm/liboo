@@ -5,6 +5,6 @@
 
 void devirt_set_detection_callbacks(ir_entity *(*detect_call)(ir_node *call));
 
-void devirtualize_calls_to_local_objects(ir_entity **entry_points);
+int devirtualize_calls_to_local_objects(ir_entity **entry_points);
 
 #endif

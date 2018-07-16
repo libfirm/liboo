@@ -11,7 +11,7 @@
 
 
 #include "liboo/xta.h"
-
+#include "liboo/devirt_local.h"
 #include <assert.h>
 
 #include <stdbool.h>
@@ -25,6 +25,7 @@
 #include "adt/pdeq.h"
 #include "adt/hashptr.h"
 
+#include <libfirm/iroptimize.h>
 
 // debug setting
 #define DEBUG_XTA 1
@@ -65,6 +66,14 @@ static inline cpset_t *new_cpset(cpset_hash_function hash_function, cpset_cmp_fu
 	return cpset;
 }
 
+static void after_inline_opt(ir_graph *irg)
+{
+	scalar_replacement_opt(irg);
+	optimize_load_store(irg);
+	optimize_graph_df(irg);
+	optimize_cf(irg);
+	combo(irg);
+}
 /*
 static inline cpmap_iterator_t *new_cpmap_iterator(cpmap_t *map) // missing new function for cpmap iterator
 {
@@ -103,6 +112,8 @@ typedef struct analyzer_env {
 
 	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
 	cpmap_t *unused_targets; // map that stores a map for evert call site which stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: call site ->(Map: class -> (Map: method entity -> Set: call entities)) This is needed to update results when a class becomes live after there were already some dynamically bound calls that would call a method of it.
+
+	cpmap_t *ext_called_constr; //constructors called in methods without graph. Map method to set of class types
 } analyzer_env;
 
 typedef struct iteration_set {
@@ -674,6 +685,17 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 				// add to live methods
 				//cpset_insert(a_env->live_methods, entity);
 
+				//look whether methods calls constructors that aren't in a graph
+				analyzer_env *a_env = m_env->analyzer_env;
+				cpset_t *classes;
+				if((classes = cpmap_find(a_env->ext_called_constr, entity)) != NULL) {
+					cpset_iterator_t iterator;
+					cpset_iterator_init(&iterator, classes);
+					ir_type *klass;
+					while((klass = cpset_iterator_next(&iterator)) != NULL) {
+						add_new_live_class(klass, m_env);
+					}
+				}
 				add_to_workqueue(entity, m_env);
 			}
 			break;
@@ -1137,7 +1159,7 @@ static void del_live_classes_fields(cpmap_t *live_classes_fields)
  * @param live_methods give pointer to empty uninitialized set for receiving results, This is where all live methods are put (as ir_entity*).
  * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically bound calls if possible. (see also function rta_optimize_dyncalls)
  */
-static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpmap_t *dyncall_targets)
+static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpmap_t *dyncall_targets, cpmap_t *ext_called_constr)
 {
 	assert(entry_points);
 	assert(dyncall_targets);
@@ -1160,6 +1182,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		.live_classes_fields = &live_classes_fields,
 		.dyncall_targets = dyncall_targets,
 		.unused_targets = &unused_targets,
+		.ext_called_constr = ext_called_constr,
 	};
 
 
@@ -1602,13 +1625,21 @@ static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 }
 
 
-void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
+void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, cpmap_t *ext_called_constr)
 {
 	assert(entry_points);
 
 	cpmap_t dyncall_targets;
 
-	xta_run(entry_points, initial_live_classes, &dyncall_targets);
+	xta_run(entry_points, initial_live_classes, &dyncall_targets, ext_called_constr);
 	xta_devirtualize_calls(entry_points, &dyncall_targets);
 	xta_dispose_results(&dyncall_targets);
+
+	int devirt_calls_after_inlining;
+	do {
+		inline_functions(750, 0, after_inline_opt);
+		devirt_calls_after_inlining = devirtualize_calls_to_local_objects(entry_points);
+		DEBUGOUT("devirt calls after inlining: %d\n", devirt_calls_after_inlining);
+	}
+	while(devirt_calls_after_inlining);
 }

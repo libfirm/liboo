@@ -15,6 +15,7 @@
 
 
 #include <libfirm/firm.h>
+#include "../../src-cpp/adt/cpmap.h"
 
 /** sets important callback functions needed to detect calls (e.g. class intialization) hidden behind frontend-specific nodes
  * @note It's very important for the frontend to implement these callbacks correctly, if anything is missing RTA's assumptions may not hold and it can lead to defective programs!
@@ -36,7 +37,7 @@ void xta_set_detection_callbacks(ir_entity *(*detect_call)(ir_node *call));
  * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
  */
-void xta_optimization(ir_entity** entry_points, ir_type **initial_live_classes);
+void xta_optimization(ir_entity** entry_points, ir_type **initial_live_classes, cpmap_t *ext_called_constr);
 
 
 #endif

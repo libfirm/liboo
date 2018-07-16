@@ -12,6 +12,7 @@
 typedef struct global_env {
 	pdeq *workqueue;
 	cpset_t *done_methods;
+	int devirt_calls_count;
 } global_env;
 
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
@@ -93,6 +94,7 @@ static void walk_graph_and_devirtualize(ir_node *node, void *env) {
 							ir_node *mem = get_irn_n(methodsel, 0);
 							ir_node *input[] = { mem, address };
 							turn_into_tuple(methodsel, 2, input);
+							glob_env->devirt_calls_count++;
 						}
 					}
 				}
@@ -114,7 +116,7 @@ static void walk_graph_and_devirtualize(ir_node *node, void *env) {
 
 }
 
-void devirtualize_calls_to_local_objects(ir_entity **entry_points) {
+int devirtualize_calls_to_local_objects(ir_entity **entry_points) {
 	cpset_t done_methods;
 	cpset_init(&done_methods, hash_ptr, ptr_equals);
 
@@ -122,6 +124,7 @@ void devirtualize_calls_to_local_objects(ir_entity **entry_points) {
 	global_env env = {
 		.workqueue = workqueue,
 		.done_methods = &done_methods,
+		.devirt_calls_count = 0,
 	};
 
 	ir_entity *entity;
@@ -144,5 +147,6 @@ void devirtualize_calls_to_local_objects(ir_entity **entry_points) {
 			irg_walk_graph(graph, NULL, walk_graph_and_devirtualize, &env);
 		}
 	}
+	return env.devirt_calls_count;
 }
 
