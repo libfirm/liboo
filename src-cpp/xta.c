@@ -1261,6 +1261,26 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			cpmap_set(&done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
 			DEBUGOUT(4, "COLLECTING ARGS AND RES TYPES\n");
 			collect_arg_and_res_types(m_env);
+			DEBUGOUT(1, "COLLECTING LIVE CLASSES FROM CALLLERS");
+			//This has to be done here, because already propagated classes will not be looked at during propagaton.
+			method_info *info = m_env->info;
+			iteration_set *callee_i_set = info->live_classes;
+			cpset_iterator_t set_iterator;
+			//Method calls
+			cpset_iterator_init(&set_iterator, info->callers);
+			ir_entity *caller;
+			while ((caller = cpset_iterator_next(&set_iterator)) != NULL) {
+				method_info *caller_info = cpmap_find(&done_map, caller);
+				cpset_t cut;
+				cpset_init(&cut, hash_ptr, ptr_equals);
+				//Parameters
+				iteration_set *caller_i_set = caller_info->live_classes;
+				cut_sets(&cut, caller_i_set->propagated, info->parameter_subtypes);
+				make_subset(callee_i_set->current, &cut);
+
+				cpset_destroy(&cut);
+			}
+
 			DEBUGOUT(1, "ANALYZING GRAPH\n");
 			ir_graph *graph = get_entity_irg(entity);
 			if (graph == NULL) {
