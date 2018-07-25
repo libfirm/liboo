@@ -19,6 +19,7 @@
 
 #include <liboo/oo.h>
 #include <liboo/nodes.h>
+#include <libfirm/timing.h>
 
 #include "adt/cpmap.h"
 #include "adt/cpset.h"
@@ -32,7 +33,7 @@
 
 // stats
 #define RTA_STATS 1
-#undef RTA_STATS // comment to activate stats
+//#undef RTA_STATS // comment to activate stats
 
 // override option just for early development to keep going without information about live classes
 #define JUST_CHA 0
@@ -1080,8 +1081,13 @@ void rta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 	cpset_t live_methods;
 	cpmap_t dyncall_targets;
 
+	ir_timer_t *timer = ir_timer_new();
+	ir_timer_start(timer);
 	rta_run(entry_points, initial_live_classes, &live_classes, &live_methods, &dyncall_targets);
 	rta_devirtualize_calls(entry_points, &dyncall_targets);
 	//rta_discard(&live_classes, &live_methods); //TODO
 	rta_dispose_results(&live_classes, &live_methods, &dyncall_targets);
+	ir_timer_stop(timer);
+	printf("RTA needed %f sec.\n", ir_timer_elapsed_sec(timer));
+	ir_timer_free(timer);
 }

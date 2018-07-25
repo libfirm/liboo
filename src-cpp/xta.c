@@ -26,9 +26,9 @@
 #include "adt/hashptr.h"
 
 #include <libfirm/iroptimize.h>
-
+#include <libfirm/timing.h>
 // debug setting
-#define DEBUG_XTA 1
+#define DEBUG_XTA 0
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 // stats
@@ -1699,9 +1699,14 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 	assert(entry_points);
 	cpmap_t dyncall_targets;
 
+	ir_timer_t *timer = ir_timer_new();
+	ir_timer_start(timer);
 	xta_run(entry_points, initial_live_classes, &dyncall_targets, ext_called_constr);
 	xta_devirtualize_calls(entry_points, &dyncall_targets);
 	xta_dispose_results(&dyncall_targets);
+	ir_timer_stop(timer);
+	printf("XTA needed %f sec.\n", ir_timer_elapsed_sec(timer));
+	ir_timer_free(timer);
 
 	int devirt_calls_after_inlining;
 	do {
