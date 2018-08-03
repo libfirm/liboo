@@ -28,14 +28,15 @@
 #include <libfirm/iroptimize.h>
 #include <libfirm/timing.h>
 // debug setting
-#define DEBUG_XTA 0
+#define DEBUG_XTA 5
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 // stats
 #define XTA_STATS 1
 //#undef XTA_STATS // comment to activate stats
 
-
+static bool make_subset(cpset_t *a, cpset_t *b);
+static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b);
 
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
 {
@@ -291,7 +292,7 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 			cpmap_destroy(methods);
 			free(methods);
 		}
-
+		//TODO: Ceck for external superclass?
 	}
 }
 
@@ -429,6 +430,30 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 	}
 	else {
 		cpset_insert(done_entity_info->callers, env->entity);
+		//This is later done for entities added to the workqueue.
+		//for already analyzed methods, we update already propagate info here.
+		//TODO:Can be deleted, because caller_i_set->propagated is empty
+		//TODO: Cant be implemented here, becuase thi sis called during propagation, propagated ain't empty and the iterator cannot handle changing sets. this needs to be done elsewhere.
+		//TODO: Handling with propagatino sets definitely needs more thought
+		if(entity != env->entity) { //This fails on recursive methods as mentioned above. maybe recursive calls have to be handled diffenrently on other occasions too
+			//TODO: cant be here probably or add to new, not to current
+			method_info *caller_info = env->info;
+			cpset_t cut;
+			cpset_init(&cut, hash_ptr, ptr_equals);
+			//Parameters
+			iteration_set *caller_i_set = caller_info->live_classes;
+			cut_sets(&cut, caller_i_set->propagated, done_entity_info->parameter_subtypes);
+			iteration_set *callee_i_set = done_entity_info->live_classes;
+			//if(cpset_size(&cut) != 0)
+			//	printf("N %lu\n", cpset_size(&cut));
+			make_subset(callee_i_set->current, &cut);
+				
+			//Return
+			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->propagated);
+			make_subset(caller_i_set->new, &cut); //TODO:Changed to new, because current is iterated over
+
+			cpset_destroy(&cut);
+		}
 	}
 }
 
@@ -797,10 +822,13 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 		if (is_VptrIsSet(node)) {
 			// use new VptrIsSet node for detection of object creation
 			ir_type *klass = get_VptrIsSet_type(node);
-			assert(is_Class_type(klass));
+			if(klass != NULL) {
+				//printf("%s\n", gdb_node_helper(klass));
+				assert(is_Class_type(klass));
 
-			DEBUGOUT(4, "\tVptrIsSet: %s\n", get_compound_name(klass));
-			add_new_live_class(klass, m_env);
+				DEBUGOUT(4, "\tVptrIsSet: %s\n", get_compound_name(klass));
+				add_new_live_class(klass, m_env);
+			}
 		}
 		// skip other node types
 		break;
@@ -1216,7 +1244,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	{
 		// add all given entry points to live methods and to workqueue
 		size_t i = 0;
-		DEBUGOUT(1, "entrypoints:\n");
+		DEBUGOUT(2, "entrypoints:\n");
 		ir_entity *entity;
 		for (; (entity = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entity));
@@ -1234,11 +1262,11 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 			// add all given initial live classes to live classes
 			if (initial_live_classes != NULL) {
-				DEBUGOUT(1, "\ninitial live classes of %s:\n", get_entity_name(entity));
+				DEBUGOUT(2, "\ninitial live classes of %s:\n", get_entity_name(entity));
 				ir_type *klass;
 				for (size_t i = 0; (klass = initial_live_classes[i]) != NULL; i++) {
 					assert(is_Class_type(klass));
-					DEBUGOUT(1, "\t%s\n", get_compound_name(klass));
+					DEBUGOUT(2, "\t%s\n", get_compound_name(klass));
 					iteration_set *i_set = info->live_classes;
 					cpset_insert(i_set->current, klass);
 					check_for_external_superclasses(klass, meth_env);
@@ -1255,13 +1283,11 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			ir_entity *entity = m_env->entity;
 			if (cpmap_find(&done_map, entity) != NULL) continue;
 
-			DEBUGOUT(1, "\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
-			DEBUGOUT(4, "CURRENT INFO\n");
-			DEBUGCALL(4) debug_print_info(m_env->info);
+			DEBUGOUT(1, "== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 			cpmap_set(&done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
 			DEBUGOUT(4, "COLLECTING ARGS AND RES TYPES\n");
 			collect_arg_and_res_types(m_env);
-			DEBUGOUT(1, "COLLECTING LIVE CLASSES FROM CALLLERS");
+			DEBUGOUT(4, "COLLECTING LIVE CLASSES FROM CALLLERS");
 			//This has to be done here, because already propagated classes will not be looked at during propagaton.
 			method_info *info = m_env->info;
 			iteration_set *callee_i_set = info->live_classes;
@@ -1281,7 +1307,10 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				cpset_destroy(&cut);
 			}
 
-			DEBUGOUT(1, "ANALYZING GRAPH\n");
+			DEBUGOUT(4, "CURRENT INFO\n");
+			DEBUGCALL(4) debug_print_info(m_env->info);
+
+			DEBUGOUT(4, "ANALYZING GRAPH\n");
 			ir_graph *graph = get_entity_irg(entity);
 			if (graph == NULL) {
 				analyzer_handle_no_graph(entity, m_env);
@@ -1290,28 +1319,41 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				// analyze graph
 				irg_walk_graph(graph, NULL, walk_callgraph_and_analyze, m_env);
 			}
+
+			//Handle already propagated live classes of fields, that are read from (Therefore doing it after analyzing graph
+			//Field Reads
+			cpset_iterator_init(&set_iterator, info->field_reads);
+			ir_entity *field;
+			while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
+				iteration_set *field_i_set = cpmap_find(env.live_classes_fields, field);
+				if (field_i_set) {
+					make_subset(callee_i_set->current, field_i_set->propagated);
+				}
+			}
+
+
 			free(m_env);
 		}
 	}
 	while (propagate_live_classes(&env));
 
 	if (DEBUG_XTA) {
-		DEBUGOUT(1, "\n\n==== Results ==============================================\n");
+		DEBUGOUT(2, "\n\n==== Results ==============================================\n");
 		{
 			cpmap_iterator_t iterator;
 			cpmap_iterator_init(&iterator, &done_map);
 			cpmap_entry_t entry;
-			DEBUGOUT(1, "FINAL INFO\n");
+			DEBUGOUT(2, "FINAL INFO\n");
 			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *entity = entry.key;
 				method_info *info = entry.data;
-				DEBUGOUT(1, "\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
-				DEBUGCALL(1) debug_print_info(info);
+				DEBUGOUT(2, "\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+				DEBUGCALL(2) debug_print_info(info);
 			}
 
 		}
 		{
-			DEBUGOUT(1, "\ndyncall target sets (%lu):\n", (unsigned long)cpmap_size(dyncall_targets));
+			DEBUGOUT(2, "\ndyncall target sets (%lu):\n", (unsigned long)cpmap_size(dyncall_targets));
 			//DEBUGOUT("size %u\n", cpmap_size(dyncall_targets));
 			cpmap_iterator_t iterator;
 			cpmap_iterator_init(&iterator, dyncall_targets);
@@ -1319,18 +1361,18 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *call_entity = entry.key;
 				assert(call_entity);
-				DEBUGOUT(1, "\t%s.%s %s\n", get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
+				DEBUGOUT(2, "\t%s.%s %s\n", get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 
 				cpmap_t *call_sites = entry.data;
 				assert(call_sites);
-				DEBUGOUT(1, "\tcall sites (%lu):\n", (unsigned long)cpmap_size(call_sites));
+				DEBUGOUT(2, "\tcall sites (%lu):\n", (unsigned long)cpmap_size(call_sites));
 				cpmap_iterator_t iter;
 				cpmap_iterator_init(&iter, call_sites);
 				cpmap_entry_t e;
 				while ((e = cpmap_iterator_next(&iter)).key != NULL || e.data != NULL) {
 					const ir_entity *call_site = e.key;
 					assert(call_site);
-					DEBUGOUT(1, "\t\t%s.%s\n", get_compound_name(get_entity_owner(call_site)), get_entity_name(call_site));
+					DEBUGOUT(2, "\t\t%s.%s\n", get_compound_name(get_entity_owner(call_site)), get_entity_name(call_site));
 
 					cpset_t *targets = e.data;
 					assert(targets);
@@ -1339,12 +1381,12 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 					ir_entity *method;
 					while ((method = cpset_iterator_next(&it)) != NULL) {
 						//DEBUGOUT("\t\t%s.%s %s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), gdb_node_helper(method));
-						DEBUGOUT(1, "\t\t\t%s.%s %s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
+						DEBUGOUT(2, "\t\t\t%s.%s %s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 					}
 				}
 			}
 		}
-		DEBUGOUT(1, "\n=============================================================\n");
+		DEBUGOUT(2, "\n=============================================================\n");
 	}
 
 	// free data structures
@@ -1547,7 +1589,7 @@ static void optimizer_handle_dynamic_call(ir_node *call, ir_entity *entity, ir_n
 #endif
 
 		// set an Address node as callee to make the call statically bound
-		DEBUGOUT(1, "\t\tdevirtualizing call %s.%s -> %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_compound_name(get_entity_owner(target)), get_entity_name(target));
+		DEBUGOUT(2, "\t\tdevirtualizing call %s.%s -> %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_compound_name(get_entity_owner(target)), get_entity_name(target));
 		ir_graph *graph = get_irn_irg(methodsel);
 		ir_node *address = new_r_Address(graph, target);
 		ir_node *mem = get_irn_n(methodsel, 0);
@@ -1713,8 +1755,8 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 		//inline_functions(750, 0, NULL);
 		inline_functions(750, 0, after_inline_opt);
 		devirt_calls_after_inlining = devirtualize_calls_to_local_objects(entry_points);
-		DEBUGOUT(1, "devirt calls after inlining: %d\n", devirt_calls_after_inlining);
+		DEBUGOUT(2, "devirt calls after inlining: %d\n", devirt_calls_after_inlining);
 	}
 	while (devirt_calls_after_inlining);
-	DEBUGOUT(1, "Finished XTA\n");
+	DEBUGOUT(2, "Finished XTA\n");
 }
