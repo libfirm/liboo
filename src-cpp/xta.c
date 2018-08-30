@@ -26,17 +26,50 @@
 #include "adt/hashptr.h"
 
 #include <libfirm/iroptimize.h>
-#include <libfirm/timing.h>
+#include <../../driver/timing.h>
 // debug setting
-#define DEBUG_XTA 5
+#define DEBUG_XTA 0
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 // stats
 #define XTA_STATS 1
 //#undef XTA_STATS // comment to activate stats
 
+#define NO_GRAPH_INACC 1
+#undef NO_GRAPH_INACC
+
+#define TIMING 1
+#define START_TIMER if (TIMING) start_timer(__func__);
+#define STOP_TIMER if (TIMING) stop_timer(__func__);
+
 static bool make_subset(cpset_t *a, cpset_t *b);
 static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b);
+
+static cpmap_t *timers;
+static cpmap_t *running_timers;
+
+static void start_timer(const char *desc) {
+	ir_timer_t *timer = cpmap_find(timers, desc);
+	if(timer == NULL) {
+		timer = ir_timer_new();
+		timer_register(timer, desc);
+		cpmap_set(timers, desc, timer);
+	}
+	if(cpmap_find(running_timers, timer)) return;
+	cpmap_set(running_timers, timer, timer);
+	timer_start(timer);
+	printf("STARTING %s \n", desc);
+}
+
+static void stop_timer(const char *desc) {
+	ir_timer_t *timer = cpmap_find(timers, desc);
+	if(timer != NULL) {
+		timer_stop(timer);
+		cpmap_remove(running_timers, timer);
+		printf("STOPPING %s \n", desc);
+	}
+
+}
 
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
 {
@@ -268,6 +301,7 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 	assert(env);
 	assert(klass);
 
+	START_TIMER
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
 	if (klasses != NULL) {
@@ -294,6 +328,7 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 		}
 		//TODO: Ceck for external superclass?
 	}
+	STOP_TIMER
 }
 
 static bool is_in_iteration_set(iteration_set *set, void *element)
@@ -383,6 +418,8 @@ static ir_entity *get_ldname_redirect(ir_entity *entity)
 	return target;
 }
 
+static ir_type *get_class_from_type(ir_type *type);
+
 static void analyzer_handle_no_graph(ir_entity *entity, method_env *env) //TODO: Edit
 {
 	assert(entity);
@@ -397,15 +434,33 @@ static void analyzer_handle_no_graph(ir_entity *entity, method_env *env) //TODO:
 	if (target != NULL) { // if redirection target exists
 		DEBUGOUT(4, "\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 		add_to_workqueue(target, env);
-		return; // don't do anything else afterwards in this function
+	} else { 
+		// assume external
+		DEBUGOUT(4, "\t\t\tprobably external %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+
+		//TODO maybe do something with external function: check whitelist+blacklist, get calls and creations, ... ?
+		//Add all known subclasses of return type live. Hopefully we don't lose much precision.
+		method_info *info = env->info;
+		iteration_set *i_set = info->live_classes;
+#ifdef NO_GRAPH_INACC
+		ir_type *entity_type = get_entity_type(entity);
+		size_t res_n = get_method_n_ress(entity_type);
+		for (size_t i = 0; i < res_n; i++) {
+			ir_type *res_type = get_method_res_type(entity_type, i);
+			ir_type *type = get_class_from_type(res_type);
+			if(type)
+				cpset_insert(i_set->current, type);
+		}
+#endif
+#ifndef NO_GRAPH_INACC
+		cpset_iterator_t it;
+		cpset_iterator_init(&it, info->return_subtypes);
+		ir_type *type;
+		while ((type = cpset_iterator_next(&it)) != NULL) {
+			cpset_insert(i_set->current, type);
+		}
+#endif
 	}
-
-
-	// assume external
-	DEBUGOUT(4, "\t\t\tprobably external %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
-
-	//TODO maybe do something with external function: check whitelist+blacklist, get calls and creations, ... ?
-
 }
 
 static void add_to_workqueue(ir_entity *entity, method_env *env)
@@ -923,26 +978,37 @@ static bool make_subset(cpset_t *a, cpset_t *b)
 	return change;
 }
 
+static ir_type *get_class_from_type(ir_type *type)
+{
+	assert(type);
+
+	if (is_Class_type(type)) {
+		DEBUGOUT(3, "class %s\n",  get_compound_name(type));
+		return type;
+	}
+	else if (is_Array_type(type)) {
+		DEBUGOUT(3, "array of ");
+		return get_class_from_type(get_array_element_type(type));
+	}
+	else if (is_Pointer_type(type)) {
+		DEBUGOUT(3, "pointer to ");
+		return get_class_from_type(get_pointer_points_to_type(type));
+	}
+	else {
+		DEBUGOUT(3, "Unsupported or unnecessary type %s found\n", get_type_opcode_name(get_type_opcode(type)));
+		return NULL;
+	}
+}
+
 static void get_subclasses_from_type(ir_type *type, cpset_t *set)
 {
 	assert(type);
 	assert(set);
-
-	if (is_Class_type(type)) {
-		DEBUGOUT(3, "class %s\n",  get_compound_name(type));
-		get_all_subtypes(type, set);
-	}
-	else if (is_Array_type(type)) {
-		DEBUGOUT(3, "array of ");
-		get_subclasses_from_type(get_array_element_type(type), set);
-	}
-	else if (is_Pointer_type(type)) {
-		DEBUGOUT(3, "pointer to ");
-		get_subclasses_from_type(get_pointer_points_to_type(type), set);
-	}
-	else {
-		DEBUGOUT(3, "Unsupported or unnecessary type %s found\n", get_type_opcode_name(get_type_opcode(type)));
-	}
+	//START_TIMER
+	ir_type *klass = get_class_from_type(type);
+	if (klass)
+		get_all_subtypes(klass, set);
+	//STOP_TIMER
 }
 
 static void collect_arg_and_res_types(method_env *env)
@@ -955,7 +1021,7 @@ static void collect_arg_and_res_types(method_env *env)
 	size_t arg_n = get_method_n_params(entity_type);
 	cpset_t param_subtypes;
 	cpset_init(&param_subtypes, hash_ptr, ptr_equals);
-	for (size_t i = 0; i < arg_n; i++) {
+	for (size_t i = 1; i < arg_n; i++) { //TODO: Make sure 0 is this
 		ir_type *param_type = get_method_param_type(entity_type, i);
 		DEBUGOUT(3, "Getting parameter ");
 		get_subclasses_from_type(param_type, &param_subtypes);
@@ -1028,6 +1094,7 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 
 static bool update_iteration_sets(analyzer_env *env)
 {
+	//START_TIMER
 	cpmap_iterator_t iterator;
 	cpmap_iterator_init(&iterator, env->live_classes_fields);
 	cpmap_entry_t entry;
@@ -1058,13 +1125,14 @@ static bool update_iteration_sets(analyzer_env *env)
 		handle_new_classes_in_current_set(i_set, &m_env);
 		change = change || cpset_size(i_set->current) != 0;
 	}
+	//STOP_TIMER
 	return change;
 }
 
 static bool propagate_live_classes(analyzer_env *env)
 {
 	assert(env);
-
+	//START_TIMER
 	cpmap_t *done_map = env->done_map;
 	cpmap_iterator_t iterator;
 	cpmap_iterator_init(&iterator, done_map);
@@ -1149,6 +1217,7 @@ static bool propagate_live_classes(analyzer_env *env)
 		}*/
 #endif
 	}
+	//STOP_TIMER
 	return update_iteration_sets(env) || change;
 }
 
@@ -1277,6 +1346,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		assert(i > 0 && "give at least one entry point");
 	}
 	do {
+		//START_TIMER
 		while (!pdeq_empty(workqueue)) {
 			method_env *m_env = pdeq_getl(workqueue);
 			assert(m_env && is_method_entity(m_env->entity));
@@ -1331,9 +1401,9 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				}
 			}
 
-
 			free(m_env);
 		}
+		//STOP_TIMER
 	}
 	while (propagate_live_classes(&env));
 
@@ -1741,14 +1811,19 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 	assert(entry_points);
 	cpmap_t dyncall_targets;
 
-	ir_timer_t *timer = ir_timer_new();
-	ir_timer_start(timer);
+	timer_init();
+	timers = new_cpmap(hash_ptr, ptr_equals);
+	running_timers = new_cpmap(hash_ptr, ptr_equals);
+	//START_TIMER
 	xta_run(entry_points, initial_live_classes, &dyncall_targets, ext_called_constr);
 	xta_devirtualize_calls(entry_points, &dyncall_targets);
 	xta_dispose_results(&dyncall_targets);
-	ir_timer_stop(timer);
-	printf("XTA needed %f sec.\n", ir_timer_elapsed_sec(timer));
-	ir_timer_free(timer);
+	//STOP_TIMER
+	FILE *f = fopen("timers.out", "a");
+	timer_term(f);
+	fclose(f);
+	cpmap_destroy(timers);
+	cpmap_destroy(running_timers);
 
 	int devirt_calls_after_inlining;
 	do {

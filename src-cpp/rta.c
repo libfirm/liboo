@@ -37,7 +37,10 @@
 
 // override option just for early development to keep going without information about live classes
 #define JUST_CHA 0
-
+#define NO_GRAPH_ACC 1
+//#undef NO_GRAPH_ACC
+#define NO_GRAPH_INACC 1
+#undef NO_GRAPH_INACC 
 
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
 {
@@ -273,6 +276,44 @@ static ir_entity *get_ldname_redirect(ir_entity *entity)
 	return target;
 }
 
+static ir_type *get_class_from_type(ir_type *type)
+{
+	assert(type);
+
+	if (is_Class_type(type)) {
+		return type;
+	}
+	else if (is_Array_type(type)) {
+		return get_class_from_type(get_array_element_type(type));
+	}
+	else if (is_Pointer_type(type)) {
+		return get_class_from_type(get_pointer_points_to_type(type));
+	}
+	else {
+		return NULL;
+	}
+}
+
+static void get_all_subtypes(ir_type *klass, cpset_t *res_set)
+{
+	assert(is_Class_type(klass));
+	cpset_insert(res_set, klass);
+	size_t subtypes_n = get_class_n_subtypes(klass);
+	for (size_t i = 0; i < subtypes_n; i++) {
+		get_all_subtypes(get_class_subtype(klass, i), res_set);
+	}
+}
+
+static void get_subclasses_from_type(ir_type *type, cpset_t *set)
+{
+	assert(type);
+	assert(set);
+	
+	ir_type *klass = get_class_from_type(type);
+	if (klass)
+		get_all_subtypes(klass, set);
+}
+
 static void analyzer_handle_no_graph(ir_entity *entity, analyzer_env *env)
 {
 	assert(entity);
@@ -291,11 +332,38 @@ static void analyzer_handle_no_graph(ir_entity *entity, analyzer_env *env)
 		return; // don't do anything else afterwards in this function
 	}
 
-
 	// assume external
 	DEBUGOUT("\t\t\tprobably external %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
 	//TODO maybe do something with external function: check whitelist+blacklist, get calls and creations, ... ?
+#ifdef NO_GRAPH_INACC
+	ir_type *entity_type = get_entity_type(entity);
+	size_t res_n = get_method_n_ress(entity_type);
+	for (size_t i = 0; i < res_n; i++) {
+		ir_type *res_type = get_method_res_type(entity_type, i);
+		ir_type *type = get_class_from_type(res_type);
+		if(type)
+			add_new_live_class(type, env);
+		
+	}
+#endif
+#ifdef NO_GRAPH_ACC
+	ir_type *entity_type = get_entity_type(entity);
+	size_t res_n = get_method_n_ress(entity_type);
+	cpset_iterator_t it;
+	ir_type *type;
+	cpset_t set;
+	for (size_t i = 0; i < res_n; i++) {
+		ir_type *res_type = get_method_res_type(entity_type, i);
+		cpset_init(&set, hash_ptr, ptr_equals);
+		get_subclasses_from_type(res_type, &set);
+		cpset_iterator_init(&it, &set);
+		while ((type = cpset_iterator_next(&it)) != NULL) {
+			add_new_live_class(type, env);
+		}
+		
+	}
+#endif
 
 }
 
@@ -609,10 +677,12 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 		if (is_VptrIsSet(node)) {
 			// use new VptrIsSet node for detection of object creation
 			ir_type *klass = get_VptrIsSet_type(node);
-			assert(is_Class_type(klass));
+			if(klass != NULL) {
+				assert(is_Class_type(klass));
 
-			DEBUGOUT("\tVptrIsSet: %s\n", get_compound_name(klass));
-			add_new_live_class(klass, env);
+				DEBUGOUT("\tVptrIsSet: %s\n", get_compound_name(klass));
+				add_new_live_class(klass, env);
+			}
 		}
 		// skip other node types
 		break;
@@ -694,6 +764,7 @@ static void rta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		if (cpset_find(&done_set, entity) != NULL) continue;
 
 		DEBUGOUT("\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		//printf("== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
 		cpset_insert(&done_set, entity); // mark as done _before_ walking to not add it again in case of recursive calls
 		ir_graph *graph = get_entity_irg(entity);
@@ -1047,7 +1118,7 @@ static void rta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 
 		if (cpset_find(&done_set, entity) != NULL) continue;
 
-		DEBUGOUT("\n== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		DEBUGOUT("== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
 		cpset_insert(&done_set, entity); // mark as done _before_ walking to not add it again in case of recursive calls
 		ir_graph *graph = get_entity_irg(entity);
