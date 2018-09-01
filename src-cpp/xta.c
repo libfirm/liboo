@@ -38,9 +38,11 @@
 #define NO_GRAPH_INACC 1
 #undef NO_GRAPH_INACC
 
-#define TIMING 1
+#define TIMING 0
 #define START_TIMER if (TIMING) start_timer(__func__);
 #define STOP_TIMER if (TIMING) stop_timer(__func__);
+
+#define DEVIRT_LOCAL_THRESHOLD 50
 
 static bool make_subset(cpset_t *a, cpset_t *b);
 static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b);
@@ -773,6 +775,7 @@ static void get_all_subtypes(ir_type *klass, cpset_t *res_set)
 	}
 }
 
+
 static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 {
 	assert(environment);
@@ -1069,11 +1072,6 @@ static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b)
 		if (cpset_find(b, element))
 			cpset_insert(res, element);
 	}
-	cpset_iterator_init(&iterator, b);
-	while ((element = cpset_iterator_next(&iterator)) != NULL) {
-		if (cpset_find(a, element))
-			cpset_insert(res, element);
-	}
 }
 
 static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *env)
@@ -1152,11 +1150,15 @@ static bool propagate_live_classes(analyzer_env *env)
 			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Parameters
 			iteration_set *caller_i_set = caller_info->live_classes;
-			cut_sets(&cut, caller_i_set->current, info->parameter_subtypes);
-			make_subset(callee_i_set->new, &cut);
+			if(cpset_size(caller_i_set->current) != 0) {
+				cut_sets(&cut, caller_i_set->current, info->parameter_subtypes);
+				make_subset(callee_i_set->new, &cut);
+			}
 			//Return
-			cut_sets(&cut, info->return_subtypes, callee_i_set->current);
-			make_subset(caller_i_set->new, &cut);
+			if(cpset_size(callee_i_set->current) != 0) {
+				cut_sets(&cut, info->return_subtypes, callee_i_set->current);
+				make_subset(caller_i_set->new, &cut);
+			}
 
 			cpset_destroy(&cut);
 		}
@@ -1165,7 +1167,7 @@ static bool propagate_live_classes(analyzer_env *env)
 		ir_entity *field;
 		while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
 			iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
-			if (field_i_set) {
+			if (field_i_set && cpset_size(field_i_set->current) != 0) {
 				make_subset(callee_i_set->new, field_i_set->current);
 			}
 		}
@@ -1175,38 +1177,40 @@ static bool propagate_live_classes(analyzer_env *env)
 			cpset_t subtypes;
 			cpset_init(&subtypes, hash_ptr, ptr_equals);
 			//DEBUGOUT("Field type of %s.%s is %s", get_compound_name(get_entity_owner(field)), get_entity_name(field), get_type_opcode_name(get_type_opcode(get_entity_type(field))));
-			get_subclasses_from_type(get_entity_type(field), &subtypes);
+			get_subclasses_from_type(get_entity_type(field), &subtypes);//TODO; To expensive here, caching?
 			cpset_t cut;
 			cpset_init(&cut, hash_ptr, ptr_equals);
-			cut_sets(&cut, &subtypes, callee_i_set->current);
-			bool res = add_live_classes_to_field(env, field, &cut);
-			change = change || res;
+			if(cpset_size(callee_i_set->current) != 0) {
+				cut_sets(&cut, &subtypes, callee_i_set->current);
+				bool res = add_live_classes_to_field(env, field, &cut);
+				change = change || res;
+
 
 #if (DEBUG_XTA > 1)
-			if (res) {
-				printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
-				iteration_set *i_set = cpmap_find(env->live_classes_fields, field);
-				cpset_iterator_t iterator;
-				cpset_iterator_init(&iterator, i_set->propagated);
-				printf("p: ");
-				ir_type *type;
-				while ((type = cpset_iterator_next(&iterator)) != NULL) {
-					printf("%s, ", get_compound_name(type));
+				if (res) {
+					printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
+					iteration_set *i_set = cpmap_find(env->live_classes_fields, field);
+					cpset_iterator_t iterator;
+					cpset_iterator_init(&iterator, i_set->propagated);
+					printf("p: ");
+					ir_type *type;
+					while ((type = cpset_iterator_next(&iterator)) != NULL) {
+						printf("%s, ", get_compound_name(type));
+					}
+					cpset_iterator_init(&iterator, i_set->current);
+					printf("c: ");
+					while ((type = cpset_iterator_next(&iterator)) != NULL) {
+						printf("%s, ", get_compound_name(type));
+					}
+					cpset_iterator_init(&iterator, i_set->new);
+					printf("n: ");
+					while ((type = cpset_iterator_next(&iterator)) != NULL) {
+						printf("%s, ", get_compound_name(type));
+					}
+					printf("\n");
 				}
-				cpset_iterator_init(&iterator, i_set->current);
-				printf("c: ");
-				while ((type = cpset_iterator_next(&iterator)) != NULL) {
-					printf("%s, ", get_compound_name(type));
-				}
-				cpset_iterator_init(&iterator, i_set->new);
-				printf("n: ");
-				while ((type = cpset_iterator_next(&iterator)) != NULL) {
-					printf("%s, ", get_compound_name(type));
-				}
-				printf("\n");
-			}
 #endif
-
+			}
 			cpset_destroy(&subtypes);
 			cpset_destroy(&cut);
 		}
@@ -1805,33 +1809,91 @@ static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 	cpset_destroy(&done_set);
 }
 
+static int devirtualized_calls_local = 0;
+
+static void walk_graph_and_devirt_local(ir_node *node, void *env) {
+	switch(get_irn_opcode(node)) {
+	case iro_Call: {
+		ir_node *call = node;
+		ir_node *callee = get_irn_n(call, 1);
+		if(is_Proj(callee) && !oo_get_call_is_statically_bound(call)) {
+			ir_node *pred = get_Proj_pred(callee);
+			if(is_MethodSel(pred)) {
+				ir_node *methodsel = pred;
+				ir_entity *entity = get_MethodSel_entity(methodsel);
+				ir_node *proj = get_irn_n(methodsel, 1);
+				if(is_Proj(proj)) {
+					ir_node *vptrIsSet = get_Proj_pred(proj);
+					if(is_VptrIsSet(vptrIsSet)) {
+						ir_type *type = get_VptrIsSet_type(vptrIsSet);
+						ir_entity *target = get_class_member_by_name(type, get_entity_ident(entity));
+						//printf("DEBUG: %s \n", get_entity_name(entity));
+						if(target != NULL) {
+							ir_graph *graph = get_irn_irg(methodsel);
+							ir_node *address = new_r_Address(graph, target);
+							ir_node *mem = get_irn_n(methodsel, 0);
+							ir_node *input[] = { mem, address };
+							turn_into_tuple(methodsel, 2, input);
+							devirtualized_calls_local++;
+						}
+					}
+				}
+			}				
+		}
+		break;
+	}
+	default: break;
+	}
+
+}
+
+static void devirt_local(void) {
+	for (size_t i = 0, n = get_irp_n_irgs(); i < n; ++i) {
+		ir_graph *irg = get_irp_irg(i);
+		irg_walk_graph(irg, NULL, walk_graph_and_devirt_local, NULL);
+	}
+}
 
 void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, cpmap_t *ext_called_constr)
 {
 	assert(entry_points);
 	cpmap_t dyncall_targets;
 
+	devirt_local();
+	
+	printf("Number initially devirtualized: %d\n", devirtualized_calls_local);
 	timer_init();
 	timers = new_cpmap(hash_ptr, ptr_equals);
 	running_timers = new_cpmap(hash_ptr, ptr_equals);
 	//START_TIMER
+	ir_timer_t *t = ir_timer_new();
+	ir_timer_start(t);
 	xta_run(entry_points, initial_live_classes, &dyncall_targets, ext_called_constr);
+	ir_timer_stop(t);
+	printf("XTA needed %f\n", ir_timer_elapsed_sec(t));
+	ir_timer_free(t);
 	xta_devirtualize_calls(entry_points, &dyncall_targets);
 	xta_dispose_results(&dyncall_targets);
 	//STOP_TIMER
+#if TIMER
 	FILE *f = fopen("timers.out", "a");
 	timer_term(f);
 	fclose(f);
+#endif
 	cpmap_destroy(timers);
 	cpmap_destroy(running_timers);
+	
+	exit(0); //Call for testing
 
-	int devirt_calls_after_inlining;
+	int prev_count;
 	do {
 		//inline_functions(750, 0, NULL);
 		inline_functions(750, 0, after_inline_opt);
-		devirt_calls_after_inlining = devirtualize_calls_to_local_objects(entry_points);
-		DEBUGOUT(2, "devirt calls after inlining: %d\n", devirt_calls_after_inlining);
+		//devirt_calls_after_inlining = devirtualize_calls_to_local_objects(entry_points);
+		prev_count = devirtualized_calls_local;
+		devirt_local();
+		DEBUGOUT(2, "devirt calls after inlining: %d\n", devirtualized_calls_local - prev_count);
 	}
-	while (devirt_calls_after_inlining);
+	while (devirtualized_calls_local - prev_count > DEVIRT_LOCAL_THRESHOLD);
 	DEBUGOUT(2, "Finished XTA\n");
 }
