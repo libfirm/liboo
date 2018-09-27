@@ -28,7 +28,7 @@
 #include <libfirm/iroptimize.h>
 #include <../../driver/timing.h>
 // debug setting
-#define DEBUG_XTA 0
+#define DEBUG_XTA 5
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 // stats
@@ -38,7 +38,7 @@
 #define NO_GRAPH_INACC 1
 #undef NO_GRAPH_INACC
 
-#define TIMING 0
+#define TIMING 1
 #define START_TIMER if (TIMING) start_timer(__func__);
 #define STOP_TIMER if (TIMING) stop_timer(__func__);
 
@@ -50,25 +50,27 @@ static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b);
 static cpmap_t *timers;
 static cpmap_t *running_timers;
 
-static void start_timer(const char *desc) {
+static void start_timer(const char *desc)
+{
 	ir_timer_t *timer = cpmap_find(timers, desc);
-	if(timer == NULL) {
+	if (timer == NULL) {
 		timer = ir_timer_new();
 		timer_register(timer, desc);
 		cpmap_set(timers, desc, timer);
 	}
-	if(cpmap_find(running_timers, timer)) return;
+	if (cpmap_find(running_timers, timer)) return;
 	cpmap_set(running_timers, timer, timer);
 	timer_start(timer);
-	printf("STARTING %s \n", desc);
+	//printf("STARTING %s \n", desc);
 }
 
-static void stop_timer(const char *desc) {
+static void stop_timer(const char *desc)
+{
 	ir_timer_t *timer = cpmap_find(timers, desc);
-	if(timer != NULL) {
+	if (timer != NULL) {
 		timer_stop(timer);
 		cpmap_remove(running_timers, timer);
-		printf("STOPPING %s \n", desc);
+		//printf("STOPPING %s \n", desc);
 	}
 
 }
@@ -303,7 +305,7 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 	assert(env);
 	assert(klass);
 
-	START_TIMER
+	//START_TIMER
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
 	if (klasses != NULL) {
@@ -330,7 +332,7 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 		}
 		//TODO: Ceck for external superclass?
 	}
-	STOP_TIMER
+	//STOP_TIMER
 }
 
 static bool is_in_iteration_set(iteration_set *set, void *element)
@@ -436,7 +438,8 @@ static void analyzer_handle_no_graph(ir_entity *entity, method_env *env) //TODO:
 	if (target != NULL) { // if redirection target exists
 		DEBUGOUT(4, "\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 		add_to_workqueue(target, env);
-	} else { 
+	}
+	else {
 		// assume external
 		DEBUGOUT(4, "\t\t\tprobably external %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
@@ -450,7 +453,7 @@ static void analyzer_handle_no_graph(ir_entity *entity, method_env *env) //TODO:
 		for (size_t i = 0; i < res_n; i++) {
 			ir_type *res_type = get_method_res_type(entity_type, i);
 			ir_type *type = get_class_from_type(res_type);
-			if(type)
+			if (type)
 				cpset_insert(i_set->current, type);
 		}
 #endif
@@ -492,7 +495,7 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 		//TODO:Can be deleted, because caller_i_set->propagated is empty
 		//TODO: Cant be implemented here, becuase thi sis called during propagation, propagated ain't empty and the iterator cannot handle changing sets. this needs to be done elsewhere.
 		//TODO: Handling with propagatino sets definitely needs more thought
-		if(entity != env->entity) { //This fails on recursive methods as mentioned above. maybe recursive calls have to be handled diffenrently on other occasions too
+		if (entity != env->entity) { //This fails on recursive methods as mentioned above. maybe recursive calls have to be handled diffenrently on other occasions too
 			//TODO: cant be here probably or add to new, not to current
 			method_info *caller_info = env->info;
 			cpset_t cut;
@@ -504,7 +507,7 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 			//if(cpset_size(&cut) != 0)
 			//	printf("N %lu\n", cpset_size(&cut));
 			make_subset(callee_i_set->current, &cut);
-				
+
 			//Return
 			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->propagated);
 			make_subset(caller_i_set->new, &cut); //TODO:Changed to new, because current is iterated over
@@ -765,6 +768,8 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 	}
 }
 
+static cpmap_t known_types;
+
 static void get_all_subtypes(ir_type *klass, cpset_t *res_set)
 {
 	assert(is_Class_type(klass));
@@ -775,6 +780,49 @@ static void get_all_subtypes(ir_type *klass, cpset_t *res_set)
 	}
 }
 
+static cpset_t *get_all_subtypes_c(ir_type *klass)
+{
+	cpset_t *types = cpmap_find(&known_types, klass);
+	if (types == NULL) {
+		types = new_cpset(hash_ptr, ptr_equals);
+		get_all_subtypes(klass, types);
+		cpmap_set(&known_types, klass, types);
+	}
+	return types;
+}
+
+static ir_type *get_class_from_type(ir_type *type)
+{
+	assert(type);
+
+	if (is_Class_type(type)) {
+		DEBUGOUT(3, "class %s\n",  get_compound_name(type));
+		return type;
+	}
+	else if (is_Array_type(type)) {
+		DEBUGOUT(3, "array of ");
+		return get_class_from_type(get_array_element_type(type));
+	}
+	else if (is_Pointer_type(type)) {
+		DEBUGOUT(3, "pointer to ");
+		return get_class_from_type(get_pointer_points_to_type(type));
+	}
+	else {
+		DEBUGOUT(3, "Unsupported or unnecessary type %s found\n", get_type_opcode_name(get_type_opcode(type)));
+		return NULL;
+	}
+}
+
+static cpset_t *get_subclasses_from_type(ir_type *type)
+{
+	assert(type);
+	//START_TIMER
+	ir_type *klass = get_class_from_type(type);
+	if (klass)
+		return get_all_subtypes_c(klass);
+	//STOP_TIMER
+	return NULL;
+}
 
 static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 {
@@ -850,37 +898,45 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 			ir_node *field = get_irn_n(node, 1);
 			if (is_Member(field)) {
 				ir_entity *member_entity = get_Member_entity(field);
-				method_info *info = m_env->info;
-				cpset_insert(info->field_writes, member_entity);
-				DEBUGOUT(4, "\tfield write to: %s\n", get_entity_name(member_entity));
+				if (get_subclasses_from_type(get_entity_type(member_entity)) != NULL) { //Only non primitive type fields are important
+					method_info *info = m_env->info;
+					cpset_insert(info->field_writes, member_entity);
+					DEBUGOUT(4, "\tfield write to: %s\n", get_entity_name(member_entity));
+				}
 			}
 			else if (is_Address(field)) {
 				ir_entity *member_entity = get_Address_entity(field);
-				method_info *info = m_env->info;
-				cpset_insert(info->field_writes, member_entity);
-				DEBUGOUT(4, "\tfield write to: %s\n", get_entity_name(member_entity));
+				if (get_subclasses_from_type(get_entity_type(member_entity)) != NULL) { //Only non primitive type fields are important
+					method_info *info = m_env->info;
+					cpset_insert(info->field_writes, member_entity);
+					DEBUGOUT(4, "\tfield write to: %s\n", get_entity_name(member_entity));
+				}
 			}
 		}
 	case iro_Load: {
 			ir_node *field = get_irn_n(node, 1);
 			if (is_Member(field)) {
 				ir_entity *member_entity = get_Member_entity(field);
-				method_info *info = m_env->info;
-				cpset_insert(info->field_reads, member_entity);
-				DEBUGOUT(4, "\tfield read to: %s\n", get_entity_name(member_entity));
+				if (get_subclasses_from_type(get_entity_type(member_entity)) != NULL) { //Only non primitive type fields are important
+					method_info *info = m_env->info;
+					cpset_insert(info->field_reads, member_entity);
+					DEBUGOUT(4, "\tfield read to: %s\n", get_entity_name(member_entity));
+				}
 			}
 			else if (is_Address(field)) {
 				ir_entity *member_entity = get_Address_entity(field);
-				method_info *info = m_env->info;
-				cpset_insert(info->field_reads, member_entity);
-				DEBUGOUT(4, "\tfield read to: %s\n", get_entity_name(member_entity));
+				if (get_subclasses_from_type(get_entity_type(member_entity)) != NULL) { //Only non primitive type fields are important
+					method_info *info = m_env->info;
+					cpset_insert(info->field_reads, member_entity);
+					DEBUGOUT(4, "\tfield read to: %s\n", get_entity_name(member_entity));
+				}
 			}
 		}
 	default:
 		if (is_VptrIsSet(node)) {
 			// use new VptrIsSet node for detection of object creation
 			ir_type *klass = get_VptrIsSet_type(node);
-			if(klass != NULL) {
+			if (klass != NULL) {
 				//printf("%s\n", gdb_node_helper(klass));
 				assert(is_Class_type(klass));
 
@@ -981,39 +1037,6 @@ static bool make_subset(cpset_t *a, cpset_t *b)
 	return change;
 }
 
-static ir_type *get_class_from_type(ir_type *type)
-{
-	assert(type);
-
-	if (is_Class_type(type)) {
-		DEBUGOUT(3, "class %s\n",  get_compound_name(type));
-		return type;
-	}
-	else if (is_Array_type(type)) {
-		DEBUGOUT(3, "array of ");
-		return get_class_from_type(get_array_element_type(type));
-	}
-	else if (is_Pointer_type(type)) {
-		DEBUGOUT(3, "pointer to ");
-		return get_class_from_type(get_pointer_points_to_type(type));
-	}
-	else {
-		DEBUGOUT(3, "Unsupported or unnecessary type %s found\n", get_type_opcode_name(get_type_opcode(type)));
-		return NULL;
-	}
-}
-
-static void get_subclasses_from_type(ir_type *type, cpset_t *set)
-{
-	assert(type);
-	assert(set);
-	//START_TIMER
-	ir_type *klass = get_class_from_type(type);
-	if (klass)
-		get_all_subtypes(klass, set);
-	//STOP_TIMER
-}
-
 static void collect_arg_and_res_types(method_env *env)
 {
 	assert(env);
@@ -1022,27 +1045,23 @@ static void collect_arg_and_res_types(method_env *env)
 	//Arguments
 	ir_type *entity_type = get_entity_type(env->entity);
 	size_t arg_n = get_method_n_params(entity_type);
-	cpset_t param_subtypes;
-	cpset_init(&param_subtypes, hash_ptr, ptr_equals);
 	for (size_t i = 1; i < arg_n; i++) { //TODO: Make sure 0 is this
 		ir_type *param_type = get_method_param_type(entity_type, i);
 		DEBUGOUT(3, "Getting parameter ");
-		get_subclasses_from_type(param_type, &param_subtypes);
+		cpset_t *subtypes = get_subclasses_from_type(param_type);
+		if (subtypes != NULL)
+			make_subset(info->parameter_subtypes, subtypes);
 	}
-	make_subset(info->parameter_subtypes, &param_subtypes);
 	//Result
 	size_t res_n = get_method_n_ress(entity_type);
-	cpset_t ress_subtypes;
-	cpset_init(&ress_subtypes, hash_ptr, ptr_equals);
 	for (size_t i = 0; i < res_n; i++) {
 		ir_type *res_type = get_method_res_type(entity_type, i);
 		DEBUGOUT(3, "Getting result ");
-		get_subclasses_from_type(res_type, &ress_subtypes);
+		cpset_t *subtypes = get_subclasses_from_type(res_type);
+		if (subtypes != NULL)
+			make_subset(info->return_subtypes, subtypes);
 	}
-	make_subset(info->return_subtypes, &ress_subtypes);
 
-	cpset_destroy(&param_subtypes);
-	cpset_destroy(&ress_subtypes);
 }
 
 static bool add_live_classes_to_field(analyzer_env *env, ir_entity *field, cpset_t *klasses)
@@ -1065,11 +1084,16 @@ static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b)
 	assert(a);
 	assert(b);
 
+	cpset_t *c = b;
+	if (cpset_size(a) > cpset_size(b)) {
+		c = a;
+		a = b;
+	}
 	cpset_iterator_t iterator;
 	cpset_iterator_init(&iterator, a);
 	void *element;
 	while ((element = cpset_iterator_next(&iterator)) != NULL) {
-		if (cpset_find(b, element))
+		if (cpset_find(c, element))
 			cpset_insert(res, element);
 	}
 }
@@ -1111,7 +1135,7 @@ static bool update_iteration_sets(analyzer_env *env)
 	m_env.analyzer_env = env;
 	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
 		method_info *info = entry.data;
-		ir_entity *entity = entry.key;
+		ir_entity *entity = (ir_entity *) entry.key;
 		m_env.entity = entity;
 		m_env.info = info;
 		iteration_set *i_set = info->live_classes;
@@ -1130,7 +1154,7 @@ static bool update_iteration_sets(analyzer_env *env)
 static bool propagate_live_classes(analyzer_env *env)
 {
 	assert(env);
-	//START_TIMER
+	START_TIMER
 	cpmap_t *done_map = env->done_map;
 	cpmap_iterator_t iterator;
 	cpmap_iterator_init(&iterator, done_map);
@@ -1150,12 +1174,12 @@ static bool propagate_live_classes(analyzer_env *env)
 			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Parameters
 			iteration_set *caller_i_set = caller_info->live_classes;
-			if(cpset_size(caller_i_set->current) != 0) {
+			if (cpset_size(caller_i_set->current) != 0) {
 				cut_sets(&cut, caller_i_set->current, info->parameter_subtypes);
 				make_subset(callee_i_set->new, &cut);
 			}
 			//Return
-			if(cpset_size(callee_i_set->current) != 0) {
+			if (cpset_size(callee_i_set->current) != 0) {
 				cut_sets(&cut, info->return_subtypes, callee_i_set->current);
 				make_subset(caller_i_set->new, &cut);
 			}
@@ -1174,14 +1198,13 @@ static bool propagate_live_classes(analyzer_env *env)
 		//Field Writes
 		cpset_iterator_init(&set_iterator, info->field_writes);
 		while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
-			cpset_t subtypes;
-			cpset_init(&subtypes, hash_ptr, ptr_equals);
+			cpset_t *subtypes;
 			//DEBUGOUT("Field type of %s.%s is %s", get_compound_name(get_entity_owner(field)), get_entity_name(field), get_type_opcode_name(get_type_opcode(get_entity_type(field))));
-			get_subclasses_from_type(get_entity_type(field), &subtypes);//TODO; To expensive here, caching?
+			subtypes = get_subclasses_from_type(get_entity_type(field));
 			cpset_t cut;
 			cpset_init(&cut, hash_ptr, ptr_equals);
-			if(cpset_size(callee_i_set->current) != 0) {
-				cut_sets(&cut, &subtypes, callee_i_set->current);
+			if (cpset_size(callee_i_set->current) != 0) {
+				cut_sets(&cut, subtypes, callee_i_set->current);
 				bool res = add_live_classes_to_field(env, field, &cut);
 				change = change || res;
 
@@ -1211,7 +1234,6 @@ static bool propagate_live_classes(analyzer_env *env)
 				}
 #endif
 			}
-			cpset_destroy(&subtypes);
 			cpset_destroy(&cut);
 		}
 #if DEBUG_XTA
@@ -1221,7 +1243,7 @@ static bool propagate_live_classes(analyzer_env *env)
 		}*/
 #endif
 	}
-	//STOP_TIMER
+	STOP_TIMER
 	return update_iteration_sets(env) || change;
 }
 
@@ -1300,6 +1322,8 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	cpmap_t done_map;
 	cpmap_init(&done_map, hash_ptr, ptr_equals);
+
+	cpmap_init(&known_types, hash_ptr, ptr_equals);
 
 	analyzer_env env = {
 		.workqueue = workqueue,
@@ -1508,6 +1532,17 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	// note: live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
 
+	{
+		// delete the map and sets in map known_types
+		cpmap_iterator_t iterator;
+		cpmap_iterator_init(&iterator, &known_types);
+		cpmap_entry_t entry;
+		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+			cpset_t *set = entry.data;
+			cpset_destroy(set);
+		}
+		cpmap_destroy(&known_types);
+	}
 }
 
 
@@ -1809,48 +1844,52 @@ static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 	cpset_destroy(&done_set);
 }
 
-static int devirtualized_calls_local = 0;
 
-static void walk_graph_and_devirt_local(ir_node *node, void *env) {
-	switch(get_irn_opcode(node)) {
+static void walk_graph_and_devirt_local(ir_node *node, void *env)
+{
+	int *count = env;
+
+	switch (get_irn_opcode(node)) {
 	case iro_Call: {
-		ir_node *call = node;
-		ir_node *callee = get_irn_n(call, 1);
-		if(is_Proj(callee) && !oo_get_call_is_statically_bound(call)) {
-			ir_node *pred = get_Proj_pred(callee);
-			if(is_MethodSel(pred)) {
-				ir_node *methodsel = pred;
-				ir_entity *entity = get_MethodSel_entity(methodsel);
-				ir_node *proj = get_irn_n(methodsel, 1);
-				if(is_Proj(proj)) {
-					ir_node *vptrIsSet = get_Proj_pred(proj);
-					if(is_VptrIsSet(vptrIsSet)) {
-						ir_type *type = get_VptrIsSet_type(vptrIsSet);
-						ir_entity *target = get_class_member_by_name(type, get_entity_ident(entity));
-						//printf("DEBUG: %s \n", get_entity_name(entity));
-						if(target != NULL) {
-							ir_graph *graph = get_irn_irg(methodsel);
-							ir_node *address = new_r_Address(graph, target);
-							ir_node *mem = get_irn_n(methodsel, 0);
-							ir_node *input[] = { mem, address };
-							turn_into_tuple(methodsel, 2, input);
-							devirtualized_calls_local++;
+			ir_node *call = node;
+			ir_node *callee = get_irn_n(call, 1);
+			if (is_Proj(callee) && !oo_get_call_is_statically_bound(call)) {
+				ir_node *pred = get_Proj_pred(callee);
+				if (is_MethodSel(pred)) {
+					ir_node *methodsel = pred;
+					ir_entity *entity = get_MethodSel_entity(methodsel);
+					ir_node *proj = get_irn_n(methodsel, 1);
+					if (is_Proj(proj)) {
+						ir_node *vptrIsSet = get_Proj_pred(proj);
+						if (is_VptrIsSet(vptrIsSet)) {
+							ir_type *type = get_VptrIsSet_type(vptrIsSet);
+							ir_entity *target = get_class_member_by_name(type, get_entity_ident(entity));
+							//printf("DEBUG: %s \n", get_entity_name(entity));
+							if (target != NULL) {
+								ir_graph *graph = get_irn_irg(methodsel);
+								ir_node *address = new_r_Address(graph, target);
+								ir_node *mem = get_irn_n(methodsel, 0);
+								ir_node *input[] = { mem, address };
+								turn_into_tuple(methodsel, 2, input);
+								(*count)++;
+							}
 						}
 					}
 				}
-			}				
+			}
+			break;
 		}
-		break;
-	}
 	default: break;
 	}
 
 }
 
-static void devirt_local(void) {
+static void devirt_local(int *count)
+{
+	*count = 0;
 	for (size_t i = 0, n = get_irp_n_irgs(); i < n; ++i) {
 		ir_graph *irg = get_irp_irg(i);
-		irg_walk_graph(irg, NULL, walk_graph_and_devirt_local, NULL);
+		irg_walk_graph(irg, NULL, walk_graph_and_devirt_local, count);
 	}
 }
 
@@ -1859,8 +1898,10 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 	assert(entry_points);
 	cpmap_t dyncall_targets;
 
-	devirt_local();
-	
+
+	int devirtualized_calls_local;
+	devirt_local(&devirtualized_calls_local);
+
 	printf("Number initially devirtualized: %d\n", devirtualized_calls_local);
 	timer_init();
 	timers = new_cpmap(hash_ptr, ptr_equals);
@@ -1875,25 +1916,24 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 	xta_devirtualize_calls(entry_points, &dyncall_targets);
 	xta_dispose_results(&dyncall_targets);
 	//STOP_TIMER
-#if TIMER
+#if TIMING
 	FILE *f = fopen("timers.out", "a");
 	timer_term(f);
 	fclose(f);
 #endif
 	cpmap_destroy(timers);
 	cpmap_destroy(running_timers);
-	
+
 	exit(0); //Call for testing
 
-	int prev_count;
 	do {
 		//inline_functions(750, 0, NULL);
 		inline_functions(750, 0, after_inline_opt);
 		//devirt_calls_after_inlining = devirtualize_calls_to_local_objects(entry_points);
-		prev_count = devirtualized_calls_local;
-		devirt_local();
-		DEBUGOUT(2, "devirt calls after inlining: %d\n", devirtualized_calls_local - prev_count);
+		devirt_local(&devirtualized_calls_local);
+		DEBUGOUT(2, "devirt calls after inlining: %d\n", devirtualized_calls_local);
 	}
-	while (devirtualized_calls_local - prev_count > DEVIRT_LOCAL_THRESHOLD);
+	while (devirtualized_calls_local > DEVIRT_LOCAL_THRESHOLD);
+	inline_functions(750, 0, after_inline_opt);
 	DEBUGOUT(2, "Finished XTA\n");
 }
