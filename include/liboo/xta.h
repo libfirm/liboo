@@ -14,8 +14,14 @@
 #define OO_XTA_H
 
 
+#include <stdbool.h>
 #include <libfirm/firm.h>
 #include "../../src-cpp/adt/cpmap.h"
+#include "../../src-cpp/adt/cpset.h"
+
+
+void xta_set_is_constructor_callback(bool (*is_constr)(ir_entity *method));
+void xta_set_non_leaking_ext_methods(cpset_t *methods);
 
 /** sets important callback functions needed to detect calls (e.g. class intialization) hidden behind frontend-specific nodes
  * @note It's very important for the frontend to implement these callbacks correctly, if anything is missing RTA's assumptions may not hold and it can lead to defective programs!
