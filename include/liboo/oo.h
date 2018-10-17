@@ -6,7 +6,6 @@
 
 #include "ddispatch.h"
 #include "rta.h"
-#include "devirt_local.h"
 #include "xta.h"
 
 void oo_init(void);

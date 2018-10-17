@@ -1,17 +1,17 @@
 /*
- * This file is part of liboo.
+ * This file is part of liboo and contains the implementation
+ * of XTA to devirtualize dynamic calls.
  */
 
 /**
  * @file	xta.c
- * @brief	Devirtualization of dynamically bound calls through Hyprid  Type Analysis
+ * @brief	Devirtualization of dynamically bound calls through Hyprid Type Analysis
  * @author	Daniel Biester
  * @date	2018
  */
 
 
 #include "liboo/xta.h"
-#include "liboo/devirt_local.h"
 #include <assert.h>
 
 #include <stdbool.h>
@@ -35,45 +35,8 @@
 #define XTA_STATS 1
 //#undef XTA_STATS // comment to activate stats
 
-#define NO_GRAPH_INACC 1
-#undef NO_GRAPH_INACC
-
-#define TIMING 1
-#define START_TIMER if (TIMING) start_timer(__func__);
-#define STOP_TIMER if (TIMING) stop_timer(__func__);
-
-#define DEVIRT_LOCAL_THRESHOLD 50
-
 static bool make_subset(cpset_t *a, cpset_t *b);
 static void cut_sets(cpset_t *res, cpset_t *a, cpset_t *b);
-
-static cpmap_t *timers;
-static cpmap_t *running_timers;
-
-static void start_timer(const char *desc)
-{
-	ir_timer_t *timer = cpmap_find(timers, desc);
-	if (timer == NULL) {
-		timer = ir_timer_new();
-		timer_register(timer, desc);
-		cpmap_set(timers, desc, timer);
-	}
-	if (cpmap_find(running_timers, timer)) return;
-	cpmap_set(running_timers, timer, timer);
-	timer_start(timer);
-	//printf("STARTING %s \n", desc);
-}
-
-static void stop_timer(const char *desc)
-{
-	ir_timer_t *timer = cpmap_find(timers, desc);
-	if (timer != NULL) {
-		timer_stop(timer);
-		cpmap_remove(running_timers, timer);
-		//printf("STOPPING %s \n", desc);
-	}
-
-}
 
 static ir_entity *get_class_member_by_name(ir_type *cls, ident *ident) // function which was removed from newer libfirm versions
 {
@@ -112,22 +75,6 @@ static void after_inline_opt(ir_graph *irg)
 	optimize_cf(irg);
 	combo(irg);
 }
-/*
-static inline cpmap_iterator_t *new_cpmap_iterator(cpmap_t *map) // missing new function for cpmap iterator
-{
-	cpmap_iterator_t *it = (cpmap_iterator_t*)malloc(sizeof(cpmap_iterator_t));
-	cpmap_iterator_init(it, map);
-	return it;
-}
-
-static inline cpset_iterator_t *new_cpset_iterator(cpset_t *set) // missing new function for cpset iterator
-{
-	cpset_iterator_t *it = (cpset_iterator_t*)malloc(sizeof(cpset_iterator_t));
-	cpset_iterator_init(it, set);
-	return it;
-}
-*/
-
 
 static ir_entity *default_detect_call(ir_node *call)
 {
@@ -250,6 +197,12 @@ static inline method_info *new_method_info(void)
 	return info;
 }
 
+static bool ext_method_is_non_leaking(ir_entity *method) {
+	if(non_leaking_ext_methods == NULL)
+		return false;
+	return cpset_find(non_leaking_ext_methods, method);
+}
+
 static void add_to_workqueue(ir_entity *method, method_env *env); // forward declaration
 
 // add method entity to target sets of all call entities
@@ -266,16 +219,13 @@ static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, method_en
 	while ((call_entity = cpset_iterator_next(&iterator)) != NULL) {
 		cpmap_t *call_sites = cpmap_find(a_env->dyncall_targets, call_entity);
 		assert(call_sites);
-		cpset_t *targets = cpmap_find(call_sites, env->entity);//TODO: maybe creating set/map?
+		cpset_t *targets = cpmap_find(call_sites, env->entity);
 		assert(targets != NULL);
 		//assert(cpset_find(targets, method) == NULL); // doesn't make sense!?
 
 		DEBUGOUT(2, "\t\t\t\t\tupdating method %s.%s for call %s.%s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
 		// add to targets set
 		cpset_insert(targets, method);
-
-		// add to workqueue
-		//add_to_workqueue(method, env);
 	}
 }
 
@@ -284,7 +234,6 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 	assert(env);
 	assert(klass);
 
-	//START_TIMER
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
 	if (klasses != NULL) {
@@ -314,9 +263,7 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 			cpmap_destroy(methods);
 			free(methods);
 		}
-		//TODO: Ceck for external superclass?
 	}
-	//STOP_TIMER
 }
 
 static bool is_in_iteration_set(iteration_set *set, void *element)
@@ -333,7 +280,7 @@ static void add_new_live_class(ir_type *klass, method_env *env)
 	method_info *info = env->info;
 	iteration_set *i_set = info->live_classes;
 	if (!is_in_iteration_set(i_set, klass) // if it had not already been added
-	        && !oo_get_class_is_extern(klass) && !oo_get_class_is_abstract(klass)) { // if not extern and not abstract TODO: extern here correct?
+		&& !oo_get_class_is_abstract(klass)) { // if not abstract
 		// add to live classes
 		cpset_insert(i_set->current, klass);
 		DEBUGOUT(2, "\t\t\t\t\tadded new live class %s to method %s.%s \n", get_compound_name(klass), get_compound_name(get_entity_owner(env->entity)), get_entity_name(env->entity));
@@ -407,7 +354,7 @@ static ir_entity *get_ldname_redirect(ir_entity *entity)
 
 static ir_type *get_class_from_type(ir_type *type);
 
-static void analyzer_handle_no_graph(ir_entity *entity, method_env *env) //TODO: Edit
+static void analyzer_handle_no_graph(ir_entity *entity, method_env *env)
 {
 	assert(entity);
 	assert(is_method_entity(entity));
@@ -426,53 +373,16 @@ static void analyzer_handle_no_graph(ir_entity *entity, method_env *env) //TODO:
 		// assume external
 		DEBUGOUT(4, "\t\t\tprobably external %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 
-		//TODO maybe do something with external function: check whitelist+blacklist, get calls and creations, ... ?
-		/*if(!oo_get_class_is_extern(get_entity_owner(entity))) {
-			//Handle external methode (e.g. native)
-			//Add all known subclasses of return type live. Hopefully we don't lose much precision.
-			method_info *info = env->info;
-			iteration_set *i_set = info->live_classes;
-#ifdef NO_GRAPH_INACC
-			ir_type *entity_type = get_entity_type(entity);
-			size_t res_n = get_method_n_ress(entity_type);
-			for (size_t i = 0; i < res_n; i++) {
-				ir_type *res_type = get_method_res_type(entity_type, i);
-				ir_type *type = get_class_from_type(res_type);
-				if (type)
-					cpset_insert(i_set->current, type);
-			}
-#endif
-#ifndef NO_GRAPH_INACC
-			cpset_iterator_t it;
-			cpset_iterator_init(&it, info->return_subtypes);
-			ir_type *type;
-			while ((type = cpset_iterator_next(&it)) != NULL) {
-				cpset_insert(i_set->current, type);
-			}
-#endif
-		}*/
 		//Handle external methode (e.g. native)
 		//Add all known subclasses of return type live. Hopefully we don't lose much precision.
 		method_info *info = env->info;
 		iteration_set *i_set = info->live_classes;
-#ifdef NO_GRAPH_INACC
-		ir_type *entity_type = get_entity_type(entity);
-		size_t res_n = get_method_n_ress(entity_type);
-		for (size_t i = 0; i < res_n; i++) {
-			ir_type *res_type = get_method_res_type(entity_type, i);
-			ir_type *type = get_class_from_type(res_type);
-			if (type)
-				cpset_insert(i_set->current, type);
-		}
-#endif
-#ifndef NO_GRAPH_INACC
 		cpset_iterator_t it;
 		cpset_iterator_init(&it, info->return_subtypes);
 		ir_type *type;
 		while ((type = cpset_iterator_next(&it)) != NULL) {
 			cpset_insert(i_set->current, type);
 		}
-#endif
 	}
 }
 
@@ -481,7 +391,7 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 	assert(entity);
 	assert(is_method_entity(entity));
 	assert(env);
-
+	
 	analyzer_env *a_env = env->analyzer_env;
 	method_info *done_entity_info = cpmap_find(a_env->done_map, entity);
 	if (done_entity_info == NULL) { // only enqueue if not already done
@@ -490,42 +400,22 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 		entity_menv->entity = entity;
 		method_info *info = new_method_info();
 		iteration_set *i_set = info->live_classes;
-		if(is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity))) { //TODO: Are there external classes with non-external methods?
+		if(is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity))) {
 			//Handle external library methods
-			method_info *info = env->info;
 			info->is_library_method = true;
+			DEBUGOUT(5, "%s.%s is marked as library method\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
 		}
-		/*if(!get_entity_irg(entity)) {
-			cpset_destroy(i_set->new);
-			cpset_destroy(i_set->propagated);
-			cpset_destroy(i_set->current);
-			free(i_set->current);
-			free(i_set->new);
-			free(i_set->propagated);
-			free(i_set);
-			i_set = a_env->ext_live_classes;
-		}*/
 		cpset_insert(i_set->current, get_entity_owner(entity));
 		entity_menv->info = info;
 		entity_menv->analyzer_env = a_env;
 		cpset_insert(info->callers, env->entity);
-		if(is_constr(env->entity))
-			cpset_insert(i_set->current, get_entity_owner(env->entity));
 		pdeq_putr(a_env->workqueue, entity_menv);
 	}
 	else {
 		cpset_insert(done_entity_info->callers, env->entity);
-		if(is_constr(env->entity)) {
-			iteration_set *i_set = done_entity_info->live_classes;
-			cpset_insert(i_set->new, get_entity_owner(env->entity));
-		}
 		//This is later done for entities added to the workqueue.
-		//for already analyzed methods, we update already propagate info here.
-		//TODO:Can be deleted, because caller_i_set->propagated is empty
-		//TODO: Cant be implemented here, becuase thi sis called during propagation, propagated ain't empty and the iterator cannot handle changing sets. this needs to be done elsewhere.
-		//TODO: Handling with propagatino sets definitely needs more thought
-		if (entity != env->entity) { //This fails on recursive methods as mentioned above. maybe recursive calls have to be handled diffenrently on other occasions too
-			//TODO: cant be here probably or add to new, not to current
+		//for already analyzed methods, we update already propagated info here.
+		if (entity != env->entity) { //Only if call is non-recurisve
 			method_info *caller_info = env->info;
 			cpset_t cut;
 			cpset_init(&cut, hash_ptr, ptr_equals);
@@ -533,16 +423,16 @@ static void add_to_workqueue(ir_entity *entity, method_env *env)
 			iteration_set *caller_i_set = caller_info->live_classes;
 			cut_sets(&cut, caller_i_set->propagated, done_entity_info->parameter_subtypes);
 			iteration_set *callee_i_set = done_entity_info->live_classes;
-			//if(cpset_size(&cut) != 0)
-			//	printf("N %lu\n", cpset_size(&cut));
 			if (done_entity_info->is_library_method) {
 				make_subset(a_env->ext_live_classes, &cut);
 			} else {
 				make_subset(callee_i_set->current, &cut);
 			}
+			cpset_destroy(&cut);
+			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Return
 			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->propagated);
-			make_subset(caller_i_set->new, &cut); //TODO:Changed to new, because current is iterated over
+			make_subset(caller_i_set->new, &cut);
 
 			cpset_destroy(&cut);
 		}
@@ -710,7 +600,7 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 	}
 	method_info *m_info = env->info;
 	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
-		if (is_in_iteration_set(m_info->live_classes, klass) || oo_get_class_is_extern(klass)) { // if class is considered in use TODO: remove extern
+		if (is_in_iteration_set(m_info->live_classes, klass)) { // if class is considered in use 
 			take_entity(current_entity, result_set, env);
 		}
 		else {
@@ -751,7 +641,7 @@ static void analyzer_handle_static_call(ir_node *call, ir_entity *entity, method
 	// add to live methods
 	//cpset_insert(env->live_methods, entity);
 
-	add_to_workqueue(entity, env);//TODO: static methods don't need method_info, does it hurt somewhere
+	add_to_workqueue(entity, env);
 
 
 	// hack to detect calls (like class initialization) that are hidden in frontend-specific nodes
@@ -848,11 +738,9 @@ static ir_type *get_class_from_type(ir_type *type)
 static cpset_t *get_subclasses_from_type(ir_type *type)
 {
 	assert(type);
-	//START_TIMER
 	ir_type *klass = get_class_from_type(type);
 	if (klass)
 		return get_all_subtypes_c(klass);
-	//STOP_TIMER
 	return NULL;
 }
 
@@ -914,9 +802,17 @@ static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 				}
 				else {
 					// indirect call via function pointers or are there even more types of calls?
-					DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
-					DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
-					DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
+
+					if(get_Tuple_n_preds(pred) == 2 && is_Address(get_Tuple_pred(pred, 1))) {
+						ir_entity *entity = get_Address_entity(get_Tuple_pred(pred, 1));
+						
+						DEBUGOUT(4, "local devirt static call\n");
+						analyzer_handle_static_call(call, entity, m_env);
+					} else {
+						DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+						DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
+						DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
+					}
 				}
 			}
 			else {
@@ -986,6 +882,8 @@ static void debug_print_info(method_info *info)
 	assert(info);
 
 	printf("===START INFO BLOCK==========\n");
+	if(info->is_library_method)
+		printf("It's a library method");
 	cpset_t *set = info->parameter_subtypes;
 	cpset_iterator_t iterator;
 	cpset_iterator_init(&iterator, set);
@@ -1078,7 +976,7 @@ static void collect_arg_and_res_types(method_env *env)
 	ir_type *entity_type = get_entity_type(env->entity);
 	size_t arg_n = get_method_n_params(entity_type);
 	size_t i = 1;
-	if(info->is_library_method) {
+	if(info->is_library_method || is_constr(env->entity)) {
 		i = 0; //external methods get this pointer too
 	}
 	for (; i < arg_n; i++) { 
@@ -1107,7 +1005,7 @@ static bool add_live_classes_to_field(analyzer_env *env, ir_entity *field, cpset
 	assert(klasses);
 
 	cpset_t *field_set;
-	if(oo_get_class_is_extern(get_entity_owner(field))) {
+	if(is_Class_type(get_entity_owner(field)) && oo_get_class_is_extern(get_entity_owner(field))) {
 		field_set = env->ext_live_classes;
 	} else {
 		iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
@@ -1157,7 +1055,6 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 
 static bool update_iteration_sets(analyzer_env *env)
 {
-	//START_TIMER
 	cpmap_iterator_t iterator;
 	cpmap_iterator_init(&iterator, env->live_classes_fields);
 	cpmap_entry_t entry;
@@ -1188,21 +1085,18 @@ static bool update_iteration_sets(analyzer_env *env)
 		handle_new_classes_in_current_set(i_set, &m_env);
 		change = change || cpset_size(i_set->current) != 0;
 	}
-	//STOP_TIMER
 	return change;
 }
 
 static bool propagate_live_classes(analyzer_env *env)
 {
 	assert(env);
-	START_TIMER
 	cpmap_t *done_map = env->done_map;
 	cpmap_iterator_t iterator;
 	cpmap_iterator_init(&iterator, done_map);
 	cpmap_entry_t entry;
 	bool change = false;
 	while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
-		//ir_entity *entity = (ir_entity *) entry.key;
 		method_info *info = (method_info *) entry.data;
 		iteration_set *callee_i_set = info->live_classes;
 		cpset_iterator_t set_iterator;
@@ -1223,6 +1117,8 @@ static bool propagate_live_classes(analyzer_env *env)
 					make_subset(callee_i_set->new, &cut);
 				}
 			}
+			cpset_destroy(&cut);
+			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Return
 			if (cpset_size(callee_i_set->current) != 0) {
 				cut_sets(&cut, info->return_subtypes, callee_i_set->current);
@@ -1235,7 +1131,7 @@ static bool propagate_live_classes(analyzer_env *env)
 		cpset_iterator_init(&set_iterator, info->field_reads);
 		ir_entity *field;
 		while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
-			if(oo_get_class_is_extern(get_entity_owner(field))) {
+			if(is_Class_type(get_entity_owner(field)) && oo_get_class_is_extern(get_entity_owner(field))) {
 				cpset_t cut;
 				cpset_init(&cut, hash_ptr, ptr_equals);
 				cut_sets(&cut, env->ext_live_classes, get_subclasses_from_type(get_entity_type(field)));
@@ -1289,18 +1185,12 @@ static bool propagate_live_classes(analyzer_env *env)
 			}
 			cpset_destroy(&cut);
 		}
-#if DEBUG_XTA
-		/*if (change) {
-			DEBUGOUT("UPDATED METHOD INFO FROM %s.%s TO\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
-			debug_print_info(info);
-		}*/
-#endif
 	}
 
-	//Handle from external callable methods
+	//Handle externally callable methods
 	cpset_iterator_t it;
 	cpset_iterator_init(&it, env->methods_ext_called);
-	ir_entity *ec_method; //external callable method
+	ir_entity *ec_method; //externally callable method
 	while((ec_method = cpset_iterator_next(&it)) != NULL) {
 		if(cpset_find(env->ext_live_classes, get_entity_owner(ec_method))) {
 			method_info *info = cpmap_find(env->done_map, ec_method);
@@ -1310,6 +1200,8 @@ static bool propagate_live_classes(analyzer_env *env)
 			//Parameters
 			cut_sets(&cut, env->ext_live_classes, info->parameter_subtypes);
 			make_subset(i_set->new, &cut);
+			cpset_destroy(&cut);
+			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Return
 			if (cpset_size(i_set->current) != 0) {
 				cut_sets(&cut, info->return_subtypes, i_set->current);
@@ -1319,7 +1211,6 @@ static bool propagate_live_classes(analyzer_env *env)
 			cpset_destroy(&cut);
 		}
 	}
-	STOP_TIMER
 	return update_iteration_sets(env) || change;
 }
 
@@ -1500,23 +1391,20 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 			pdeq_putr(workqueue, meth_env);
 
-			// add all given initial live classes to live classes
-			if (initial_live_classes != NULL) {
-				DEBUGOUT(2, "\ninitial live classes of %s:\n", get_entity_name(entity));
-				ir_type *klass;
-				for (size_t i = 0; (klass = initial_live_classes[i]) != NULL; i++) {
-					assert(is_Class_type(klass));
-					DEBUGOUT(2, "\t%s\n", get_compound_name(klass));
-					iteration_set *i_set = info->live_classes;
-					cpset_insert(i_set->current, klass);
-				}
-			}
+			iteration_set *i_set = info->live_classes;
+			//add all subtypes of the parameter to the live set
+			collect_arg_and_res_types(meth_env);
+			cpset_iterator_t it;
+			cpset_iterator_init(&it, info->parameter_subtypes);
+			ir_type *klass;
+			while((klass = cpset_iterator_next(&it)) != NULL)
+				cpset_insert(i_set->current, klass);
 
 		}
 		assert(i > 0 && "give at least one entry point");
 	}
 	do {
-		//START_TIMER
+		DEBUGOUT(5, "PROPAGATION FINISHED\n");
 		while (!pdeq_empty(workqueue)) {
 			method_env *m_env = pdeq_getl(workqueue);
 			assert(m_env && is_method_entity(m_env->entity));
@@ -1531,9 +1419,23 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 					caller_env.analyzer_env = &env;
 					caller_env.entity = caller;
 					caller_env.info = cpmap_find(&done_map, caller);
+					if(caller_env.info == NULL) 
+						DEBUGOUT(5, "CALLER IS NULL");
 					add_to_workqueue(entity, &caller_env);
 				}
 				continue;
+			}
+			
+			iteration_set *callee_i_set = info->live_classes;
+			// add all given initial live classes to live classes
+			if (initial_live_classes != NULL) {
+				DEBUGOUT(2, "\ninitial live classes of %s:\n", get_entity_name(entity));
+				ir_type *klass;
+				for (size_t i = 0; (klass = initial_live_classes[i]) != NULL; i++) {
+					assert(is_Class_type(klass));
+					DEBUGOUT(2, "\t%s\n", get_compound_name(klass));
+					cpset_insert(callee_i_set->current, klass);
+				}
 			}
 
 			DEBUGOUT(1, "== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
@@ -1542,7 +1444,6 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 			collect_arg_and_res_types(m_env);
 			DEBUGOUT(4, "COLLECTING LIVE CLASSES FROM CALLLERS\n");
 			//This has to be done here, because already propagated classes will not be looked at during propagaton.
-			iteration_set *callee_i_set = info->live_classes;
 			cpset_iterator_t set_iterator;
 			//Method calls
 			cpset_iterator_init(&set_iterator, info->callers);
@@ -1576,12 +1477,12 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				irg_walk_graph(graph, NULL, walk_callgraph_and_analyze, m_env);
 			}
 
-			//Handle already propagated live classes of fields, that are read from (Therefore doing it after analyzing graph
+			//Handle already propagated live classes of fields, that are read from (Therefore doing it after analyzing graph)
 			//Field Reads
 			cpset_iterator_init(&set_iterator, info->field_reads);
 			ir_entity *field;
 			while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
-				if(oo_get_class_is_extern(get_entity_owner(field))) {
+				if(is_Class_type(get_entity_owner(field)) && oo_get_class_is_extern(get_entity_owner(field))) {
 					cpset_t cut;
 					cpset_init(&cut, hash_ptr, ptr_equals);
 					cut_sets(&cut, env.ext_live_classes, get_subclasses_from_type(get_entity_type(field)));
@@ -1597,7 +1498,6 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 			free(m_env);
 		}
-		//STOP_TIMER
 	}
 	while (propagate_live_classes(&env));
 
@@ -1652,6 +1552,8 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		}
 		DEBUGOUT(2, "\n=============================================================\n");
 	}
+
+	printf(" %zu &", cpmap_size(env.done_map));
 
 	// free data structures
 	del_pdeq(workqueue);
@@ -1932,9 +1834,15 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void *environment)
 					DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
 					DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
 					DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
+					if(get_Tuple_n_preds(pred) == 2 && is_Address(get_Tuple_pred(pred, 1))) {
+						ir_entity *entity = get_Address_entity(get_Tuple_pred(pred, 1));
+
+						optimizer_handle_static_call(call, entity, env);
+					} else {
 #ifdef XTA_STATS
-					env->n_others++;
+						env->n_others++;
 #endif
+					}
 				}
 			}
 			else {
@@ -2012,12 +1920,12 @@ static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 	}
 
 #ifdef XTA_STATS
-	printf("static calls: %llu\n", env.n_staticcalls);
-	printf("dynamic calls: %llu\n", env.n_dyncalls);
-	printf("interface calls: %llu\n", env.n_icalls);
-	printf("devirtualizations of dynamic calls: %llu\n", env.n_devirts);
-	printf("devirtualizations of interface calls: %llu\n", env.n_devirts_icalls);
-	printf("other calls: %llu\n", env.n_others);
+	printf(" %llu &", env.n_staticcalls);
+	printf(" %llu &", env.n_dyncalls);
+	printf(" %llu &", env.n_icalls);
+	printf(" %llu &", env.n_others);
+	printf(" %llu &", env.n_devirts);
+	printf(" %llu \n", env.n_devirts_icalls);
 #endif
 
 	// free data structures
@@ -2083,38 +1991,15 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 	int devirtualized_calls_local;
 	devirt_local(&devirtualized_calls_local);
 
-	printf("Number initially devirtualized: %d\n", devirtualized_calls_local);
-	timer_init();
-	timers = new_cpmap(hash_ptr, ptr_equals);
-	running_timers = new_cpmap(hash_ptr, ptr_equals);
-	//START_TIMER
 	ir_timer_t *t = ir_timer_new();
 	ir_timer_start(t);
 	xta_run(entry_points, initial_live_classes, &dyncall_targets, ext_called_constr);
 	ir_timer_stop(t);
-	printf("XTA needed %f\n", ir_timer_elapsed_sec(t));
-	ir_timer_free(t);
 	xta_devirtualize_calls(entry_points, &dyncall_targets);
 	xta_dispose_results(&dyncall_targets);
-	//STOP_TIMER
-#if TIMING
-	FILE *f = fopen("timers.out", "a");
-	timer_term(f);
-	fclose(f);
-#endif
-	cpmap_destroy(timers);
-	cpmap_destroy(running_timers);
 
-	exit(0); //Call for testing
-
-	do {
-		//inline_functions(750, 0, NULL);
-		inline_functions(750, 0, after_inline_opt);
-		//devirt_calls_after_inlining = devirtualize_calls_to_local_objects(entry_points);
-		devirt_local(&devirtualized_calls_local);
-		DEBUGOUT(2, "devirt calls after inlining: %d\n", devirtualized_calls_local);
-	}
-	while (devirtualized_calls_local > DEVIRT_LOCAL_THRESHOLD);
-	inline_functions(750, 0, after_inline_opt);
+	printf("Number initially devirtualized: %d\n", devirtualized_calls_local);
+	printf("XTA needed %f\n", ir_timer_elapsed_sec(t));
+	ir_timer_free(t);
 	DEBUGOUT(2, "Finished XTA\n");
 }
