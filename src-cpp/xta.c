@@ -67,15 +67,6 @@ static inline cpset_t *new_cpset(cpset_hash_function hash_function, cpset_cmp_fu
 	return cpset;
 }
 
-static void after_inline_opt(ir_graph *irg)
-{
-	scalar_replacement_opt(irg);
-	optimize_load_store(irg);
-	optimize_graph_df(irg);
-	optimize_cf(irg);
-	combo(irg);
-}
-
 static ir_entity *default_detect_call(ir_node *call)
 {
 	(void)call;
@@ -1325,6 +1316,11 @@ static void retrieve_library_info(analyzer_env *env) {
 	cpset_destroy(&done_types);
 }
 
+#ifdef XTA_STATS
+static size_t n_fields = 0;
+static size_t n_ext_fields = 0;
+#endif
+
 /** run Rapid Type Analysis
  * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically bound call.
  * @note See the important notes in the documentation of function rta_optimization in the header file!
@@ -1552,6 +1548,23 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		}
 		DEBUGOUT(2, "\n=============================================================\n");
 	}
+
+#ifdef XTA_STATS
+	{
+		cpmap_iterator_t it;
+		cpmap_iterator_init(&it, env.live_classes_fields);
+
+		cpmap_entry_t entry;
+		while ((entry = cpmap_iterator_next(&it)).key != NULL) {
+			ir_entity *entity = (ir_entity *) entry.key;
+			if(is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity)))
+				n_ext_fields++;
+			else
+				n_fields++;
+		}
+	}
+#endif
+
 
 	printf(" %zu &", cpmap_size(env.done_map));
 
@@ -2002,4 +2015,40 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, 
 	printf("XTA needed %f\n", ir_timer_elapsed_sec(t));
 	ir_timer_free(t);
 	DEBUGOUT(2, "Finished XTA\n");
+
+	//Print program statistics
+#ifdef XTA_STATS
+	size_t n_classes = 0;
+	size_t n_ext_classes = 0;
+	size_t n_methods = 0;
+	size_t n_ext_methods = 0;
+	for (size_t i = 0, n = get_irp_n_types(); i < n; ++i) {
+		ir_type *type = get_irp_type(i);
+		if(is_Class_type(type)) {
+			if(!strcmp(get_compound_name(type), "<frame_type>")) continue;
+			if(!strcmp(get_compound_name(type), "array")) continue;
+			if(oo_get_class_is_extern(type))
+				n_ext_classes++;
+			else
+				n_classes++;
+			for (size_t j=0, k = get_class_n_members(type); j < k; ++j) {
+				ir_entity *entity = get_class_member(type, j);
+				if(oo_get_class_is_extern(type)) {
+					if(is_method_entity(entity))
+						n_ext_methods++;
+				} else {
+					if(is_method_entity(entity))
+						n_methods++;
+				}
+			}
+		}
+	}
+	printf("Classes, methods, fields (non, ex)\n");
+	printf("%lu &", n_classes);
+	printf(" %lu &", n_ext_classes);
+	printf(" %lu &", n_methods);
+	printf(" %lu &", n_ext_methods);
+	printf(" %lu &", n_fields);
+	printf(" %lu\n", n_ext_fields);
+#endif
 }
