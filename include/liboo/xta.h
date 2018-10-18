@@ -42,7 +42,7 @@ void xta_set_non_leaking_ext_methods(cpset_t *methods);
  * @note The callbacks are only called on statically bound call nodes that call a function that has no firm graph.
  * @param detect_call give function that returns the entity (ir_entity*) of the method called by the call node or NULL if no method is called
  */
-void xta_set_detection_callbacks(ir_entity *(*detect_call)(ir_node *call));
+void xta_set_detection_callbacks(ir_entity * (*detect_call)(ir_node *call));
 
 
 /** runs Hybrid Type Analysis (XTA) and then tries to devirtualize dynamically bound calls and to discard unneeded classes and methods
@@ -53,7 +53,7 @@ void xta_set_detection_callbacks(ir_entity *(*detect_call)(ir_node *call));
  * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
  */
-void xta_optimization(ir_entity** entry_points, ir_type **initial_live_classes, cpmap_t *ext_called_constr);
+void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, cpmap_t *ext_called_constr);
 
 
 #endif
