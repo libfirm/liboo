@@ -31,6 +31,10 @@ struct class_info_t {
 	method_info_t        *methods;
 	uint32_t              n_interfaces;
 	struct class_info_t **interfaces;
+	uint32_t              mask0;
+	uint32_t              mask1;
+	uint32_t              mask2;
+	uint32_t              mask3;
 };
 typedef struct class_info_t class_info_t;
 

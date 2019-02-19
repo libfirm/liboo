@@ -11,6 +11,9 @@
 #include "adt/obst.h"
 #include "adt/util.h"
 
+#include <libfirm/adt/pmap.h>
+#include <libfirm/typerep.h>
+
 static ir_type   *class_info;
 static ir_entity *class_info_name;
 static ir_entity *class_info_uid;
@@ -20,6 +23,7 @@ static ir_entity *class_info_n_methods;
 static ir_entity *class_info_methods;
 static ir_entity *class_info_n_interfaces;
 static ir_entity *class_info_interfaces;
+static ir_entity *class_info_masks[4];
 
 static ir_type   *method_info;
 static ir_entity *method_info_name;
@@ -44,6 +48,8 @@ typedef struct {
 
 static construct_runtime_typeinfo_t construct_runtime_typeinfo;
 static construct_instanceof_t       construct_instanceof;
+
+static pmap *array_types;
 
 static void free_scpe(scp_entry_t *scpe)
 {
@@ -116,6 +122,14 @@ static void init_rtti_firm_types(void)
 	class_info_n_interfaces = new_entity(class_info, id, type_uint32_t);
 	id = new_id_from_str("interfaces");
 	class_info_interfaces = new_entity(class_info, id, type_reference);
+	id = new_id_from_str("mask0");
+	class_info_masks[0] = new_entity(class_info, id, type_uint32_t);
+	id = new_id_from_str("mask1");
+	class_info_masks[1] = new_entity(class_info, id, type_uint32_t);
+	id = new_id_from_str("mask2");
+	class_info_masks[2] = new_entity(class_info, id, type_uint32_t);
+	id = new_id_from_str("mask3");
+	class_info_masks[3] = new_entity(class_info, id, type_uint32_t);
 	default_layout_compound_type(class_info);
 	/* I'd really like to use the following assert, unfortunately it is
 	 * useless when we are cross-compiling. And I see no easy way at the
@@ -286,6 +300,120 @@ static ir_entity *create_interface_table(ir_type *klass, size_t n_interfaces)
 	return entity;
 }
 
+#define MASK_COUNT 4
+static const unsigned BYTES_PER_WORD = 4;
+static const unsigned BITS_PER_TAG = 2;
+static const unsigned MASK_BITS = 32;
+
+typedef enum {
+	TAG_INT = 0,
+	TAG_POINTER = 1,
+	TAG_ARRAY_START = 2,
+	TAG_INVALID = 3,
+} pointer_tag_t;
+
+typedef uintptr_t array_kind_t;
+
+void register_array_type(ir_type *type, array_kind_t kind)
+{
+	pmap_insert(array_types, type, (void*)kind);
+}
+
+static void set_tag(pointer_tag_t *tags, size_t offset, pointer_tag_t tag)
+{
+	pointer_tag_t present = tags[offset];
+	if (present != TAG_INVALID && present != tag) {
+		panic("Conflicting pointer tags!");
+	}
+	tags[offset] = tag;
+}
+
+static array_kind_t type_array_kind(ir_type *strukt)
+{
+	if (pmap_contains(array_types, strukt)) {
+		return (array_kind_t)pmap_get(void, array_types, strukt);
+	} else {
+		return AK_NO_ARRAY;
+	}
+}
+
+static void collect_tags_from_type(ir_type *klass, unsigned start_offset, pointer_tag_t *tags_by_offset)
+{
+	size_t n_members = get_compound_n_members(klass);
+	for (size_t m = 0; m < n_members; m++) {
+		ir_entity *member = get_compound_member(klass, m);
+		ir_type *member_type = get_entity_type(member);
+		size_t offset_words = get_entity_offset(member) / BYTES_PER_WORD;
+		size_t global_offset = start_offset + offset_words;
+
+		switch (get_type_opcode(member_type)) {
+		case tpo_primitive:
+			printf("Member %s : primitive in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
+			set_tag(tags_by_offset, global_offset, TAG_INT);
+			if (get_type_size(member_type) > BYTES_PER_WORD) {
+				set_tag(tags_by_offset, global_offset + 1, TAG_INT);
+			}
+			if (get_type_size(member_type) > 2 * BYTES_PER_WORD) {
+				panic("Primitive type larger than 64 bits");
+			}
+			break;
+		case tpo_pointer:
+			printf("Member %s : pointer in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
+			set_tag(tags_by_offset, global_offset, TAG_POINTER);
+			break;
+		case tpo_struct:
+		case tpo_class:
+			printf("Member %s : %s %s in %s at word-offset %lu (global offset %lu)\n",
+			       get_entity_name(member), get_type_opcode_name(get_type_opcode(member_type)), get_compound_name(get_entity_type(member)),
+			       get_compound_name(klass), offset_words, global_offset);
+			switch (type_array_kind(member_type)) {
+			case AK_NO_ARRAY:
+				/* We have an embedded object, recurse into it */
+				collect_tags_from_type(member_type, global_offset, tags_by_offset);
+				break;
+			case AK_PRIMITIVE_ARRAY:
+				set_tag(tags_by_offset, global_offset, TAG_ARRAY_START);
+				set_tag(tags_by_offset, global_offset + 1, TAG_INT);
+				set_tag(tags_by_offset, global_offset + 2, TAG_INT);
+				break;
+			case AK_POINTER_ARRAY:
+				set_tag(tags_by_offset, global_offset, TAG_ARRAY_START);
+				set_tag(tags_by_offset, global_offset + 1, TAG_POINTER);
+				set_tag(tags_by_offset, global_offset + 2, TAG_POINTER);
+				break;
+			}
+			break;
+		case tpo_method:
+			// Ignore methods
+			break;
+		default:
+			panic("Unexpected type opcode %d", get_type_opcode(member_type));
+		}
+	}
+}
+
+static void compute_pointer_masks(ir_type *klass, uint32_t masks[static MASK_COUNT])
+{
+	unsigned type_bytes = get_type_size(klass);
+	unsigned type_words = type_bytes / BYTES_PER_WORD;
+
+	assert(type_words <= MASK_COUNT * MASK_BITS / BITS_PER_TAG);
+
+	pointer_tag_t tags_by_offset[type_words];
+	for (unsigned i = 0; i < type_words; i++) {
+		tags_by_offset[i] = TAG_INVALID;
+	}
+
+	collect_tags_from_type(klass, 0, tags_by_offset);
+
+	printf("Pointer masks for %s\n", get_compound_name(klass));
+	for (unsigned i = 0; i < type_words; i++) {
+		printf("\t[%d] -> %d\n", i, tags_by_offset[i]);
+	}
+
+	/* TODO actually set masks */
+}
+
 void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 {
 	assert(is_Class_type(klass));
@@ -377,6 +505,15 @@ void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 	}
 	set_initializer_compound_value(initializer, i++, interfaces_init);
 
+	uint32_t masks[MASK_COUNT];
+	compute_pointer_masks(klass, masks);
+
+	ir_type *mask_type = get_entity_type(class_info_masks[0]);
+	for (int m = 0; m < MASK_COUNT; m++) {
+		ir_initializer_t *init = new_initializer_long(0, mask_type);
+		set_initializer_compound_value(initializer, i++, init);
+	}
+
 	assert(i == n_init);
 
 	set_entity_type(rtti_entity, class_info);
@@ -433,6 +570,8 @@ void rtti_init()
 
 	init_rtti_firm_types();
 	cpset_init(&string_constant_pool, scp_hash_function, scp_cmp_function);
+
+	array_types = pmap_create();
 }
 
 void rtti_deinit()
@@ -446,6 +585,7 @@ void rtti_deinit()
 	}
 
 	cpset_destroy(&string_constant_pool);
+	pmap_destroy(array_types);
 }
 
 void rtti_construct_runtime_typeinfo(ir_type *klass)
