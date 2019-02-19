@@ -19,6 +19,18 @@ public final class OO {
 		SEARCHED_ITABLE_M2F
 	}
 
+	public enum ArrayKind {
+		NO_ARRAY(binding_oo.array_kind_t.AK_NO_ARRAY.val),
+		PRIMITIVE_ARRAY(binding_oo.array_kind_t.AK_PRIMITIVE_ARRAY.val),
+		POINTER_ARRAY(binding_oo.array_kind_t.AK_POINTER_ARRAY.val);
+
+		final int value;
+
+		private ArrayKind(int value) {
+			this.value = value;
+		}
+	}
+
 	private OO() {
 	}
 
@@ -216,5 +228,9 @@ public final class OO {
 
 	public static boolean getClassIsFinal(ClassType classType) {
 		return binding_oo.oo_get_class_is_final(classType.ptr);
+	}
+
+	public static void registerArrayType(ClassType classType, ArrayKind kind) {
+		binding_oo.register_array_type(classType.ptr, kind.value);
 	}
 }
