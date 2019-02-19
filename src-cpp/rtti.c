@@ -346,7 +346,7 @@ static void collect_tags_from_type(ir_type *klass, unsigned start_offset, pointe
 
 		switch (get_type_opcode(member_type)) {
 		case tpo_primitive:
-			printf("Member %s : primitive in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
+			// printf("Member %s : primitive in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
 			set_tag(tags_by_offset, global_offset, TAG_INT);
 			if (get_type_size(member_type) > BYTES_PER_WORD) {
 				set_tag(tags_by_offset, global_offset + 1, TAG_INT);
@@ -356,14 +356,14 @@ static void collect_tags_from_type(ir_type *klass, unsigned start_offset, pointe
 			}
 			break;
 		case tpo_pointer:
-			printf("Member %s : pointer in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
+			// printf("Member %s : pointer in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
 			set_tag(tags_by_offset, global_offset, TAG_POINTER);
 			break;
 		case tpo_struct:
 		case tpo_class:
-			printf("Member %s : %s %s in %s at word-offset %lu (global offset %lu)\n",
-			       get_entity_name(member), get_type_opcode_name(get_type_opcode(member_type)), get_compound_name(get_entity_type(member)),
-			       get_compound_name(klass), offset_words, global_offset);
+			// printf("Member %s : %s %s in %s at word-offset %lu (global offset %lu)\n",
+			//       get_entity_name(member), get_type_opcode_name(get_type_opcode(member_type)), get_compound_name(get_entity_type(member)),
+			//       get_compound_name(klass), offset_words, global_offset);
 			switch (type_array_kind(member_type)) {
 			case AK_NO_ARRAY:
 				/* We have an embedded object, recurse into it */
@@ -404,9 +404,9 @@ static void compute_pointer_masks(ir_type *klass, uint32_t masks[static MASK_COU
 
 	collect_tags_from_type(klass, 0, tags_by_offset);
 
-	printf("Pointer masks for %s\n", get_compound_name(klass));
+	// printf("Pointer masks for %s\n", get_compound_name(klass));
 	for (unsigned i = 0; i < type_words; i++) {
-		printf("\t[%d] -> %d\n", i, tags_by_offset[i]);
+		// printf("\t[%d] -> %d\n", i, tags_by_offset[i]);
 	}
 
 	for (unsigned m = 0; m < MASK_COUNT; m++) {
@@ -423,6 +423,11 @@ static void compute_pointer_masks(ir_type *klass, uint32_t masks[static MASK_COU
 			       get_compound_name(klass), offset);
 		}
 	}
+
+	for (unsigned m = 0; m < MASK_COUNT; m++) {
+		// printf("%08x ", masks[m]);
+	}
+	// printf("\n");
 }
 
 void rtti_default_construct_runtime_typeinfo(ir_type *klass)
