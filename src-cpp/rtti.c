@@ -409,7 +409,20 @@ static void compute_pointer_masks(ir_type *klass, uint32_t masks[static MASK_COU
 		printf("\t[%d] -> %d\n", i, tags_by_offset[i]);
 	}
 
-	/* TODO actually set masks */
+	for (unsigned m = 0; m < MASK_COUNT; m++) {
+		masks[m] = 0;
+	}
+	for (unsigned offset = 0; offset < type_words; offset++) {
+		unsigned mask_index = offset / 16;
+		unsigned bit_pos = (offset % 16) * 2;
+
+		if (tags_by_offset[offset] != TAG_INVALID) {
+			masks[mask_index] |= tags_by_offset[offset] << bit_pos;
+		} else {
+			printf("Warning: Missing tag for type %s at offset %u\n",
+			       get_compound_name(klass), offset);
+		}
+	}
 }
 
 void rtti_default_construct_runtime_typeinfo(ir_type *klass)
