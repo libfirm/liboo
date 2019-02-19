@@ -3,9 +3,14 @@
 
 #include <libfirm/firm.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "ddispatch.h"
 #include "rta.h"
+
+#define AK_NO_ARRAY 0
+#define AK_PRIMITIVE_ARRAY 1
+#define AK_POINTER_ARRAY 2
 
 void oo_init(void);
 void oo_deinit(void);
@@ -65,5 +70,7 @@ ir_type *oo_get_class_superclass(ir_type *klass);
 ir_entity *oo_get_entity_overwritten_superclass_entity(ir_entity *entity);
 
 void oo_copy_entity_info(ir_entity *src, ir_entity *dest);
+
+void register_array_type(ir_type *type, uintptr_t array_kind);
 
 #endif
