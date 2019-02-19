@@ -312,8 +312,6 @@ typedef enum {
 	TAG_INVALID = 3,
 } pointer_tag_t;
 
-typedef uintptr_t array_kind_t;
-
 void register_array_type(ir_type *type, array_kind_t kind)
 {
 	pmap_insert(array_types, type, (void*)kind);
