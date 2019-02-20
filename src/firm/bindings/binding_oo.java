@@ -273,6 +273,33 @@ public class binding_oo {
 		}
 	}
 
+	public static enum float_int_conversion_overflow_style_t {
+		ir_overflow_indefinite(),
+		ir_overflow_min_max();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		float_int_conversion_overflow_style_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		float_int_conversion_overflow_style_t() {
+			this.val = C.next_val++;
+		}
+
+		public static float_int_conversion_overflow_style_t getEnum(int val) {
+			for (float_int_conversion_overflow_style_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum ir_visibility {
 		ir_visibility_external(),
 		ir_visibility_external_private(),
@@ -581,35 +608,6 @@ public class binding_oo {
 		}
 	}
 
-	public static enum arch_dep_opts_t {
-		arch_dep_none(0),
-		arch_dep_mul_to_shift((1 << 0)),
-		arch_dep_div_by_const((1 << 1)),
-		arch_dep_mod_by_const((1 << 2));
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		arch_dep_opts_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		arch_dep_opts_t() {
-			this.val = C.next_val++;
-		}
-
-		public static arch_dep_opts_t getEnum(int val) {
-			for (arch_dep_opts_t entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum osr_flags {
 		osr_flag_none(0),
 		osr_flag_lftr_with_ov_check(1),
@@ -662,33 +660,6 @@ public class binding_oo {
 
 		public static ir_mode_arithmetic getEnum(int val) {
 			for (ir_mode_arithmetic entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
-	public static enum float_int_conversion_overflow_style_t {
-		ir_overflow_indefinite(),
-		ir_overflow_min_max();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		float_int_conversion_overflow_style_t(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		float_int_conversion_overflow_style_t() {
-			this.val = C.next_val++;
-		}
-
-		public static float_int_conversion_overflow_style_t getEnum(int val) {
-			for (float_int_conversion_overflow_style_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -917,7 +888,6 @@ public class binding_oo {
 	public static enum op_arity {
 		oparity_invalid(0),
 		oparity_binary(),
-		oparity_variable(),
 		oparity_dynamic(),
 		oparity_any();
 		public final int val;
@@ -1112,6 +1082,34 @@ public class binding_oo {
 
 		public static n_ASM getEnum(int val) {
 			for (n_ASM entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum pn_ASM {
+		pn_ASM_M(),
+		pn_ASM_first_out(),
+		pn_ASM_max(pn_ASM.pn_ASM_first_out.val);
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		pn_ASM(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		pn_ASM() {
+			this.val = C.next_val++;
+		}
+
+		public static pn_ASM getEnum(int val) {
+			for (pn_ASM entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}
@@ -2469,35 +2467,6 @@ public class binding_oo {
 		}
 	}
 
-	public static enum range_types {
-		VRP_UNDEFINED(),
-		VRP_RANGE(),
-		VRP_ANTIRANGE(),
-		VRP_VARYING();
-		public final int val;
-
-		private static class C {
-			static int next_val;
-		}
-
-		range_types(int val) {
-			this.val = val;
-			C.next_val = val + 1;
-		}
-
-		range_types() {
-			this.val = C.next_val++;
-		}
-
-		public static range_types getEnum(int val) {
-			for (range_types entry : values()) {
-				if (val == entry.val)
-					return entry;
-			}
-			return null;
-		}
-	}
-
 	public static enum ir_dump_verbosity_t {
 		dump_verbosity_onlynames(0x00000001),
 		dump_verbosity_fields(0x00000002),
@@ -2911,6 +2880,69 @@ public class binding_oo {
 		}
 	}
 
+	public static enum ir_platform_type_t {
+		IR_TYPE_BOOL(),
+		IR_TYPE_CHAR(),
+		IR_TYPE_SHORT(),
+		IR_TYPE_INT(),
+		IR_TYPE_LONG(),
+		IR_TYPE_LONG_LONG(),
+		IR_TYPE_FLOAT(),
+		IR_TYPE_DOUBLE(),
+		IR_TYPE_LONG_DOUBLE();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		ir_platform_type_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		ir_platform_type_t() {
+			this.val = C.next_val++;
+		}
+
+		public static ir_platform_type_t getEnum(int val) {
+			for (ir_platform_type_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum range_types {
+		VRP_UNDEFINED(),
+		VRP_RANGE(),
+		VRP_ANTIRANGE(),
+		VRP_VARYING();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		range_types(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		range_types() {
+			this.val = C.next_val++;
+		}
+
+		public static range_types getEnum(int val) {
+			for (range_types entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
 	public static enum ddispatch_binding {
 		bind_unknown(),
 		bind_static(),
@@ -2962,6 +2994,34 @@ public class binding_oo {
 
 		public static ddispatch_interface_call getEnum(int val) {
 			for (ddispatch_interface_call entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+	public static enum idtype_t {
+		P_ALL(),
+		P_PID(),
+		P_PGID();
+		public final int val;
+
+		private static class C {
+			static int next_val;
+		}
+
+		idtype_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		idtype_t() {
+			this.val = C.next_val++;
+		}
+
+		public static idtype_t getEnum(int val) {
+			for (idtype_t entry : values()) {
 				if (val == entry.val)
 					return entry;
 			}

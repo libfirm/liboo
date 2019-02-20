@@ -4,7 +4,7 @@ package firm.bindings;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 
-public class binding_rta {
+public class binding_xta {
 	static {
 		Native.register("oo");
 	}
@@ -2943,8 +2943,40 @@ public class binding_rta {
 		}
 	}
 
+	public static enum idtype_t {
+		P_ALL(),
+		P_PID(),
+		P_PGID();
+		public final int val;
 
-	public static native void rta_set_detection_callbacks(Pointer detect_call);
+		private static class C {
+			static int next_val;
+		}
 
-	public static native void rta_optimization(java.nio.Buffer entry_points, java.nio.Buffer initial_live_classes);
+		idtype_t(int val) {
+			this.val = val;
+			C.next_val = val + 1;
+		}
+
+		idtype_t() {
+			this.val = C.next_val++;
+		}
+
+		public static idtype_t getEnum(int val) {
+			for (idtype_t entry : values()) {
+				if (val == entry.val)
+					return entry;
+			}
+			return null;
+		}
+	}
+
+
+	public static native void xta_set_is_constructor_callback(Pointer is_constr);
+
+	public static native void xta_set_non_leaking_ext_methods(Pointer methods);
+
+	public static native void xta_set_detection_callbacks(Pointer detect_call);
+
+	public static native void xta_optimization(java.nio.Buffer entry_points, java.nio.Buffer initial_live_classes, Pointer ext_called_constr);
 }
