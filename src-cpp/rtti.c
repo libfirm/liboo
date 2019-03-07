@@ -304,6 +304,8 @@ static ir_entity *create_interface_table(ir_type *klass, size_t n_interfaces)
 static const unsigned BYTES_PER_WORD = 4;
 static const unsigned BITS_PER_TAG = 2;
 static const unsigned MASK_BITS = 32;
+/* TODO The X10 compiler should set this */
+static const unsigned HEADER_WORDS = 5;
 
 typedef enum {
 	TAG_INT = 0,
@@ -405,16 +407,17 @@ static void compute_pointer_masks(ir_type *klass, uint32_t masks[static MASK_COU
 	collect_tags_from_type(klass, 0, tags_by_offset);
 
 	// printf("Pointer masks for %s\n", get_compound_name(klass));
-	for (unsigned i = 0; i < type_words; i++) {
+	for (unsigned i = HEADER_WORDS; i < type_words; i++) {
 		// printf("\t[%d] -> %d\n", i, tags_by_offset[i]);
 	}
 
 	for (unsigned m = 0; m < MASK_COUNT; m++) {
 		masks[m] = 0;
 	}
-	for (unsigned offset = 0; offset < type_words; offset++) {
-		unsigned mask_index = offset / 16;
-		unsigned bit_pos = (offset % 16) * 2;
+	for (unsigned offset = HEADER_WORDS; offset < type_words; offset++) {
+		unsigned mask_offset = offset - HEADER_WORDS;
+		unsigned mask_index = mask_offset / 16;
+		unsigned bit_pos = (mask_offset % 16) * 2;
 
 		if (tags_by_offset[offset] != TAG_INVALID) {
 			masks[mask_index] |= tags_by_offset[offset] << bit_pos;
