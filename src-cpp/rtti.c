@@ -308,8 +308,8 @@ static const unsigned MASK_BITS = 32;
 typedef enum {
 	TAG_INT = 0,
 	TAG_POINTER = 1,
-	TAG_ARRAY_START = 2,
-	TAG_INVALID = 3,
+	TAG_ARRAY_START = 3,
+	TAG_INVALID = 2,
 } pointer_tag_t;
 
 void register_array_type(ir_type *type, array_kind_t kind)
