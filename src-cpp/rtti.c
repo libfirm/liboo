@@ -529,7 +529,7 @@ void rtti_default_construct_runtime_typeinfo(ir_type *klass)
 
 	ir_type *mask_type = get_entity_type(class_info_masks[0]);
 	for (int m = 0; m < MASK_COUNT; m++) {
-		ir_initializer_t *init = new_initializer_long(0, mask_type);
+		ir_initializer_t *init = new_initializer_long(masks[m], mask_type);
 		set_initializer_compound_value(initializer, i++, init);
 	}
 
