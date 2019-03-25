@@ -310,8 +310,9 @@ static const unsigned HEADER_WORDS = 5;
 typedef enum {
 	TAG_INT = 0,
 	TAG_POINTER = 1,
+	TAG_TRANSIENT = 2,
 	TAG_ARRAY_START = 3,
-	TAG_INVALID = 2,
+	TAG_INVALID = 4,
 } pointer_tag_t;
 
 void register_array_type(ir_type *type, array_kind_t kind)
@@ -348,6 +349,11 @@ static void collect_tags_from_type(ir_type *klass, unsigned start_offset, pointe
 
 		switch (get_type_opcode(member_type)) {
 		case tpo_primitive:
+			if (oo_get_field_is_transient(member)) {
+				set_tag(tags_by_offset, global_offset, TAG_TRANSIENT);
+				break;
+			}
+
 			// printf("Member %s : primitive in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
 			set_tag(tags_by_offset, global_offset, TAG_INT);
 			if (get_type_size(member_type) > BYTES_PER_WORD) {
@@ -358,6 +364,11 @@ static void collect_tags_from_type(ir_type *klass, unsigned start_offset, pointe
 			}
 			break;
 		case tpo_pointer:
+			if (oo_get_field_is_transient(member)) {
+				set_tag(tags_by_offset, global_offset, TAG_TRANSIENT);
+				break;
+			}
+
 			// printf("Member %s : pointer in %s at word-offset %lu (global offset %lu)\n", get_entity_name(member), get_compound_name(klass), offset_words, global_offset);
 			set_tag(tags_by_offset, global_offset, TAG_POINTER);
 			break;
