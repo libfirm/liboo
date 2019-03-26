@@ -383,11 +383,23 @@ static void collect_tags_from_type(ir_type *klass, unsigned start_offset, pointe
 				collect_tags_from_type(member_type, global_offset, tags_by_offset);
 				break;
 			case AK_PRIMITIVE_ARRAY:
+				if (oo_get_field_is_transient(member)) {
+					set_tag(tags_by_offset, global_offset, TAG_TRANSIENT);
+					set_tag(tags_by_offset, global_offset + 1, TAG_TRANSIENT);
+					set_tag(tags_by_offset, global_offset + 2, TAG_TRANSIENT);
+					break;
+				}
 				set_tag(tags_by_offset, global_offset, TAG_ARRAY_START);
 				set_tag(tags_by_offset, global_offset + 1, TAG_INT);
 				set_tag(tags_by_offset, global_offset + 2, TAG_INT);
 				break;
 			case AK_POINTER_ARRAY:
+				if (oo_get_field_is_transient(member)) {
+					set_tag(tags_by_offset, global_offset, TAG_TRANSIENT);
+					set_tag(tags_by_offset, global_offset + 1, TAG_TRANSIENT);
+					set_tag(tags_by_offset, global_offset + 2, TAG_TRANSIENT);
+					break;
+				}
 				set_tag(tags_by_offset, global_offset, TAG_ARRAY_START);
 				set_tag(tags_by_offset, global_offset + 1, TAG_POINTER);
 				set_tag(tags_by_offset, global_offset + 2, TAG_POINTER);
