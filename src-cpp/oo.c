@@ -563,14 +563,18 @@ ddispatch_interface_call oo_get_interface_call_type()
 	return interface_call_type;
 }
 
+static void oo_init_opcode_entity_attrs(void)
+{
+	set_op_get_entity_attr(op_MethodSel, get_MethodSel_entity);
+}
+
 void oo_init(void)
 {
 	obstack_init(&oo_info_obst);
 	oo_node_info_map = pmap_create();
 	oo_init_opcodes();
-	ddispatch_init();
+	oo_init_opcode_entity_attrs();
 	dmemory_init();
-	rtti_init();
 	eh_init();
 }
 
@@ -585,7 +589,8 @@ void oo_deinit(void)
 
 void oo_lower(void)
 {
-
+	ddispatch_init();
+	rtti_init();
 	ddispatch_interface_call call_type = oo_get_interface_call_type();
 	if ((call_type & call_searched_itable) == call_searched_itable ||
 		call_type == call_itable_indexed) {

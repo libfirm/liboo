@@ -35,6 +35,19 @@ void xta_set_is_constructor_callback(bool (*is_constr)(ir_entity *method));
  */
 void xta_set_non_leaking_ext_methods(cpset_t *methods);
 
+/**
+ * Clears the map of leaking types.
+ */
+void clear_leaking_types_map(void);
+
+/**
+ * Adds a type to a method, which is live in the caller after the call.
+ * Useful for methods which cannot be analyzed.
+ * @param method the method which is leaking the type
+ * @param leaking_type the type
+ */
+void add_leaking_type_to_method(ir_entity *method, ir_type *leaking_type);
+
 /** sets important callback function needed to detect calls (e.g. class intialization) hidden behind frontend-specific nodes
  * @note It's very important for the frontend to implement these callbacks correctly, if anything is missing XTA's assumptions may not hold and it can lead to defective programs!
  * @note This mechanism is meant for functions similar to e.g. _Jv_InitClass that hide calls to analyzable methods in native code.
@@ -53,7 +66,7 @@ void xta_set_detection_callbacks(ir_entity * (*detect_call)(ir_node *call));
  * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
  */
-void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes, cpmap_t *ext_called_constr);
+void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes);
 
 
 #endif

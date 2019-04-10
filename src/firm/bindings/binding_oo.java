@@ -150,7 +150,8 @@ public class binding_oo {
 		mtp_property_always_inline((1 << 9)),
 		mtp_property_noinline((1 << 10)),
 		mtp_property_inline_recommended((1 << 11)),
-		mtp_temporary((1 << 12));
+		mtp_temporary((1 << 12)),
+		mtp_property_is_constructor((1 << 13));
 		public final int val;
 
 		private static class C {

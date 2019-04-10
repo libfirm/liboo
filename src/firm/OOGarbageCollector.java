@@ -1,20 +1,16 @@
-
 package firm;
 
-import firm.bindings.binding_xta;
+import firm.bindings.binding_oo_gc;
 
 import com.sun.jna.Pointer;
 import java.nio.Buffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
-public class XTA {
-	public static void addLeakingTypeToMethod(Entity method, Type type) {
-		binding_xta.add_leaking_type_to_method(method.ptr, type.ptr);
-	}
+public class OOGarbageCollector {
 	
-	public static void runXTA(Entity[] entrypoints, Type[] initialLiveClasses) {
-		binding_xta.xta_optimization(getBufferFromArray(entrypoints, true), getBufferFromArray(initialLiveClasses, true));
+	public static void garbageCollectEntities(Entity[] entrypoints) {
+		binding_oo_gc.oo_garbage_collect_entities(getBufferFromArray(entrypoints, true));
 	}
 
 	private static Buffer getBufferFromArray(JNAWrapper[] array, boolean nullterminate) {

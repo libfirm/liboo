@@ -150,7 +150,8 @@ public class binding_xta {
 		mtp_property_always_inline((1 << 9)),
 		mtp_property_noinline((1 << 10)),
 		mtp_property_inline_recommended((1 << 11)),
-		mtp_temporary((1 << 12));
+		mtp_temporary((1 << 12)),
+		mtp_property_is_constructor((1 << 13));
 		public final int val;
 
 		private static class C {
@@ -2976,7 +2977,11 @@ public class binding_xta {
 
 	public static native void xta_set_non_leaking_ext_methods(Pointer methods);
 
+	public static native void clear_leaking_types_map();
+
+	public static native void add_leaking_type_to_method(Pointer method, Pointer leaking_type);
+
 	public static native void xta_set_detection_callbacks(Pointer detect_call);
 
-	public static native void xta_optimization(java.nio.Buffer entry_points, java.nio.Buffer initial_live_classes, Pointer ext_called_constr);
+	public static native void xta_optimization(java.nio.Buffer entry_points, java.nio.Buffer initial_live_classes);
 }
