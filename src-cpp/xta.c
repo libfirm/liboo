@@ -53,17 +53,17 @@ static int ptr_equals(const void *pt1, const void *pt2) // missing default point
 	return pt1 == pt2;
 }
 
-static inline cpmap_t *new_cpmap(cpmap_hash_function hash_function, cpmap_cmp_function cmp_function) // missing new function for cpmap
+static inline cpmap_t *new_cpmap(void) // missing new function for cpmap
 {
-	cpmap_t *cpmap = (cpmap_t *)malloc(sizeof(cpmap_t));
-	cpmap_init(cpmap, hash_function, cmp_function);
+	cpmap_t *cpmap = malloc(sizeof(cpmap_t));
+	cpmap_init(cpmap, hash_ptr, ptr_equals);
 	return cpmap;
 }
 
-static inline cpset_t *new_cpset(cpset_hash_function hash_function, cpset_cmp_function cmp_function) // missing new function for cpset
+static inline cpset_t *new_cpset(void) // missing new function for cpset
 {
-	cpset_t *cpset = (cpset_t *)malloc(sizeof(cpset_t));
-	cpset_init(cpset, hash_function, cmp_function);
+	cpset_t *cpset = malloc(sizeof(cpset_t));
+	cpset_init(cpset, hash_ptr, ptr_equals);
 	return cpset;
 }
 
@@ -143,18 +143,15 @@ typedef struct method_env {
 static inline iteration_set *new_iteration_set(void)
 {
 
-	iteration_set *i_set = (iteration_set *) malloc(sizeof(iteration_set));
+	iteration_set *i_set = malloc(sizeof(iteration_set));
 
-	cpset_t *propagated = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(propagated, hash_ptr, ptr_equals);
+	cpset_t *propagated = new_cpset();
 	i_set->propagated = propagated;
 
-	cpset_t *current = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(current, hash_ptr, ptr_equals);
+	cpset_t *current = new_cpset();
 	i_set->current = current;
 
-	cpset_t *new = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(new, hash_ptr, ptr_equals);
+	cpset_t *new = new_cpset();
 	i_set->new = new;
 
 	return i_set;
@@ -162,30 +159,25 @@ static inline iteration_set *new_iteration_set(void)
 
 static inline method_info *new_method_info(void)
 {
-	method_info *info = (method_info *) malloc(sizeof(method_info));
+	method_info *info = malloc(sizeof(method_info));
 
 	info->is_library_method = false;
 
-	cpset_t *callers = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(callers, hash_ptr, ptr_equals);
+	cpset_t *callers = new_cpset();
 	info->callers = callers;
 
 	info->live_classes = new_iteration_set();
 
-	cpset_t *parameter_subtypes = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(parameter_subtypes, hash_ptr, ptr_equals);
+	cpset_t *parameter_subtypes = new_cpset();
 	info->parameter_subtypes = parameter_subtypes;
 
-	cpset_t *return_subtypes = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(return_subtypes, hash_ptr, ptr_equals);
+	cpset_t *return_subtypes = new_cpset();
 	info->return_subtypes = return_subtypes;
 
-	cpset_t *field_writes = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(field_writes, hash_ptr, ptr_equals);
+	cpset_t *field_writes = new_cpset();
 	info->field_writes = field_writes;
 
-	cpset_t *field_reads = (cpset_t *) malloc(sizeof(cpset_t));
-	cpset_init(field_reads, hash_ptr, ptr_equals);
+	cpset_t *field_reads = new_cpset();
 	info->field_reads = field_reads;
 
 	return info;
@@ -293,17 +285,17 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
 	if (klasses == NULL) {
-		klasses = new_cpmap(hash_ptr, ptr_equals);
+		klasses = new_cpmap();
 		cpmap_set(a_env->unused_targets, env->entity, klasses);
 	}
 	cpmap_t *methods = cpmap_find(klasses, klass);
 	if (methods == NULL) {
-		methods = new_cpmap(hash_ptr, ptr_equals);
+		methods = new_cpmap();
 		cpmap_set(klasses, klass, methods);
 	}
 	cpset_t *call_entities = cpmap_find(methods, entity);
 	if (call_entities == NULL) {
-		call_entities = new_cpset(hash_ptr, ptr_equals);
+		call_entities = new_cpset();
 		cpmap_set(methods, entity, call_entities);
 	}
 	cpset_insert(call_entities, call_entity);
@@ -403,7 +395,7 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 			DEBUGOUT(5, "%s.%s is marked as library method\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
 		}
 		if(klass != NULL && is_Class_type(klass))
-			cpset_insert(i_set->current, klass);//TODO: owner is wrong as we have to add all possible "owners". FIXED now klass
+			cpset_insert(i_set->current, klass);
 		entity_menv->info = info;
 		entity_menv->analyzer_env = a_env;
 		cpset_insert(info->callers, env->entity);
@@ -412,12 +404,11 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 	else {
 		cpset_insert(done_entity_info->callers, env->entity);
 		if(klass != NULL && is_Class_type(klass)) {
-			method_env *entity_menv = malloc(sizeof(*entity_menv));
-			entity_menv->entity = entity;
-			entity_menv->analyzer_env = a_env;
-			entity_menv->info = done_entity_info;
-			add_new_live_class(klass, entity_menv);
-			free(entity_menv);
+			method_env entity_menv;
+			entity_menv.entity = entity;
+			entity_menv.analyzer_env = a_env;
+			entity_menv.info = done_entity_info;
+			add_new_live_class(klass, &entity_menv);
 		}
 		//This is later done for entities added to the workqueue.
 		//for already analyzed methods, we update already propagated info here.
@@ -454,7 +445,6 @@ static void take_entity(ir_entity *entity, ir_type *klass, cpset_t *result_set, 
 
 	if (cpset_find(result_set, entity) == NULL) { // take each entity only once (the sets won't mind but the workqueue)
 		DEBUGOUT(4, "\t\t\ttaking entity %s.%s ( %s ) of %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), get_compound_name(klass));
-
 
 		// add to result set
 		cpset_insert(result_set, entity);
@@ -577,7 +567,6 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 	assert(entity);
 	assert(is_method_entity(entity));
 	assert(result_set);
-	assert(env);
 
 	DEBUGOUT(3, "\t\twalking %s%s %s\n", ((oo_get_class_is_abstract(klass)) ? "abstract " : ""), ((oo_get_class_is_interface(klass)) ? "interface" : "class"), get_compound_name(klass));
 	ir_entity *current_entity = entity;
@@ -605,14 +594,18 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 			//assert(false); // there are problems with X10 structs (they don't have interface implementations because their box classes have them) and with missing entities (e.g. String.ixi in test case ArrayTest)
 		}
 	}
-	method_info *m_info = env->info;
 	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
-		if (is_in_iteration_set(m_info->live_classes, klass)) { // if class is considered in use
-			take_entity(current_entity, klass, result_set, env);//TODO: Why current_entity and not class
-		}
-		else {
-			DEBUGOUT(3, "\t\t\tclass not in use, memorizing %s.%s %s\n", get_compound_name(get_entity_owner(current_entity)), get_entity_name(current_entity), ((get_entity_irg(current_entity)) ? "G" : "N"));
-			memorize_unused_target(klass, current_entity, call_entity, env); // remember entity with this class for patching if this class will become used
+		if(env) {//Supports call with method environment and without it
+			method_info *m_info = env->info;
+			if (is_in_iteration_set(m_info->live_classes, klass)) { // if class is considered in use
+				take_entity(current_entity, klass, result_set, env);
+			}
+			else {
+				DEBUGOUT(3, "\t\t\tclass not in use, memorizing %s.%s %s\n", get_compound_name(get_entity_owner(current_entity)), get_entity_name(current_entity), ((get_entity_irg(current_entity)) ? "G" : "N"));
+				memorize_unused_target(klass, current_entity, call_entity, env); // remember entity with this class for patching if this class will become used
+			}
+		} else {
+			cpset_insert(result_set, current_entity);
 		}
 	}
 	else {
@@ -679,7 +672,7 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *call_sites = cpmap_find(a_env->dyncall_targets, entity);
 	if (call_sites == NULL) {
-		call_sites = new_cpmap(hash_ptr, ptr_equals);
+		call_sites = new_cpmap();
 		cpmap_set(a_env->dyncall_targets, entity, call_sites);
 	}
 	if (cpmap_find(call_sites, env->entity) == NULL) { // if not already done
@@ -689,7 +682,7 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 		// The entity from the MethodSel node is already what the result of a static lookup would be.
 
 		// then collect all potentially called method entities from downwards the class hierarchy
-		cpset_t *result_set = new_cpset(hash_ptr, ptr_equals);
+		cpset_t *result_set = new_cpset();
 		collect_methods(entity, result_set, env);
 
 		// note: cannot check for nonempty result set here because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
@@ -713,7 +706,7 @@ static cpset_t *get_all_subtypes_c(ir_type *klass)
 {
 	cpset_t *types = cpmap_find(&known_types, klass);
 	if (types == NULL) {
-		types = new_cpset(hash_ptr, ptr_equals);
+		types = new_cpset();
 		get_all_subtypes(klass, types);
 		cpmap_set(&known_types, klass, types);
 	}
@@ -751,147 +744,6 @@ static cpset_t *get_subclasses_from_type(ir_type *type)
 	return NULL;
 }
 
-//TODO: Remove copied code (below gc code, was copied and chagned from above code)
-static ir_entity *fir_ascend_into_superclasses_and_merge_c(ir_type *klass, ir_entity *call_entity, ir_entity *current_result); // forward declaration
-
-static ir_entity *find_implementation_recursive_c(ir_type *klass, ir_entity *call_entity)
-{
-	assert(klass);
-	assert(is_Class_type(klass));
-	assert(call_entity);
-	assert(is_method_entity(call_entity));
-
-	ir_entity *result = NULL;
-
-
-	result = get_class_member_by_name(klass, get_entity_ident(call_entity));
-
-	if (result != NULL) {
-		if (oo_get_method_is_abstract(result)) {
-			result = NULL;
-		}
-	}
-	else {
-		result = fir_ascend_into_superclasses_and_merge_c(klass, call_entity, result);
-	}
-
-	return result;
-}
-
-static ir_entity *fir_ascend_into_superclasses_and_merge_c(ir_type *klass, ir_entity *call_entity, ir_entity *current_result)
-{
-	assert(klass);
-	assert(is_Class_type(klass));
-	assert(call_entity);
-	assert(is_method_entity(call_entity));
-
-	ir_entity *result = current_result;
-
-	size_t n_supertypes = get_class_n_supertypes(klass);
-	for (size_t i = 0; i < n_supertypes; i++) {
-		ir_type *superclass = get_class_supertype(klass, i);
-
-		//if (oo_get_class_is_interface(superclass)) continue; // need to ascend in interfaces because of stuff like Java 8 default methods
-
-		ir_entity *r = find_implementation_recursive_c(superclass, call_entity);
-
-		// merge results
-		// more than one is ambiguous, but class methods win against interface default methods (at least in Java 8) !?
-		if (result == NULL) {
-			result = r;
-		}
-		else {
-			if (r != NULL) {
-				ir_type *result_owner          = get_entity_owner(result);
-				ir_type *r_owner               = get_entity_owner(r);
-				bool     result_from_interface = oo_get_class_is_interface(result_owner);
-				bool     r_from_interface      = oo_get_class_is_interface(r_owner);
-				bool     r_overrides_result    = is_class_trans_subtype(result_owner, r_owner);
-				bool     result_overrides_r    = is_class_trans_subtype(r_owner, result_owner);
-
-				if (result_owner == r_owner) {
-					// Nothing to do, we reached the same class by two ways
-				}
-				else if (result_overrides_r || (r_from_interface && !result_from_interface)) {
-					//Nothing to do?
-				}
-				else if (r_overrides_result || (result_from_interface && !r_from_interface)) {
-					result = r;
-				}
-				else if (result_from_interface == r_from_interface) {   // both true or both false
-					assert(false && "ambiguous interface implementation");
-				}
-				else {
-					assert(false && "Missing case");
-				}
-			}
-		}
-	}
-
-	return result;
-}
-
-static ir_entity *find_inherited_implementation_c(ir_type *klass, ir_entity *call_entity)
-{
-	assert(klass);
-	assert(is_Class_type(klass));
-	assert(call_entity);
-	assert(is_method_entity(call_entity));
-	assert(oo_get_method_is_abstract(call_entity));
-
-	ir_entity *result = NULL;
-
-	result = fir_ascend_into_superclasses_and_merge_c(klass, call_entity, result);
-
-	return result;
-}
-
-static void collect_methods_recursive_c(ir_entity *call_entity, ir_type *klass, ir_entity *entity, cpset_t *result_set)
-{
-	assert(call_entity);
-	assert(is_method_entity(call_entity));
-	assert(klass);
-	assert(is_Class_type(klass));
-	assert(entity);
-	assert(is_method_entity(entity));
-	assert(result_set);
-
-	ir_entity *current_entity = entity;
-
-	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity));
-	if (overwriting_entity != NULL && overwriting_entity != current_entity) { // if has overwriting entity
-
-		current_entity = overwriting_entity;
-	}
-	// else it is inherited
-
-
-	// support for FIRM usage without any entity copies at all (not even for case interface method implemention inherited from a superclass) -> have to assume some usual semantics
-	// for interface calls (or more general abstract calls) there has to be a non-abstract implementation in each non-abstract subclass, if there is no entity copy we have to find the implementation by ourselves (in cases an inherited method implements the abstract method)
-	if (oo_get_method_is_abstract(call_entity) && !oo_get_class_is_abstract(klass) && !oo_get_class_is_interface(klass) && oo_get_method_is_abstract(current_entity)) { // careful: interfaces seem not always to be marked as abstract
-		ir_entity *inherited_impl = find_inherited_implementation_c(klass, call_entity);
-		if (inherited_impl != NULL) {
-			current_entity = inherited_impl;
-		}
-	}
-	if (!oo_get_method_is_abstract(current_entity)) { // ignore abstract methods
-		cpset_insert(result_set, current_entity);
-	}
-
-	size_t n_subtypes = get_class_n_subtypes(klass);
-	for (size_t i = 0; i < n_subtypes; i++) {
-		ir_type *subclass = get_class_subtype(klass, i);
-
-		collect_methods_recursive_c(call_entity, subclass, current_entity, result_set);
-	}
-}
-
-// collect method entities from downwards in the class hierarchy
-// it walks down the classes to have the entities with the classes even when the method is inherited
-static void collect_methods_c(ir_entity *call_entity, cpset_t *result_set)
-{
-	collect_methods_recursive_c(call_entity, get_entity_owner(call_entity), call_entity, result_set);
-}
 static void visit_entity(ir_entity *entity, analyzer_env *env);
 
 static void visit_node(ir_node *node, void *env)
@@ -935,7 +787,7 @@ static void visit_overwrittenby_entities(ir_entity *entity, analyzer_env *env) {
 		return;
 	cpset_t result_set;
 	cpset_init(&result_set, hash_ptr, ptr_equals);
-	collect_methods_c(entity, &result_set);
+	collect_methods(entity, &result_set, NULL);
 	cpset_iterator_t it;
 	cpset_iterator_init(&it, &result_set);
 	ir_entity *overwrittenby;
@@ -966,125 +818,123 @@ static void visit_entity(ir_entity *entity, analyzer_env *env)
 	}
 }
 
+static void analyze_iro_Load_Store(ir_node *node, method_env *m_env) {
+	ir_node *field = get_irn_n(node, 1);
+	ir_entity *field_entity = NULL;
+	if (is_Member(field)) {
+		field_entity = get_Member_entity(field);
+	}
+	else if (is_Address(field)) {
+		field_entity = get_Address_entity(field);
+	}
+	if (field_entity && get_subclasses_from_type(get_entity_type(field_entity)) != NULL) { //Only non primitive type fields are important
+		method_info *info = m_env->info;
+		if(get_irn_opcode(node) == iro_Load) {
+			cpset_insert(info->field_reads, field_entity);
+			DEBUGOUT(4, "\tfield read to: %s\n", get_entity_name(field_entity));
+		} else {
+			cpset_insert(info->field_writes, field_entity);
+			DEBUGOUT(4, "\tfield write to: %s\n", get_entity_name(field_entity));
+		}
+	}
+}
+
+static void analyze_iro_Call(ir_node *call, method_env *m_env) {
+	ir_node *callee = get_irn_n(call, 1);
+	if (is_Address(callee)) {
+		// static call
+		ir_entity *entity = get_Address_entity(callee);
+
+		analyzer_handle_static_call(call, entity, m_env);
+
+	}
+	else if (is_Proj(callee)) {
+		ir_node *pred = get_Proj_pred(callee);
+		if (is_MethodSel(pred)) {
+			ir_node *methodsel = pred;
+			ir_entity *entity = get_MethodSel_entity(methodsel);
+			if (oo_get_call_is_statically_bound(call)) {
+				// weird case of Call with MethodSel that is marked statically bound
+				analyzer_handle_static_call(call, entity, m_env);
+			}
+			else {
+				// dynamic call
+				analyzer_handle_dynamic_call(call, entity, m_env);
+			}
+		}
+		else {
+			// indirect call via function pointers or are there even more types of calls?
+
+			if (is_Tuple(pred) && get_Tuple_n_preds(pred) == 2 && is_Address(get_Tuple_pred(pred, 1))) {
+				ir_entity *entity = get_Address_entity(get_Tuple_pred(pred, 1));
+
+				DEBUGOUT(4, "local devirt static call\n");
+				DEBUGOUT(4, "to entity of type%s\n", get_type_opcode_name(get_type_opcode(get_entity_type(entity))));
+				if(is_method_entity(entity))
+					analyzer_handle_static_call(call, entity, m_env);
+			}
+			else {
+				DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+				DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
+				DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
+			}
+		}
+	}
+	else {
+		// indirect call via function pointers or are there even more types of calls?
+		DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+		DEBUGOUT(4, "-> %s\n", gdb_node_helper(callee));
+	}
+}
+
+static void analyze_iro_Address(ir_node *address, method_env *m_env) {
+	ir_entity *entity = get_Address_entity(address);
+	if (is_method_entity(entity)) {
+		// could be a function whose address is taken (although usually the Address node of a normal call, these cases cannot be distinguished)
+		DEBUGOUT(4, "\tAddress with method entity: %s.%s %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+		DEBUGOUT(4, "\t\tcould be address taken, so it could be called\n");
+
+		// add to live methods
+		//cpset_insert(a_env->live_methods, entity);
+
+		//look whether methods calls constructors that aren't in a graph
+		cpset_t *classes;
+		if (leaking_types_map != NULL && (classes = cpmap_find(leaking_types_map, entity)) != NULL) {
+			cpset_iterator_t iterator;
+			cpset_iterator_init(&iterator, classes);
+			ir_type *klass;
+			while ((klass = cpset_iterator_next(&iterator)) != NULL) {
+				add_new_live_class(klass, m_env);
+			}
+		}
+		add_to_workqueue(entity, get_entity_owner(entity), m_env);//TODO: klass will be added on call, otherwise: does it hurt to pass entity_owner here?
+	} else if(!is_alias_entity(entity) && entity_has_definition(entity)) {
+		ir_initializer_t *const init = get_entity_initializer(entity);
+		if (init)
+			pdeq_putr(m_env->analyzer_env->initializer_queue, init);
+	}
+}
+
 static void walk_callgraph_and_analyze(ir_node *node, void *environment)
 {
 	assert(environment);
 	method_env *m_env = (method_env *)environment;
 	switch (get_irn_opcode(node)) {
-	case iro_Address: {
-			ir_node *address = node;
-			ir_entity *entity = get_Address_entity(address);
-			if (is_method_entity(entity)) {
-				// could be a function whose address is taken (although usually the Address node of a normal call, these cases cannot be distinguished)
-				DEBUGOUT(4, "\tAddress with method entity: %s.%s %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
-				DEBUGOUT(4, "\t\tcould be address taken, so it could be called\n");
-
-				// add to live methods
-				//cpset_insert(a_env->live_methods, entity);
-
-				//look whether methods calls constructors that aren't in a graph
-				cpset_t *classes;
-				if (leaking_types_map != NULL && (classes = cpmap_find(leaking_types_map, entity)) != NULL) {
-					cpset_iterator_t iterator;
-					cpset_iterator_init(&iterator, classes);
-					ir_type *klass;
-					while ((klass = cpset_iterator_next(&iterator)) != NULL) {
-						add_new_live_class(klass, m_env);
-					}
-				}
-				add_to_workqueue(entity, get_entity_owner(entity), m_env);//klass will be added on call, otherwise: does it hurt to pass entity_owner here?
-			} else if(!is_alias_entity(entity) && entity_has_definition(entity)) {
-				ir_initializer_t *const init = get_entity_initializer(entity);
-				if (init)
-					pdeq_putr(m_env->analyzer_env->initializer_queue, init);
-			}
-			break;
-		}
-	case iro_Call: {
-			ir_node *call = node;
-			ir_node *callee = get_irn_n(call, 1);
-			if (is_Address(callee)) {
-				// static call
-				ir_entity *entity = get_Address_entity(callee);
-
-				analyzer_handle_static_call(call, entity, m_env);
-
-			}
-			else if (is_Proj(callee)) {
-				ir_node *pred = get_Proj_pred(callee);
-				if (is_MethodSel(pred)) {
-					ir_node *methodsel = pred;
-					ir_entity *entity = get_MethodSel_entity(methodsel);
-					if (oo_get_call_is_statically_bound(call)) {
-						// weird case of Call with MethodSel that is marked statically bound
-						analyzer_handle_static_call(call, entity, m_env);
-					}
-					else {
-						// dynamic call
-						analyzer_handle_dynamic_call(call, entity, m_env);
-					}
-				}
-				else {
-					// indirect call via function pointers or are there even more types of calls?
-
-					if (is_Tuple(pred) && get_Tuple_n_preds(pred) == 2 && is_Address(get_Tuple_pred(pred, 1))) {
-						ir_entity *entity = get_Address_entity(get_Tuple_pred(pred, 1));
-
-						DEBUGOUT(4, "local devirt static call\n");
-						DEBUGOUT(4, "to entity of type%s\n", get_type_opcode_name(get_type_opcode(get_entity_type(entity))));
-						if(is_method_entity(entity))
-							analyzer_handle_static_call(call, entity, m_env);
-					}
-					else {
-						DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
-						DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
-						DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
-					}
-				}
-			}
-			else {
-				// indirect call via function pointers or are there even more types of calls?
-				DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
-				DEBUGOUT(4, "-> %s\n", gdb_node_helper(callee));
-			}
-			break;
-		}
-	case iro_Store: {
-			ir_node *field = get_irn_n(node, 1);
-			ir_entity *field_entity = NULL;
-			if (is_Member(field)) {
-				field_entity = get_Member_entity(field);
-			}
-			else if (is_Address(field)) {
-				field_entity = get_Address_entity(field);
-			}
-			if (field_entity && get_subclasses_from_type(get_entity_type(field_entity)) != NULL) { //Only non primitive type fields are important
-				method_info *info = m_env->info;
-				cpset_insert(info->field_writes, field_entity);
-				DEBUGOUT(4, "\tfield write to: %s\n", get_entity_name(field_entity));
-			}
-		}
-	case iro_Load: {
-			ir_node *field = get_irn_n(node, 1);
-			ir_entity *field_entity = NULL;
-			if (is_Member(field)) {
-				field_entity = get_Member_entity(field);
-			}
-			else if (is_Address(field)) {
-				field_entity = get_Address_entity(field);
-			}
-			if (field_entity && get_subclasses_from_type(get_entity_type(field_entity)) != NULL) { //Only non primitive type fields are important
-				method_info *info = m_env->info;
-				cpset_insert(info->field_reads, field_entity);
-				DEBUGOUT(4, "\tfield read to: %s\n", get_entity_name(field_entity));
-			}
-		}
+	case iro_Address:
+		analyze_iro_Address(node, m_env);
+		break;
+	case iro_Call:
+		analyze_iro_Call(node, m_env);
+		break;
+	case iro_Store:
+	case iro_Load:
+		analyze_iro_Load_Store(node, m_env);
+		break;
 	default:
 		if (is_VptrIsSet(node)) {
 			// use new VptrIsSet node for detection of object creation
 			ir_type *klass = get_VptrIsSet_type(node);
 			if (klass != NULL) {
-				//printf("%s\n", gdb_node_helper(klass));
 				assert(is_Class_type(klass));
 
 				DEBUGOUT(4, "\tVptrIsSet: %s\n", get_compound_name(klass));
@@ -1208,7 +1058,7 @@ static void collect_arg_and_res_types(method_env *env)
 	ir_type *entity_type = get_entity_type(env->entity);
 	size_t arg_n = get_method_n_params(entity_type);
 	size_t i = 1;
-	if (method_as_lib_meth(env->entity, info) || is_constr(env->entity) || get_entity_owner(env->entity) == get_glob_type()) { //TDOD: statische methoden abfangen
+	if (method_as_lib_meth(env->entity, info) || is_constr(env->entity) || get_entity_owner(env->entity) == get_glob_type()) { 
 		if(is_constr(env->entity))
 			DEBUGOUT(3, "Constructor found: %s.%s\n", get_compound_name(get_entity_owner(env->entity)), get_entity_name(env->entity));
 		i = 0; //external methods get this pointer too
@@ -1587,14 +1437,14 @@ static size_t n_fields = 0;
 static size_t n_ext_fields = 0;
 #endif
 
-/** run Rapid Type Analysis
+/** run Hybrid Type Analysis
  * It runs over a reduced callgraph and detects which classes and methods are actually used and computes reduced sets of potentially called targets for each dynamically bound call.
- * @note See the important notes in the documentation of function rta_optimization in the header file!
+ * @note See the important notes in the documentation of function xta_optimization in the header file!
  * @param entry_points NULL-terminated array of method entities, give all entry points to program code, may _not_ be NULL and must contain at least one method entity, also all entry points should have a graph
  * @param initial_live_classes NULL-terminated array of classes that should always be considered live, may be NULL
  * @param live_classes give pointer to empty uninitialized set for receiving results, This is where all live classes are put (as ir_type*).
  * @param live_methods give pointer to empty uninitialized set for receiving results, This is where all live methods are put (as ir_entity*).
- * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically bound calls if possible. (see also function rta_optimize_dyncalls)
+ * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically bound calls if possible. (see also function xta_optimize_dyncalls)
  */
 static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cpset_t *live_methods, cpmap_t *dyncall_targets)
 {
@@ -1629,7 +1479,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		.dyncall_targets = dyncall_targets,
 		.unused_targets = &unused_targets,
 		.ext_live_classes = &ext_live_classes,
-		.methods_ext_called = new_cpset(hash_ptr, ptr_equals),
+		.methods_ext_called = new_cpset(),
 		.live_methods = live_methods,
 	};
 
@@ -1645,7 +1495,6 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		ir_entity *entity;
 		for (; (entity = entry_points[i]) != NULL; i++) {
 			assert(is_method_entity(entity));
-			//	cpset_insert(live_methods, entity);
 			method_info *info = new_method_info();
 			// add to workqueue
 			ir_graph *graph = get_entity_irg(entity);
@@ -1693,7 +1542,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				cpset_iterator_init(&it, info->live_classes->current);
 				ir_type *klass;
 				m_env->info = done_info;
-				while((klass = cpset_iterator_next(&it)) != NULL) {//There should only be on class in it
+				while((klass = cpset_iterator_next(&it)) != NULL) {
 					add_new_live_class(klass, m_env);
 				}
 				continue;
@@ -1865,13 +1714,6 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	del_live_classes_fields(&live_classes_fields);
 
 	{
-		/*cpset_destroy(ext_live_classes->new);
-		cpset_destroy(ext_live_classes->propagated);
-		cpset_destroy(ext_live_classes->current);
-		free(ext_live_classes->current);
-		free(ext_live_classes->new);
-		free(ext_live_classes->propagated);
-		free(ext_live_classes);*/
 		cpset_destroy(env.ext_live_classes);
 
 		cpset_destroy(env.methods_ext_called);
@@ -1933,11 +1775,11 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 }
 
 
-/** frees memory allocated for the results returned by function run_rta
+/** frees memory allocated for the results returned by function run_xta
  * @note does not free the memory of the sets and maps themselves, just their content allocated during XTA
- * @param live_classes as returned by rta_run
- * @param live_methods as returned by rta_run
- * @param dyncall_targets as returned by rta_run
+ * @param live_classes as returned by xta_run
+ * @param live_methods as returned by xta_run
+ * @param dyncall_targets as returned by xta_run
  */
 static void xta_dispose_results(cpmap_t *dyncall_targets)
 {
@@ -2170,8 +2012,8 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void *environment)
 
 }
 /** devirtualizes dyncalls if their target set contains only one entry
- * @param entry_points same as used with rta_run
- * @param dyncall_targets the result map returned from rta_run
+ * @param entry_points same as used with xta_run
+ * @param dyncall_targets the result map returned from xta_run
  */
 static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_targets)
 {
@@ -2422,78 +2264,13 @@ static void delete_non_walked_methods(cpset_t *walked_methods, cpset_t *methodse
 	}
 }
 
-/*static void assertOverwriteIsCorrect(cpset_t *walked_methods, cpset_t *methodsel_methods) {
-	for (size_t i = 0, n = get_irp_n_types(); i < n; ++i) {
-		ir_type *type = get_irp_type(i);
-		if (is_Class_type(type)) {
-			if (oo_get_class_is_extern(type))
-				continue; //Methods of external classes may get called in code beyond our reach
-			for (size_t j = 0, k = get_class_n_members(type); j < k; ++j) {
-				ir_entity *e = get_class_member(type, j);
-				size_t n_overwrites = get_entity_n_overwrites(e);
-				
-				for(size_t i = 0; i< n_overwrites; ++i) {
-					ir_entity *overwrites = get_entity_overwrites(e, i);
-					assert(overwrites);
-					DEBUGOUT(2, " Ow entity %s.%s\n", get_compound_name(get_entity_owner(overwrites)), get_entity_name(overwrites)); 
-				}
-				size_t n_overwritten = get_entity_n_overwrittenby(e);
-
-				for(size_t i = 0; i< n_overwritten; ++i) {
-					ir_entity *overwrittenby = get_entity_overwrittenby(e, i);
-					assert(overwrittenby);
-					DEBUGOUT(2, " Owb entity %s.%s\n", get_compound_name(get_entity_owner(overwrittenby)), get_entity_name(overwrittenby)); 
-				}
-			}
-		}
-	}
-	//cpset_iterator_t it;
-	cpset_iterator_init(&it, walked_methods);
-	ir_entity *e;
-	while ((e = cpset_iterator_next(&it)) != NULL) {
-		size_t n_overwrites = get_entity_n_overwrites(e);
-		
-		for(size_t i = 0; i< n_overwrites; ++i) {
-			ir_entity *overwrites = get_entity_overwrites(e, i);
-			assert(overwrites);
-			DEBUGOUT(2, " Ow entity %s.%s\n", get_compound_name(get_entity_owner(overwrites)), get_entity_name(overwrites)); 
-		}
-		size_t n_overwritten = get_entity_n_overwrittenby(e);
-
-		for(size_t i = 0; i< n_overwritten; ++i) {
-			ir_entity *overwrittenby = get_entity_overwrittenby(e, i);
-			assert(overwrittenby);
-			DEBUGOUT(2, " Owb entity %s.%s\n", get_compound_name(get_entity_owner(overwrittenby)), get_entity_name(overwrittenby)); 
-		}
-	}
-	cpset_iterator_init(&it, methodsel_methods);
-	while ((e = cpset_iterator_next(&it)) != NULL) {
-		size_t n_overwrites = get_entity_n_overwrites(e);
-		
-		for(size_t i = 0; i< n_overwrites; ++i) {
-			ir_entity *overwrites = get_entity_overwrites(e, i);
-			assert(overwrites);
-			DEBUGOUT(2, " Ow entity %s.%s\n", get_compound_name(get_entity_owner(overwrites)), get_entity_name(overwrites)); 
-		}
-		size_t n_overwritten = get_entity_n_overwrittenby(e);
-
-		for(size_t i = 0; i< n_overwritten; ++i) {
-			ir_entity *overwrittenby = get_entity_overwrittenby(e, i);
-			assert(overwrittenby);
-			DEBUGOUT(2, " Owb entity %s.%s\n", get_compound_name(get_entity_owner(overwrittenby)), get_entity_name(overwrittenby)); 
-		}
-	//}
-}*/
-
 void add_leaking_type_to_method(ir_entity *method, ir_type *leaking_type) {
 	if(leaking_types_map == NULL) {
-		leaking_types_map = malloc(sizeof(*leaking_types_map));
-		cpmap_init(leaking_types_map, hash_ptr, ptr_equals);
+		leaking_types_map = new_cpmap();
 	}
 	cpset_t *leaking_types = cpmap_find(leaking_types_map, method);
 	if(leaking_types == NULL) {
-		leaking_types = malloc(sizeof(*leaking_types));
-		cpset_init(leaking_types, hash_ptr, ptr_equals);
+		leaking_types = new_cpset();
 		cpmap_set(leaking_types_map, method, leaking_types);
 	}
 	cpset_insert(leaking_types, leaking_type);
@@ -2524,7 +2301,6 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 	cpmap_t dyncall_targets;
 	cpset_t live_methods;
 
-	//dump_all_ir_graphs("--before-xta");
 	int devirtualized_calls_local;
 	devirt_local(&devirtualized_calls_local);
 
@@ -2579,8 +2355,6 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 	cpset_init(&methodsel_entities, hash_ptr, ptr_equals);
 	fill_methodsel_entities(&live_methods, &methodsel_entities);
 	delete_non_walked_methods(&live_methods, &methodsel_entities);
-	//assertOverwriteIsCorrect(&walked_methods, &methodsel_entities);
 	cpset_destroy(&live_methods);
 	cpset_destroy(&methodsel_entities);
-	//dump_all_ir_graphs("-after-xta");
 }
