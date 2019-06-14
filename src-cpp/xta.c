@@ -193,6 +193,35 @@ static bool ext_method_is_non_leaking(ir_entity *method)
 	return cpset_find(non_leaking_ext_methods, method);
 }
 
+static void add_to_map_set(cpmap_t *map, void *key, void *value) {
+	if (map == NULL)
+		return;
+	cpset_t *set = cpmap_find(map, key);
+	if(set == NULL) {
+		set = new_cpset();
+		cpmap_set(map, key, set);
+	}
+	cpset_insert(set, value);
+}
+
+static void free_map_set(cpmap_t *map) {
+	if (map == NULL)
+		return;
+
+	cpmap_iterator_t it;
+	cpmap_iterator_init(&it, map);
+	cpmap_entry_t entry;
+	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
+		cpset_t *set = entry.data;
+
+		cpmap_remove_iterator(map, &it);
+		cpset_destroy(set);
+		free(set);
+	}
+	cpmap_destroy(map);
+	free(map);
+}
+
 static void add_to_workqueue(ir_entity *method, ir_type *klass, method_env *env); // forward declaration
 
 // add method entity to target sets of all call entities
@@ -299,12 +328,7 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 		methods = new_cpmap();
 		cpmap_set(klasses, klass, methods);
 	}
-	cpset_t *call_entities = cpmap_find(methods, entity);
-	if (call_entities == NULL) {
-		call_entities = new_cpset();
-		cpmap_set(methods, entity, call_entities);
-	}
-	cpset_insert(call_entities, call_entity);
+	add_to_map_set(methods, entity, call_entity);
 }
 
 static ir_entity *find_entity_by_ldname(ident *ldname)
@@ -659,13 +683,13 @@ static void handle_added_live_param_types(ir_node *call, ir_entity *entity, meth
 				}
 				if (ret_call_entity) {
 					ir_type *ret_type = get_class_from_type(get_method_res_type(get_entity_type(ret_call_entity), proj_n));
-					cpmap_set(a_env->call_mths_live_param_types, env->entity, ret_type);//TODO: make map point to set, so more than one call per method is possible
+					add_to_map_set(a_env->call_mths_live_param_types, env->entity, ret_type);//TODO: make map point to set, so more than one call per method is possible
 					DEBUGOUT(4, "Add mths_live_params %s (Rettype: %s)", get_entity_name(env->entity), get_compound_name(ret_type));
 				}
 
 			} else { //Case parameter type
 				ir_type *param_type = get_class_from_type(get_method_param_type(get_entity_type(env->entity), proj_n));
-				cpmap_set(a_env->call_mths_live_param_types, env->entity, param_type);
+				add_to_map_set(a_env->call_mths_live_param_types, env->entity, param_type);
 				DEBUGOUT(4, "Add mths_live_params %s (Paramtype: %s)", get_entity_name(env->entity), get_compound_name(param_type));
 			}
 		} else if (is_Load(pred)) { //case field read
@@ -677,7 +701,7 @@ static void handle_added_live_param_types(ir_node *call, ir_entity *entity, meth
 				field_entity = get_Address_entity(field);
 			}
 			if (field_entity) {
-				cpmap_set(a_env->call_mths_live_param_types, env->entity, get_class_from_type(get_entity_type(field_entity)));
+				add_to_map_set(a_env->call_mths_live_param_types, env->entity, get_class_from_type(get_entity_type(field_entity)));
 			}
 		}
 	}
@@ -1201,15 +1225,20 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 
 			//Add possibly additional calls
 			analyzer_env *a_env = env->analyzer_env;
-			ir_type *param_type = cpmap_find(a_env->call_mths_live_param_types, env->entity);
-			if (param_type) {
-				cpset_t *subtypes = get_all_subtypes_c(param_type);
-				if (cpset_find(subtypes, element)) {
-					for (size_t i = 0; i < get_class_n_members(element); i++) {
-						ir_entity *member = get_class_member(element, i);
-						if (is_method_entity(member)) {
-							add_to_workqueue(member, element, env);
-							DEBUGOUT(4, "Adding to workqueue manually %s.%s\n", get_compound_name(element), get_entity_name(member));
+			cpset_t *param_types = cpmap_find(a_env->call_mths_live_param_types, env->entity);
+			if(param_types) {
+				cpset_iterator_t it;
+				cpset_iterator_init(&it, param_types);
+				ir_type *param_type;
+				while((param_type = cpset_iterator_next(&it)) != NULL) {
+					cpset_t *subtypes = get_all_subtypes_c(param_type);
+					if (cpset_find(subtypes, element)) {
+						for (size_t i = 0; i < get_class_n_members(element); i++) {
+							ir_entity *member = get_class_member(element, i);
+							if (is_method_entity(member)) {
+								add_to_workqueue(member, element, env);
+								DEBUGOUT(4, "Adding to workqueue manually %s.%s\n", get_compound_name(element), get_entity_name(member));
+							}
 						}
 					}
 				}
@@ -1793,8 +1822,8 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		assert(i > 0 && "give at least one entry point");
 	}
 
-	xta_run_loop(env);
-	print_xta_run_res_calc_stats(env, initial_live_classes);
+	xta_run_loop(&env, initial_live_classes);
+	print_xta_run_res_calc_stats(&env);
 
 	// free data structures
 	del_pdeq(workqueue);
@@ -1827,20 +1856,8 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 				cpmap_t *inner_data = inner_entry.data;
 				assert(inner_data);
 
-				cpmap_iterator_t innerst_iterator;
-				cpmap_iterator_init(&innerst_iterator, inner_data);
-				cpmap_entry_t innerst_entry;
-				while ((innerst_entry = cpmap_iterator_next(&innerst_iterator)).key != NULL || innerst_entry.data != NULL) {
-					cpset_t *set = innerst_entry.data;
-					assert(set);
-
-					cpmap_remove_iterator(inner_data, &innerst_iterator);
-					cpset_destroy(set);
-					free(set);
-				}
 				cpmap_remove_iterator(map, &inner_iterator);
-				cpmap_destroy(inner_data);
-				free(inner_data);
+				free_map_set(inner_data);
 			}
 			cpmap_remove_iterator(&unused_targets, &iterator);
 			cpmap_destroy(map);
@@ -1848,7 +1865,18 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		}
 	}
 	cpmap_destroy(&unused_targets);
-	cpmap_destroy(&call_mths_live_param_types);
+	{
+		// delete the map and sets in map call_mths_live_param_types
+		cpmap_iterator_t iterator;
+		cpmap_iterator_init(&iterator, &call_mths_live_param_types);
+		cpmap_entry_t entry;
+		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+			cpset_t *set = entry.data;
+			cpset_destroy(set);
+			free(set);
+		}
+		cpmap_destroy(&call_mths_live_param_types);
+	}
 	// note: live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
 
 	{
@@ -1859,6 +1887,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
 			cpset_t *set = entry.data;
 			cpset_destroy(set);
+			free(set);
 		}
 		cpmap_destroy(&known_types);
 	}
@@ -1881,20 +1910,8 @@ static void xta_dispose_results(cpmap_t *dyncall_targets)
 	cpmap_iterator_init(&it, dyncall_targets);
 	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
 		cpmap_t *map = entry.data;
-		cpmap_iterator_t iterator;
-		cpmap_entry_t e;
-		cpmap_iterator_init(&iterator, map);
-
-		while ((e = cpmap_iterator_next(&iterator)).key != NULL || e.data != NULL) {
-			cpset_t *set = e.data;
-			cpmap_remove_iterator(map, &iterator);
-			assert(set);
-			cpset_destroy(set);
-			free(set);
-		}
 		cpmap_remove_iterator(dyncall_targets, &it);
-		cpmap_destroy(map);
-		free(map);
+		free_map_set(map);
 	}
 	cpmap_destroy(dyncall_targets);
 }
@@ -2357,12 +2374,7 @@ void add_leaking_type_to_method(ir_entity *method, ir_type *leaking_type)
 	if (leaking_types_map == NULL) {
 		leaking_types_map = new_cpmap();
 	}
-	cpset_t *leaking_types = cpmap_find(leaking_types_map, method);
-	if (leaking_types == NULL) {
-		leaking_types = new_cpset();
-		cpmap_set(leaking_types_map, method, leaking_types);
-	}
-	cpset_insert(leaking_types, leaking_type);
+	add_to_map_set(leaking_types_map, method, leaking_type);
 }
 
 void call_methods_on_param_type(ir_entity *method, int param_n)
@@ -2390,46 +2402,6 @@ static void clear_add_calls_map(void)
 	}
 	cpmap_destroy(add_live_types_in_method);
 	free(add_live_types_in_method);
-}
-
-static void clear_leaking_types_map(void)
-{
-	if (leaking_types_map == NULL)
-		return;
-
-	cpmap_iterator_t it;
-	cpmap_iterator_init(&it, leaking_types_map);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
-		cpset_t *set = entry.data;
-		assert(set);
-
-		cpmap_remove_iterator(leaking_types_map, &it);
-		cpset_destroy(set);
-		free(set);
-	}
-	cpmap_destroy(leaking_types_map);
-	free(leaking_types_map);
-}
-
-static void clear_live_leaking_types_map(void)
-{
-	if (leaking_live_types_map == NULL)
-		return;
-
-	cpmap_iterator_t it;
-	cpmap_iterator_init(&it, leaking_live_types_map);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
-		cpset_t *set = entry.data;
-		assert(set);
-
-		cpmap_remove_iterator(leaking_live_types_map, &it);
-		cpset_destroy(set);
-		free(set);
-	}
-	cpmap_destroy(leaking_live_types_map);
-	free(leaking_live_types_map);
 }
 
 void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
@@ -2493,7 +2465,7 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 	delete_non_walked_methods(&live_methods, &methodsel_entities);
 	cpset_destroy(&live_methods);
 	cpset_destroy(&methodsel_entities);
-	clear_leaking_types_map();
-	clear_live_leaking_types_map();
+	free_map_set(leaking_live_types_map);
+	free_map_set(leaking_types_map);
 	clear_add_calls_map();
 }
