@@ -1092,6 +1092,7 @@ public class binding_xta {
 
 	public static enum pn_ASM {
 		pn_ASM_M(),
+		pn_ASM_X_regular(),
 		pn_ASM_first_out(),
 		pn_ASM_max(pn_ASM.pn_ASM_first_out.val);
 		public final int val;
@@ -2977,9 +2978,11 @@ public class binding_xta {
 
 	public static native void xta_set_non_leaking_ext_methods(Pointer methods);
 
-	public static native void clear_leaking_types_map();
+	public static native void call_methods_on_param_type(Pointer method, int param_n);
 
 	public static native void add_leaking_type_to_method(Pointer method, Pointer leaking_type);
+
+	public static native void leak_all_live_ret_subtypes(Pointer method);
 
 	public static native void xta_set_detection_callbacks(Pointer detect_call);
 

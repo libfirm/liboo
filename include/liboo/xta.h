@@ -36,9 +36,11 @@ void xta_set_is_constructor_callback(bool (*is_constr)(ir_entity *method));
 void xta_set_non_leaking_ext_methods(cpset_t *methods);
 
 /**
- * Clears the map of leaking types.
+ * Calls all methods on passed subtypes of the method's specified parameter.
+ * @param the method in which the calls take place
+ * @param the parameter number of the parameter;
  */
-void clear_leaking_types_map(void);
+void call_methods_on_param_type(ir_entity *method, int param_n);
 
 /**
  * Adds a type to a method, which is live in the caller after the call.
@@ -47,6 +49,12 @@ void clear_leaking_types_map(void);
  * @param leaking_type the type
  */
 void add_leaking_type_to_method(ir_entity *method, ir_type *leaking_type);
+
+/**
+ * Given entity will leak subtypes of return type, which are globally live (there exists one instantiation in the program)
+ * @param the method which leaks all subtypes of return type
+ */
+void leak_all_live_ret_subtypes(ir_entity *method);
 
 /** sets important callback function needed to detect calls (e.g. class intialization) hidden behind frontend-specific nodes
  * @note It's very important for the frontend to implement these callbacks correctly, if anything is missing XTA's assumptions may not hold and it can lead to defective programs!

@@ -12,6 +12,14 @@ public class XTA {
 	public static void addLeakingTypeToMethod(Entity method, Type type) {
 		binding_xta.add_leaking_type_to_method(method.ptr, type.ptr);
 	}
+
+	public static void callMethodOnParamType(Entity method, int param_n) {
+		binding_xta.call_methods_on_param_type(method.ptr, param_n);
+	}
+
+	public static void leakAllLiveReturnSubtypes(Entity method) {
+		binding_xta.leak_all_live_ret_subtypes(method.ptr);
+	}
 	
 	public static void runXTA(Entity[] entrypoints, Type[] initialLiveClasses) {
 		binding_xta.xta_optimization(getBufferFromArray(entrypoints, true), getBufferFromArray(initialLiveClasses, true));

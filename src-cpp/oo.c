@@ -574,7 +574,9 @@ void oo_init(void)
 	oo_node_info_map = pmap_create();
 	oo_init_opcodes();
 	oo_init_opcode_entity_attrs();
+	ddispatch_init();
 	dmemory_init();
+	rtti_init();
 	eh_init();
 }
 
@@ -589,8 +591,6 @@ void oo_deinit(void)
 
 void oo_lower(void)
 {
-	ddispatch_init();
-	rtti_init();
 	ddispatch_interface_call call_type = oo_get_interface_call_type();
 	if ((call_type & call_searched_itable) == call_searched_itable ||
 		call_type == call_itable_indexed) {

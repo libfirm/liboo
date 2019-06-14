@@ -1092,6 +1092,7 @@ public class binding_rta {
 
 	public static enum pn_ASM {
 		pn_ASM_M(),
+		pn_ASM_X_regular(),
 		pn_ASM_first_out(),
 		pn_ASM_max(pn_ASM.pn_ASM_first_out.val);
 		public final int val;

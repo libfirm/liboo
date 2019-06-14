@@ -7,7 +7,6 @@
 #include "ddispatch.h"
 #include "rta.h"
 #include "xta.h"
-#include "oo_gc.h"
 
 void oo_init(void);
 void oo_deinit(void);
