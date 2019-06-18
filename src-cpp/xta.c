@@ -256,31 +256,29 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
-	if (klasses != NULL) {
-		cpmap_t *methods = cpmap_find(klasses, klass);
-		if (methods != NULL) {
-			{
-				cpmap_iterator_t iterator;
-				cpmap_iterator_init(&iterator, methods);
-				cpmap_entry_t entry;
-				while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
-					ir_entity *method = (ir_entity *)entry.key;
-					cpset_t *call_entities = entry.data;
+	if (klasses == NULL)
+		return;
+	cpmap_t *methods = cpmap_find(klasses, klass);
+	if (methods == NULL)
+		return;
+	cpmap_iterator_t iterator;
+	cpmap_iterator_init(&iterator, methods);
+	cpmap_entry_t entry;
+	while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+		ir_entity *method = (ir_entity *)entry.key;
+		cpset_t *call_entities = entry.data;
 
-					add_to_dyncalls(method, call_entities, env);
-					if (cpset_size(call_entities) > 0) {
-						add_to_workqueue(method, klass, env);
-					}
-					cpmap_remove_iterator(methods, &iterator);
-					cpset_destroy(call_entities);
-					free(call_entities);
-				}
-			}
-			cpmap_remove(klasses, klass);
-			cpmap_destroy(methods);
-			free(methods);
+		add_to_dyncalls(method, call_entities, env);
+		if (cpset_size(call_entities) > 0) {
+			add_to_workqueue(method, klass, env);
 		}
+		cpmap_remove_iterator(methods, &iterator);
+		cpset_destroy(call_entities);
+		free(call_entities);
 	}
+	cpmap_remove(klasses, klass);
+	cpmap_destroy(methods);
+	free(methods);
 }
 
 static bool is_in_iteration_set(iteration_set *set, void *element)
@@ -530,31 +528,29 @@ static ir_entity *fir_ascend_into_superclasses_and_merge(ir_type *klass, ir_enti
 		// more than one is ambiguous, but class methods win against interface default methods (at least in Java 8) !?
 		if (result == NULL) {
 			result = r;
-		} else {
-			if (r != NULL) {
-				ir_type *result_owner          = get_entity_owner(result);
-				ir_type *r_owner               = get_entity_owner(r);
-				bool     result_from_interface = oo_get_class_is_interface(result_owner);
-				bool     r_from_interface      = oo_get_class_is_interface(r_owner);
-				bool     r_overrides_result    = is_class_trans_subtype(result_owner, r_owner);
-				bool     result_overrides_r    = is_class_trans_subtype(r_owner, result_owner);
+		} else if (r != NULL) {
+			ir_type *result_owner          = get_entity_owner(result);
+			ir_type *r_owner               = get_entity_owner(r);
+			bool     result_from_interface = oo_get_class_is_interface(result_owner);
+			bool     r_from_interface      = oo_get_class_is_interface(r_owner);
+			bool     r_overrides_result    = is_class_trans_subtype(result_owner, r_owner);
+			bool     result_overrides_r    = is_class_trans_subtype(r_owner, result_owner);
 
-				if (result_owner == r_owner) {
-					// Nothing to do, we reached the same class by two ways
-				} else if (result_overrides_r || (r_from_interface && !result_from_interface)) {
-					DEBUGOUT(3, "\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n",
-					         get_compound_name(result_owner), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"),
-					         get_compound_name(r_owner), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"));
-				} else if (r_overrides_result || (result_from_interface && !r_from_interface)) {
-					DEBUGOUT(3, "\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n",
-					         get_compound_name(r_owner), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"),
-					         get_compound_name(result_owner), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
-					result = r;
-				} else if (result_from_interface == r_from_interface) { // both true or both false
-					assert(false && "ambiguous interface implementation");
-				} else {
-					assert(false && "Missing case");
-				}
+			if (result_owner == r_owner) {
+				// Nothing to do, we reached the same class by two ways
+			} else if (result_overrides_r || (r_from_interface && !result_from_interface)) {
+				DEBUGOUT(3, "\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n",
+					 get_compound_name(result_owner), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"),
+					 get_compound_name(r_owner), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"));
+			} else if (r_overrides_result || (result_from_interface && !r_from_interface)) {
+				DEBUGOUT(3, "\t\t\t\t\t\tcandidate %s.%s ( %s ) [%s] beats candidate %s.%s ( %s ) [%s]\n",
+					 get_compound_name(r_owner), get_entity_name(r), get_entity_ld_name(r), ((get_entity_irg(r)) ? "graph" : "nograph"),
+					 get_compound_name(result_owner), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
+				result = r;
+			} else if (result_from_interface == r_from_interface) { // both true or both false
+				assert(false && "ambiguous interface implementation");
+			} else {
+				assert(false && "Missing case");
 			}
 		}
 	}
@@ -653,56 +649,56 @@ static void handle_added_live_param_types(ir_node *call, ir_entity *entity, meth
 		return;
 	ir_node *proj = get_irn_n(call, *n_p + 2); //0 mem, 1 addr, 2 first param
 	analyzer_env *a_env = env->analyzer_env;
-	if (is_Proj(proj)) {
-		int proj_n = get_Proj_num(proj);
-		ir_node *pred = get_Proj_pred(proj);
-		if (is_VptrIsSet(pred)) { //case object creation
-			ir_type *type = get_VptrIsSet_type(pred);
+	if (!is_Proj(proj))
+		return;
+	int proj_n = get_Proj_num(proj);
+	ir_node *pred = get_Proj_pred(proj);
+	if (is_VptrIsSet(pred)) { //case object creation
+		ir_type *type = get_VptrIsSet_type(pred);
 
-			for (size_t i = 0; i < get_class_n_members(type); i++) {
-				ir_entity *member = get_class_member(type, i);
-				if (is_method_entity(member)) {
-					add_to_workqueue(member, type, env);
-					DEBUGOUT(4, "Adding to workqueue manually %s.%s\n", get_compound_name(type), get_entity_name(member));
+		for (size_t i = 0; i < get_class_n_members(type); i++) {
+			ir_entity *member = get_class_member(type, i);
+			if (is_method_entity(member)) {
+				add_to_workqueue(member, type, env);
+				DEBUGOUT(4, "Adding to workqueue manually %s.%s\n", get_compound_name(type), get_entity_name(member));
+			}
+		}
+	} else if (is_Proj(pred)) {
+		ir_node *pred_pred = get_Proj_pred(pred);
+		if (is_Call(pred_pred)) { //case return type of called method
+			ir_node *callee = get_irn_n(pred_pred, 1);
+			ir_entity *ret_call_entity;
+			if (is_Address(callee)) {
+				// static call
+				ret_call_entity = get_Address_entity(callee);
+			} else if (is_Proj(callee)) {
+				ir_node *pred = get_Proj_pred(callee);
+				if (is_MethodSel(pred)) {
+					ir_node *methodsel = pred;
+					ret_call_entity = get_MethodSel_entity(methodsel);
 				}
 			}
-		} else if (is_Proj(pred)) {
-			ir_node *pred_pred = get_Proj_pred(pred);
-			if (is_Call(pred_pred)) { //case return type of called method
-				ir_node *callee = get_irn_n(pred_pred, 1);
-				ir_entity *ret_call_entity;
-				if (is_Address(callee)) {
-					// static call
-					ret_call_entity = get_Address_entity(callee);
-				} else if (is_Proj(callee)) {
-					ir_node *pred = get_Proj_pred(callee);
-					if (is_MethodSel(pred)) {
-						ir_node *methodsel = pred;
-						ret_call_entity = get_MethodSel_entity(methodsel);
-					}
-				}
-				if (ret_call_entity) {
-					ir_type *ret_type = get_class_from_type(get_method_res_type(get_entity_type(ret_call_entity), proj_n));
-					add_to_map_set(a_env->call_mths_live_param_types, env->entity, ret_type);//TODO: make map point to set, so more than one call per method is possible
-					DEBUGOUT(4, "Add mths_live_params %s (Rettype: %s)", get_entity_name(env->entity), get_compound_name(ret_type));
-				}
+			if (ret_call_entity) {
+				ir_type *ret_type = get_class_from_type(get_method_res_type(get_entity_type(ret_call_entity), proj_n));
+				add_to_map_set(a_env->call_mths_live_param_types, env->entity, ret_type);//TODO: make map point to set, so more than one call per method is possible
+				DEBUGOUT(4, "Add mths_live_params %s (Rettype: %s)", get_entity_name(env->entity), get_compound_name(ret_type));
+			}
 
-			} else { //Case parameter type
-				ir_type *param_type = get_class_from_type(get_method_param_type(get_entity_type(env->entity), proj_n));
-				add_to_map_set(a_env->call_mths_live_param_types, env->entity, param_type);
-				DEBUGOUT(4, "Add mths_live_params %s (Paramtype: %s)", get_entity_name(env->entity), get_compound_name(param_type));
-			}
-		} else if (is_Load(pred)) { //case field read
-			ir_node *field = get_irn_n(pred, 1);
-			ir_entity *field_entity = NULL;
-			if (is_Member(field)) {
-				field_entity = get_Member_entity(field);
-			} else if (is_Address(field)) {
-				field_entity = get_Address_entity(field);
-			}
-			if (field_entity) {
-				add_to_map_set(a_env->call_mths_live_param_types, env->entity, get_class_from_type(get_entity_type(field_entity)));
-			}
+		} else { //Case parameter type
+			ir_type *param_type = get_class_from_type(get_method_param_type(get_entity_type(env->entity), proj_n));
+			add_to_map_set(a_env->call_mths_live_param_types, env->entity, param_type);
+			DEBUGOUT(4, "Add mths_live_params %s (Paramtype: %s)", get_entity_name(env->entity), get_compound_name(param_type));
+		}
+	} else if (is_Load(pred)) { //case field read
+		ir_node *field = get_irn_n(pred, 1);
+		ir_entity *field_entity = NULL;
+		if (is_Member(field)) {
+			field_entity = get_Member_entity(field);
+		} else if (is_Address(field)) {
+			field_entity = get_Address_entity(field);
+		}
+		if (field_entity) {
+			add_to_map_set(a_env->call_mths_live_param_types, env->entity, get_class_from_type(get_entity_type(field_entity)));
 		}
 	}
 }
@@ -848,13 +844,13 @@ static void visit_initializer(ir_initializer_t *initializer, analyzer_env *env)
 		return;
 
 	case IR_INITIALIZER_COMPOUND: {
-			for (size_t i = 0; i < get_initializer_compound_n_entries(initializer); ++i) {
-				ir_initializer_t *subinitializer
-				    = get_initializer_compound_value(initializer, i);
-				visit_initializer(subinitializer, env);
-			}
-			return;
+		for (size_t i = 0; i < get_initializer_compound_n_entries(initializer); ++i) {
+			ir_initializer_t *subinitializer
+			    = get_initializer_compound_value(initializer, i);
+			visit_initializer(subinitializer, env);
 		}
+		return;
+	}
 	}
 }
 
@@ -1226,20 +1222,22 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 			//Add possibly additional calls
 			analyzer_env *a_env = env->analyzer_env;
 			cpset_t *param_types = cpmap_find(a_env->call_mths_live_param_types, env->entity);
-			if(param_types) {
-				cpset_iterator_t it;
-				cpset_iterator_init(&it, param_types);
-				ir_type *param_type;
-				while((param_type = cpset_iterator_next(&it)) != NULL) {
-					cpset_t *subtypes = get_all_subtypes_c(param_type);
-					if (cpset_find(subtypes, element)) {
-						for (size_t i = 0; i < get_class_n_members(element); i++) {
-							ir_entity *member = get_class_member(element, i);
-							if (is_method_entity(member)) {
-								add_to_workqueue(member, element, env);
-								DEBUGOUT(4, "Adding to workqueue manually %s.%s\n", get_compound_name(element), get_entity_name(member));
-							}
-						}
+			if(!param_types)
+				continue;
+
+			cpset_iterator_t it;
+			cpset_iterator_init(&it, param_types);
+			ir_type *param_type;
+			while((param_type = cpset_iterator_next(&it)) != NULL) {
+				cpset_t *subtypes = get_all_subtypes_c(param_type);
+				if (!cpset_find(subtypes, element))
+					continue;
+
+				for (size_t i = 0; i < get_class_n_members(element); i++) {
+					ir_entity *member = get_class_member(element, i);
+					if (is_method_entity(member)) {
+						add_to_workqueue(member, element, env);
+						DEBUGOUT(4, "Adding to workqueue manually %s.%s\n", get_compound_name(element), get_entity_name(member));
 					}
 				}
 			}
@@ -1410,24 +1408,24 @@ static bool propagate_live_classes(analyzer_env *env)
 	cpset_iterator_init(&it, env->methods_ext_called);
 	ir_entity *ec_method; //externally callable method
 	while ((ec_method = cpset_iterator_next(&it)) != NULL) {
-		if (cpset_find(env->ext_live_classes, get_entity_owner(ec_method))) {
-			method_info *info = cpmap_find(env->done_map, ec_method);
-			iteration_set *i_set = info->live_classes;
-			cpset_t cut;
-			cpset_init(&cut, hash_ptr, ptr_equals);
-			//Parameters
-			cut_sets(&cut, env->ext_live_classes, info->parameter_subtypes);
-			make_subset(i_set->new, &cut);
-			cpset_destroy(&cut);
-			cpset_init(&cut, hash_ptr, ptr_equals);
-			//Return
-			if (cpset_size(i_set->current) != 0) {
-				cut_sets(&cut, info->return_subtypes, i_set->current);
-				make_subset(env->ext_live_classes, &cut);
-			}
-
-			cpset_destroy(&cut);
+		if (!cpset_find(env->ext_live_classes, get_entity_owner(ec_method)))
+			continue;
+		method_info *info = cpmap_find(env->done_map, ec_method);
+		iteration_set *i_set = info->live_classes;
+		cpset_t cut;
+		cpset_init(&cut, hash_ptr, ptr_equals);
+		//Parameters
+		cut_sets(&cut, env->ext_live_classes, info->parameter_subtypes);
+		make_subset(i_set->new, &cut);
+		cpset_destroy(&cut);
+		cpset_init(&cut, hash_ptr, ptr_equals);
+		//Return
+		if (cpset_size(i_set->current) != 0) {
+			cut_sets(&cut, info->return_subtypes, i_set->current);
+			make_subset(env->ext_live_classes, &cut);
 		}
+
+		cpset_destroy(&cut);
 	}
 	return update_iteration_sets(env) || change;
 }
@@ -1486,25 +1484,23 @@ static void retrieve_methods_overwriting_external_recursive(analyzer_env *env, i
 {
 	for (size_t i = 0, n = get_class_n_members(type); i < n; ++i) {
 		ir_entity *entity = get_class_member(type, i);
-		if (is_method_entity(entity)) {
-			char *id = (char *) get_entity_ident(entity);
-			if (oo_get_class_is_extern(type)) {
-				//Consider all methods from external methods on the path
-				//Implicityly: all external classes are above all app classes in hierachy
-				cpset_insert(methods, id);
-			} else {
-				if (cpset_find(methods, id) && !is_constr(entity)) {
-					cpset_insert(env->methods_ext_called, entity);
-					method_env *meth_env = (method_env *) malloc(sizeof(method_env));
-					meth_env->entity = entity;
-					meth_env->analyzer_env = env;
-					method_info *info = new_method_info();
-					iteration_set *i_set = info->live_classes;
-					cpset_insert(i_set->current, get_entity_owner(entity));
-					meth_env->info = info;
-					pdeq_putr(env->workqueue, meth_env);
-				}
-			}
+		if (!is_method_entity(entity))
+			continue;
+		char *id = (char *) get_entity_ident(entity);
+		if (oo_get_class_is_extern(type)) {
+			//Consider all methods from external methods on the path
+			//Implicityly: all external classes are above all app classes in hierachy
+			cpset_insert(methods, id);
+		} else if (cpset_find(methods, id) && !is_constr(entity)) {
+			cpset_insert(env->methods_ext_called, entity);
+			method_env *meth_env = (method_env *) malloc(sizeof(method_env));
+			meth_env->entity = entity;
+			meth_env->analyzer_env = env;
+			method_info *info = new_method_info();
+			iteration_set *i_set = info->live_classes;
+			cpset_insert(i_set->current, get_entity_owner(entity));
+			meth_env->info = info;
+			pdeq_putr(env->workqueue, meth_env);
 		}
 	}
 
@@ -2054,58 +2050,53 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void *environment)
 	assert(environment);
 	optimizer_env *env = (optimizer_env *)environment;
 
-	switch (get_irn_opcode(node)) {
-	case iro_Call: {
-			ir_node *call = node;
-			ir_node *callee = get_irn_n(call, 1);
-			if (is_Address(callee)) {
-				// static call
-				ir_entity *entity = get_Address_entity(callee);
+	if(!is_Call(node))
+		return;
 
+	ir_node *call = node;
+	ir_node *callee = get_irn_n(call, 1);
+	if (is_Address(callee)) {
+		// static call
+		ir_entity *entity = get_Address_entity(callee);
+
+		optimizer_handle_static_call(call, entity, env);
+
+	} else if (is_Proj(callee)) {
+		ir_node *pred = get_Proj_pred(callee);
+		if (is_MethodSel(pred)) {
+			ir_node *methodsel = pred;
+			ir_entity *entity = get_MethodSel_entity(methodsel);
+
+			if (oo_get_call_is_statically_bound(call)) {
+				// weird case of Call with MethodSel that is marked statically bound
 				optimizer_handle_static_call(call, entity, env);
-
-			} else if (is_Proj(callee)) {
-				ir_node *pred = get_Proj_pred(callee);
-				if (is_MethodSel(pred)) {
-					ir_node *methodsel = pred;
-					ir_entity *entity = get_MethodSel_entity(methodsel);
-
-					if (oo_get_call_is_statically_bound(call)) {
-						// weird case of Call with MethodSel that is marked statically bound
-						optimizer_handle_static_call(call, entity, env);
-					} else {
-						// dynamic call
-						optimizer_handle_dynamic_call(call, entity, methodsel, env);
-					}
-				} else {
-					// indirect call via function pointers or are there even more types of calls?
-					DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
-					DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
-					DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
-					if (is_Tuple(pred) && get_Tuple_n_preds(pred) == 2 && is_Address(get_Tuple_pred(pred, 1))) {
-						ir_entity *entity = get_Address_entity(get_Tuple_pred(pred, 1));
-
-						if (is_method_entity(entity))
-							optimizer_handle_static_call(call, entity, env);
-					} else {
-#ifdef XTA_STATS
-						env->n_others++;
-#endif
-					}
-				}
 			} else {
-				// indirect call via function pointers or are there even more types of calls?
-				DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
-				DEBUGOUT(4, "-> %s\n", gdb_node_helper(callee));
+				// dynamic call
+				optimizer_handle_dynamic_call(call, entity, methodsel, env);
+			}
+		} else {
+			// indirect call via function pointers or are there even more types of calls?
+			DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+			DEBUGOUT(4, "-> %s", gdb_node_helper(callee));
+			DEBUGOUT(4, "-> %s\n", gdb_node_helper(pred));
+			if (is_Tuple(pred) && get_Tuple_n_preds(pred) == 2 && is_Address(get_Tuple_pred(pred, 1))) {
+				ir_entity *entity = get_Address_entity(get_Tuple_pred(pred, 1));
+
+				if (is_method_entity(entity))
+					optimizer_handle_static_call(call, entity, env);
+			} else {
 #ifdef XTA_STATS
 				env->n_others++;
 #endif
 			}
-			break;
 		}
-	default:
-		// skip other node types
-		break;
+	} else {
+		// indirect call via function pointers or are there even more types of calls?
+		DEBUGOUT(4, "\tcall: neither Address nor Proj of MethodSel as callee: %s", gdb_node_helper(call));
+		DEBUGOUT(4, "-> %s\n", gdb_node_helper(callee));
+#ifdef XTA_STATS
+		env->n_others++;
+#endif
 	}
 
 }
@@ -2187,38 +2178,26 @@ static void walk_graph_and_devirt_local(ir_node *node, void *env)
 {
 	int *count = env;
 
-	switch (get_irn_opcode(node)) {
-	case iro_Call: {
-			ir_node *call = node;
-			ir_node *callee = get_irn_n(call, 1);
-			if (is_Proj(callee) && !oo_get_call_is_statically_bound(call)) {
-				ir_node *pred = get_Proj_pred(callee);
-				if (is_MethodSel(pred)) {
-					ir_node *methodsel = pred;
-					ir_entity *entity = get_MethodSel_entity(methodsel);
-					ir_node *proj = get_irn_n(methodsel, 1);
-					if (is_Proj(proj)) {
-						ir_node *vptrIsSet = get_Proj_pred(proj);
-						if (is_VptrIsSet(vptrIsSet)) {
-							ir_type *type = get_VptrIsSet_type(vptrIsSet);
-							ir_entity *target = get_class_member_by_name(type, get_entity_ident(entity));
-							if (target != NULL) {
-								ir_graph *graph = get_irn_irg(methodsel);
-								ir_node *address = new_r_Address(graph, target);
-								ir_node *mem = get_irn_n(methodsel, 0);
-								ir_node *input[] = { mem, address };
-								turn_into_tuple(methodsel, 2, input);
-								(*count)++;
-							}
-						}
-					}
-				}
-			}
-			break;
-		}
-	default: break;
-	}
+	if (!is_MethodSel(node))
+		return;
 
+	ir_entity *entity = get_MethodSel_entity(node);
+	ir_node *proj = get_irn_n(node, 1);
+	if (!is_Proj(proj))
+		return;
+	ir_node *vptrIsSet = get_Proj_pred(proj);
+	if (!is_VptrIsSet(vptrIsSet))
+		return;
+	ir_type *type = get_VptrIsSet_type(vptrIsSet);
+	ir_entity *target = get_class_member_by_name(type, get_entity_ident(entity));
+	if (target != NULL) {
+		ir_graph *graph = get_irn_irg(node);
+		ir_node *address = new_r_Address(graph, target);
+		ir_node *mem = get_irn_n(node, 0);
+		ir_node *input[] = { mem, address };
+		turn_into_tuple(node, 2, input);
+		(*count)++;
+	}
 }
 
 static void devirt_local(int *count)
@@ -2237,29 +2216,18 @@ struct fme_helper {
 
 static void fetch_methodsel_entities(ir_node *node, void *env)
 {
+	if (!is_MethodSel(node))
+		return;
 	struct fme_helper *helper = env;
 	cpset_t *methodsel_entities = helper->methodsel_entities;
-	switch (get_irn_opcode(node)) {
-	case iro_Call: {
-			ir_node *call = node;
-			ir_node *callee = get_irn_n(call, 1);
-			if (is_Proj(callee)) {
-				ir_node *pred = get_Proj_pred(callee);
-				if (is_MethodSel(pred)) {
-					ir_node *methodsel = pred;
-					ir_entity *entity = get_MethodSel_entity(methodsel);
-					if (!cpset_find(methodsel_entities, entity)) {
-						cpset_insert(methodsel_entities, entity);
-						if (!cpset_find(helper->walked_methods, entity)) {
-							if (get_entity_irg(entity) != NULL) {
-								DEBUGOUT(3, "\t Setting abstract %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
-								free_ir_graph(get_entity_irg(entity));
-								oo_set_method_is_abstract(entity, true);
-							}
-						}
-					}
-				}
-			}
+	ir_node *methodsel = node;
+	ir_entity *entity = get_MethodSel_entity(methodsel);
+	if (!cpset_find(methodsel_entities, entity)) {
+		cpset_insert(methodsel_entities, entity);
+		if (!cpset_find(helper->walked_methods, entity) && get_entity_irg(entity) != NULL) {
+			DEBUGOUT(3, "\t Setting abstract %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
+			free_ir_graph(get_entity_irg(entity));
+			oo_set_method_is_abstract(entity, true);
 		}
 	}
 }
