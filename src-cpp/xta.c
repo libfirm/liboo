@@ -20,14 +20,14 @@
 #include <liboo/oo.h>
 #include <liboo/nodes.h>
 
-#include "adt/cpmap.h"
+#include "adt/arraymap.h"
 #include "adt/arrayset.h"
 #include "adt/pdeq.h"
 #include "adt/hashptr.h"
 
 #include <libfirm/timing.h>
 // debug setting
-#define DEBUG_XTA 0
+#define DEBUG_XTA 999
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 // stats
@@ -52,11 +52,11 @@ static int ptr_equals(const void *pt1, const void *pt2) // missing default point
 	return pt1 == pt2;
 }
 
-static inline cpmap_t *new_cpmap(void) // missing new function for cpmap
+static inline arraymap_t *new_arraymap(void) // missing new function for arraymap
 {
-	cpmap_t *cpmap = malloc(sizeof(cpmap_t));
-	cpmap_init(cpmap, hash_ptr, ptr_equals);
-	return cpmap;
+	arraymap_t *arraymap = malloc(sizeof(arraymap_t));
+	arraymap_init(arraymap, ptr_equals);
+	return arraymap;
 }
 
 static inline arrayset_t *new_arrayset(void) // missing new function for arrayset
@@ -95,9 +95,9 @@ void xta_set_is_constructor_callback(bool (*is_constr_callback)(ir_entity *metho
 }
 
 static arrayset_t *non_leaking_ext_methods = NULL;
-static cpmap_t *leaking_types_map;
-static cpmap_t *leaking_live_types_map;
-static cpmap_t *add_live_types_in_method; //map from method to parameter number
+static arraymap_t *leaking_types_map;
+static arraymap_t *leaking_live_types_map;
+static arraymap_t *add_live_types_in_method; //map from method to parameter number
 
 void xta_set_non_leaking_ext_methods(arrayset_t *non_leak_meth)
 {
@@ -113,17 +113,17 @@ typedef struct iteration_set {
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	pdeq *initializer_queue; //workqueue for initializers as they cannot easily be walked while walking a method
-	cpmap_t *done_map; // map to mark methods that were already analyzed. Maps entities to their method_info
-	cpmap_t *live_classes_fields; //Live classes for field entities
+	arraymap_t *done_map; // map to mark methods that were already analyzed. Maps entities to their method_info
+	arraymap_t *live_classes_fields; //Live classes for field entities
 
-	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> caller -> Set: method entities)
-	cpmap_t *unused_targets; // map that stores a map for evert call site which stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: call site ->(Map: class -> (Map: method entity -> Set: call entities)) This is needed to update results when a class becomes live after there were already some dynamically bound calls that would call a method of it.
+	arraymap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> caller -> Set: method entities)
+	arraymap_t *unused_targets; // map that stores a map for evert call site which stores a map for every class which stores unused potential call targets of dynamic calls and a set of the call entities that would call them if the class were live) (Map: call site ->(Map: class -> (Map: method entity -> Set: call entities)) This is needed to update results when a class becomes live after there were already some dynamically bound calls that would call a method of it.
 
 	arrayset_t *ext_live_classes; //classes which are in use in external code
 	arrayset_t *methods_ext_called; //All application methods which can be called by a library (in theory)
 	arrayset_t *live_methods; //set containing all called/callable methods at the end
 	arrayset_t *glob_live_classes; //set of all classes instantiated in the program
-	cpmap_t *call_mths_live_param_types; //Parameter type of methods, where on subtypes all methods should be called
+	arraymap_t *call_mths_live_param_types; //Parameter type of methods, where on subtypes all methods should be called
 } analyzer_env;
 
 typedef struct method_info {
@@ -193,32 +193,32 @@ static bool ext_method_is_non_leaking(ir_entity *method)
 	return arrayset_find(non_leaking_ext_methods, method);
 }
 
-static void add_to_map_set(cpmap_t *map, void *key, void *value) {
+static void add_to_map_set(arraymap_t *map, void *key, void *value) {
 	if (map == NULL)
 		return;
-	arrayset_t *set = cpmap_find(map, key);
+	arrayset_t *set = arraymap_find(map, key);
 	if(set == NULL) {
 		set = new_arrayset();
-		cpmap_set(map, key, set);
+		arraymap_set(map, key, set);
 	}
 	arrayset_insert(set, value);
 }
 
-static void free_map_set(cpmap_t *map) {
+static void free_map_set(arraymap_t *map) {
 	if (map == NULL)
 		return;
 
-	cpmap_iterator_t it;
-	cpmap_iterator_init(&it, map);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
+	arraymap_iterator_t it;
+	arraymap_iterator_init(&it, map);
+	arraymap_entry_t entry;
+	while ((entry = arraymap_iterator_next(&it)).key != NULL || entry.data != NULL) {
 		arrayset_t *set = entry.data;
 
-		cpmap_remove_iterator(map, &it);
+		arraymap_remove_iterator(map, &it);
 		arrayset_destroy(set);
 		free(set);
 	}
-	cpmap_destroy(map);
+	arraymap_destroy(map);
 	free(map);
 }
 
@@ -236,9 +236,9 @@ static void add_to_dyncalls(ir_entity *method, arrayset_t *call_entities, method
 	ir_entity *call_entity;
 	analyzer_env *a_env = env->analyzer_env;
 	while ((call_entity = arrayset_iterator_next(&iterator)) != NULL) {
-		cpmap_t *call_sites = cpmap_find(a_env->dyncall_targets, call_entity);
+		arraymap_t *call_sites = arraymap_find(a_env->dyncall_targets, call_entity);
 		assert(call_sites);
-		arrayset_t *targets = cpmap_find(call_sites, env->entity);
+		arrayset_t *targets = arraymap_find(call_sites, env->entity);
 		assert(targets != NULL);
 
 		DEBUGOUT(3, "\t\t\t\t\tupdating method %s.%s for call %s.%s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
@@ -255,16 +255,16 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 	DEBUGOUT(3, "updating unused target for method %s and klass %s\n", get_entity_ld_name(env->entity), get_compound_name(klass));
 
 	analyzer_env *a_env = env->analyzer_env;
-	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
+	arraymap_t *klasses = arraymap_find(a_env->unused_targets, env->entity);
 	if (klasses == NULL)
 		return;
-	cpmap_t *methods = cpmap_find(klasses, klass);
+	arraymap_t *methods = arraymap_find(klasses, klass);
 	if (methods == NULL)
 		return;
-	cpmap_iterator_t iterator;
-	cpmap_iterator_init(&iterator, methods);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+	arraymap_iterator_t iterator;
+	arraymap_iterator_init(&iterator, methods);
+	arraymap_entry_t entry;
+	while ((entry = arraymap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 		ir_entity *method = (ir_entity *)entry.key;
 		arrayset_t *call_entities = entry.data;
 
@@ -272,12 +272,12 @@ static void update_unused_targets(method_env *env, ir_type *klass)
 		if (arrayset_size(call_entities) > 0) {
 			add_to_workqueue(method, klass, env);
 		}
-		cpmap_remove_iterator(methods, &iterator);
+		arraymap_remove_iterator(methods, &iterator);
 		arrayset_destroy(call_entities);
 		free(call_entities);
 	}
-	cpmap_remove(klasses, klass);
-	cpmap_destroy(methods);
+	arraymap_remove(klasses, klass);
+	arraymap_destroy(methods);
 	free(methods);
 }
 
@@ -316,15 +316,15 @@ static void memorize_unused_target(ir_type *klass, ir_entity *entity, ir_entity 
 	assert(env);
 
 	analyzer_env *a_env = env->analyzer_env;
-	cpmap_t *klasses = cpmap_find(a_env->unused_targets, env->entity);
+	arraymap_t *klasses = arraymap_find(a_env->unused_targets, env->entity);
 	if (klasses == NULL) {
-		klasses = new_cpmap();
-		cpmap_set(a_env->unused_targets, env->entity, klasses);
+		klasses = new_arraymap();
+		arraymap_set(a_env->unused_targets, env->entity, klasses);
 	}
-	cpmap_t *methods = cpmap_find(klasses, klass);
+	arraymap_t *methods = arraymap_find(klasses, klass);
 	if (methods == NULL) {
-		methods = new_cpmap();
-		cpmap_set(klasses, klass, methods);
+		methods = new_arraymap();
+		arraymap_set(klasses, klass, methods);
 	}
 	add_to_map_set(methods, entity, call_entity);
 }
@@ -408,7 +408,7 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 	assert(env);
 
 	analyzer_env *a_env = env->analyzer_env;
-	method_info *done_entity_info = cpmap_find(a_env->done_map, entity);
+	method_info *done_entity_info = arraymap_find(a_env->done_map, entity);
 	if (done_entity_info == NULL) { // only enqueue if not already done
 		DEBUGOUT(3, "\t\t\tadding %s.%s ( %s ) [%s] to workqueue\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), ((get_entity_irg(entity)) ? "graph" : "nograph"));
 		method_env *entity_menv = (method_env *) malloc(sizeof(method_env));
@@ -644,7 +644,7 @@ static ir_type *get_class_from_type(ir_type *type);
 
 static void handle_added_live_param_types(ir_node *call, ir_entity *entity, method_env *env)
 {
-	int *n_p = cpmap_find(add_live_types_in_method, entity);
+	int *n_p = arraymap_find(add_live_types_in_method, entity);
 	if (!n_p)
 		return;
 	ir_node *proj = get_irn_n(call, *n_p + 2); //0 mem, 1 addr, 2 first param
@@ -741,12 +741,12 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 	DEBUGOUT(4, "\tdynamic call: %s.%s %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
 
 	analyzer_env *a_env = env->analyzer_env;
-	cpmap_t *call_sites = cpmap_find(a_env->dyncall_targets, entity);
+	arraymap_t *call_sites = arraymap_find(a_env->dyncall_targets, entity);
 	if (call_sites == NULL) {
-		call_sites = new_cpmap();
-		cpmap_set(a_env->dyncall_targets, entity, call_sites);
+		call_sites = new_arraymap();
+		arraymap_set(a_env->dyncall_targets, entity, call_sites);
 	}
-	if (cpmap_find(call_sites, env->entity) == NULL) { // if not already done
+	if (arraymap_find(call_sites, env->entity) == NULL) { // if not already done
 		// calculate set of all method entities that this call could potentially call
 
 		// first static lookup upwards in the class hierarchy for the case of an inherited method
@@ -757,7 +757,7 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 		collect_methods(entity, result_set, env);
 
 		// note: cannot check for nonempty result set here because classes could be nonlive at this point but become live later depending on the order in which methods are analyzed
-		cpmap_set(call_sites, env->entity, result_set);
+		arraymap_set(call_sites, env->entity, result_set);
 		handle_added_live_param_types(call, entity, env);
 	}
 
@@ -765,7 +765,7 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 
 }
 
-static cpmap_t known_types;
+static arraymap_t known_types;
 
 static void get_all_subtypes(ir_type *klass, arrayset_t *res_set)
 {
@@ -779,11 +779,11 @@ static void get_all_subtypes(ir_type *klass, arrayset_t *res_set)
 
 static arrayset_t *get_all_subtypes_c(ir_type *klass)
 {
-	arrayset_t *types = cpmap_find(&known_types, klass);
+	arrayset_t *types = arraymap_find(&known_types, klass);
 	if (types == NULL) {
 		types = new_arrayset();
 		get_all_subtypes(klass, types);
-		cpmap_set(&known_types, klass, types);
+		arraymap_set(&known_types, klass, types);
 	}
 	return types;
 }
@@ -966,7 +966,7 @@ static void analyze_iro_Address(ir_node *address, method_env *m_env)
 
 		//look whether methods calls constructors that aren't in a graph
 		arrayset_t *classes;
-		if (leaking_types_map != NULL && (classes = cpmap_find(leaking_types_map, entity)) != NULL) {
+		if (leaking_types_map != NULL && (classes = arraymap_find(leaking_types_map, entity)) != NULL) {
 			arrayset_iterator_t iterator;
 			arrayset_iterator_init(&iterator, classes);
 			ir_type *klass;
@@ -974,7 +974,7 @@ static void analyze_iro_Address(ir_node *address, method_env *m_env)
 				add_new_live_class(klass, m_env);
 			}
 		}
-		if (leaking_live_types_map != NULL && (classes = cpmap_find(leaking_live_types_map, entity)) != NULL) {
+		if (leaking_live_types_map != NULL && (classes = arraymap_find(leaking_live_types_map, entity)) != NULL) {
 			arrayset_iterator_t iterator;
 			arrayset_t cut;
 			arrayset_init(&cut, ptr_equals);
@@ -1178,10 +1178,10 @@ static bool add_live_classes_to_field(analyzer_env *env, ir_entity *field, array
 	if (field_as_external(field)) {
 		field_set = env->ext_live_classes;
 	} else {
-		iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
+		iteration_set *field_i_set = arraymap_find(env->live_classes_fields, field);
 		if (field_i_set == NULL) {
 			field_i_set = new_iteration_set();
-			cpmap_set(env->live_classes_fields, field, field_i_set);
+			arraymap_set(env->live_classes_fields, field, field_i_set);
 		}
 		field_set = field_i_set->new;
 	}
@@ -1221,7 +1221,7 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 
 			//Add possibly additional calls
 			analyzer_env *a_env = env->analyzer_env;
-			arrayset_t *param_types = cpmap_find(a_env->call_mths_live_param_types, env->entity);
+			arrayset_t *param_types = arraymap_find(a_env->call_mths_live_param_types, env->entity);
 			if(!param_types)
 				continue;
 
@@ -1247,13 +1247,13 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 
 static bool update_iteration_sets(analyzer_env *env)
 {
-	cpmap_iterator_t iterator;
-	cpmap_iterator_init(&iterator, env->live_classes_fields);
-	cpmap_entry_t entry;
+	arraymap_iterator_t iterator;
+	arraymap_iterator_init(&iterator, env->live_classes_fields);
+	arraymap_entry_t entry;
 	bool change = false;
 	iteration_set *i_set;
 	arrayset_t *old;
-	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+	while ((entry = arraymap_iterator_next(&iterator)).data != NULL) {
 		i_set = entry.data;
 		make_subset(i_set->propagated, i_set->current);
 		arrayset_destroy(i_set->current);
@@ -1263,12 +1263,12 @@ static bool update_iteration_sets(analyzer_env *env)
 		i_set->new = old;
 		change = change || arrayset_size(i_set->current) != 0;
 	}
-	cpmap_iterator_init(&iterator, env->done_map);
+	arraymap_iterator_init(&iterator, env->done_map);
 	method_env m_env;
 	m_env.analyzer_env = env;
 	ir_entity *entity;
 	method_info *info;
-	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+	while ((entry = arraymap_iterator_next(&iterator)).data != NULL) {
 		info = entry.data;
 		entity = (ir_entity *) entry.key;
 		m_env.entity = entity;
@@ -1288,12 +1288,12 @@ static bool update_iteration_sets(analyzer_env *env)
 static bool propagate_live_classes(analyzer_env *env)
 {
 	assert(env);
-	cpmap_t *done_map = env->done_map;
-	cpmap_iterator_t iterator;
-	cpmap_iterator_init(&iterator, done_map);
-	cpmap_entry_t entry;
+	arraymap_t *done_map = env->done_map;
+	arraymap_iterator_t iterator;
+	arraymap_iterator_init(&iterator, done_map);
+	arraymap_entry_t entry;
 	bool change = false;
-	while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+	while ((entry = arraymap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 		method_info *info = (method_info *) entry.data;
 		ir_entity *callee = (ir_entity *) entry.key;
 		iteration_set *callee_i_set = info->live_classes;
@@ -1302,7 +1302,7 @@ static bool propagate_live_classes(analyzer_env *env)
 		arrayset_iterator_init(&set_iterator, info->callers);
 		ir_entity *caller;
 		while ((caller = arrayset_iterator_next(&set_iterator)) != NULL) {
-			method_info *caller_info = cpmap_find(done_map, caller);
+			method_info *caller_info = arraymap_find(done_map, caller);
 			arrayset_t cut;
 			arrayset_init(&cut, ptr_equals);
 			//Parameters
@@ -1336,7 +1336,7 @@ static bool propagate_live_classes(analyzer_env *env)
 				make_subset(callee_i_set->new, &cut);
 				arrayset_destroy(&cut);
 			} else {
-				iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
+				iteration_set *field_i_set = arraymap_find(env->live_classes_fields, field);
 				if (field_i_set && arrayset_size(field_i_set->current) != 0) {
 					make_subset(callee_i_set->new, field_i_set->current);
 				}
@@ -1359,7 +1359,7 @@ static bool propagate_live_classes(analyzer_env *env)
 				if (res) {
 					if (!field_as_external(field)) {
 						printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
-						iteration_set *i_set = cpmap_find(env->live_classes_fields, field);
+						iteration_set *i_set = arraymap_find(env->live_classes_fields, field);
 						arrayset_iterator_t iterator;
 						arrayset_iterator_init(&iterator, i_set->propagated);
 						printf("p: ");
@@ -1388,7 +1388,7 @@ static bool propagate_live_classes(analyzer_env *env)
 		}
 		//Leaking type could now be globally live, so check on each iteration
 		arrayset_t *classes;
-		if (leaking_live_types_map != NULL && (classes = cpmap_find(leaking_live_types_map, callee)) != NULL) {
+		if (leaking_live_types_map != NULL && (classes = arraymap_find(leaking_live_types_map, callee)) != NULL) {
 			arrayset_iterator_t iterator;
 			arrayset_t cut;
 			arrayset_init(&cut, ptr_equals);
@@ -1410,7 +1410,7 @@ static bool propagate_live_classes(analyzer_env *env)
 	while ((ec_method = arrayset_iterator_next(&it)) != NULL) {
 		if (!arrayset_find(env->ext_live_classes, get_entity_owner(ec_method)))
 			continue;
-		method_info *info = cpmap_find(env->done_map, ec_method);
+		method_info *info = arraymap_find(env->done_map, ec_method);
 		iteration_set *i_set = info->live_classes;
 		arrayset_t cut;
 		arrayset_init(&cut, ptr_equals);
@@ -1430,14 +1430,14 @@ static bool propagate_live_classes(analyzer_env *env)
 	return update_iteration_sets(env) || change;
 }
 
-static void del_done_map(cpmap_t *done_map)
+static void del_done_map(arraymap_t *done_map)
 {
 	assert(done_map);
 
-	cpmap_iterator_t iterator;
-	cpmap_iterator_init(&iterator, done_map);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+	arraymap_iterator_t iterator;
+	arraymap_iterator_init(&iterator, done_map);
+	arraymap_entry_t entry;
+	while ((entry = arraymap_iterator_next(&iterator)).data != NULL) {
 		method_info *info = (method_info *) entry.data;
 		arrayset_destroy(info->field_writes);
 		arrayset_destroy(info->field_reads);
@@ -1457,17 +1457,17 @@ static void del_done_map(cpmap_t *done_map)
 		free(info->callers);
 		free(info);
 	}
-	cpmap_destroy(done_map);
+	arraymap_destroy(done_map);
 }
 
-static void del_live_classes_fields(cpmap_t *live_classes_fields)
+static void del_live_classes_fields(arraymap_t *live_classes_fields)
 {
 	assert(live_classes_fields);
 
-	cpmap_iterator_t iterator;
-	cpmap_iterator_init(&iterator, live_classes_fields);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+	arraymap_iterator_t iterator;
+	arraymap_iterator_init(&iterator, live_classes_fields);
+	arraymap_entry_t entry;
+	while ((entry = arraymap_iterator_next(&iterator)).data != NULL) {
 		iteration_set *i_set = entry.data;
 		arrayset_destroy(i_set->new);
 		arrayset_destroy(i_set->propagated);
@@ -1477,7 +1477,7 @@ static void del_live_classes_fields(cpmap_t *live_classes_fields)
 		free(i_set->propagated);
 		free(i_set);
 	}
-	cpmap_destroy(live_classes_fields);
+	arraymap_destroy(live_classes_fields);
 }
 
 static void retrieve_methods_overwriting_external_recursive(analyzer_env *env, ir_type *type, arrayset_t *methods, arrayset_t *done_types)
@@ -1549,11 +1549,11 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 	if (DEBUG_XTA) {
 		DEBUGOUT(2, "\n\n==== Results ==============================================\n");
 		{
-			cpmap_iterator_t iterator;
-			cpmap_iterator_init(&iterator, env->done_map);
-			cpmap_entry_t entry;
+			arraymap_iterator_t iterator;
+			arraymap_iterator_init(&iterator, env->done_map);
+			arraymap_entry_t entry;
 			DEBUGOUT(2, "FINAL INFO\n");
-			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+			while ((entry = arraymap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *entity = entry.key;
 				method_info *info = entry.data;
 				DEBUGOUT(2, "\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
@@ -1562,22 +1562,22 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 
 		}
 		{
-			DEBUGOUT(2, "\ndyncall target sets (%lu):\n", (unsigned long)cpmap_size(env->dyncall_targets));
-			cpmap_iterator_t iterator;
-			cpmap_iterator_init(&iterator, env->dyncall_targets);
-			cpmap_entry_t entry;
-			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+			DEBUGOUT(2, "\ndyncall target sets (%lu):\n", (unsigned long)arraymap_size(env->dyncall_targets));
+			arraymap_iterator_t iterator;
+			arraymap_iterator_init(&iterator, env->dyncall_targets);
+			arraymap_entry_t entry;
+			while ((entry = arraymap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *call_entity = entry.key;
 				assert(call_entity);
 				DEBUGOUT(2, "\t%s.%s %s\n", get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 
-				cpmap_t *call_sites = entry.data;
+				arraymap_t *call_sites = entry.data;
 				assert(call_sites);
-				DEBUGOUT(2, "\tcall sites (%lu):\n", (unsigned long)cpmap_size(call_sites));
-				cpmap_iterator_t iter;
-				cpmap_iterator_init(&iter, call_sites);
-				cpmap_entry_t e;
-				while ((e = cpmap_iterator_next(&iter)).key != NULL || e.data != NULL) {
+				DEBUGOUT(2, "\tcall sites (%lu):\n", (unsigned long)arraymap_size(call_sites));
+				arraymap_iterator_t iter;
+				arraymap_iterator_init(&iter, call_sites);
+				arraymap_entry_t e;
+				while ((e = arraymap_iterator_next(&iter)).key != NULL || e.data != NULL) {
 					const ir_entity *call_site = e.key;
 					assert(call_site);
 					DEBUGOUT(2, "\t\t%s.%s\n", get_compound_name(get_entity_owner(call_site)), get_entity_name(call_site));
@@ -1598,11 +1598,11 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 
 #ifdef XTA_STATS
 	{
-		cpmap_iterator_t it;
-		cpmap_iterator_init(&it, env->live_classes_fields);
+		arraymap_iterator_t it;
+		arraymap_iterator_init(&it, env->live_classes_fields);
 
-		cpmap_entry_t entry;
-		while ((entry = cpmap_iterator_next(&it)).key != NULL) {
+		arraymap_entry_t entry;
+		while ((entry = arraymap_iterator_next(&it)).key != NULL) {
 			ir_entity *entity = (ir_entity *) entry.key;
 			if (is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity)))
 				n_ext_fields++;
@@ -1622,7 +1622,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 			assert(m_env && is_method_entity(m_env->entity));
 			ir_entity *entity = m_env->entity;
 			method_info *info = m_env->info;
-			method_info *done_info = cpmap_find(env->done_map, entity);
+			method_info *done_info = arraymap_find(env->done_map, entity);
 			if ( done_info != NULL) { //Handle case where method got queued twice
 				arrayset_iterator_t it;
 				arrayset_iterator_init(&it, info->callers);
@@ -1631,7 +1631,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 					method_env caller_env;
 					caller_env.analyzer_env = env;
 					caller_env.entity = caller;
-					caller_env.info = cpmap_find(env->done_map, caller);
+					caller_env.info = arraymap_find(env->done_map, caller);
 					add_to_workqueue(entity, NULL, &caller_env);//NULL here because in the loop below we add all live classes manually
 				}
 				arrayset_iterator_init(&it, info->live_classes->current);
@@ -1656,7 +1656,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 			}
 
 			DEBUGOUT(2, "== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
-			cpmap_set(env->done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
+			arraymap_set(env->done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
 			DEBUGOUT(3, "COLLECTING ARGS AND RES TYPES\n");
 			collect_arg_and_res_types(m_env);
 			DEBUGOUT(3, "COLLECTING LIVE CLASSES FROM CALLLERS\n");
@@ -1666,7 +1666,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 			arrayset_iterator_init(&set_iterator, info->callers);
 			ir_entity *caller;
 			while ((caller = arrayset_iterator_next(&set_iterator)) != NULL) {
-				method_info *caller_info = cpmap_find(env->done_map, caller);
+				method_info *caller_info = arraymap_find(env->done_map, caller);
 				arrayset_t cut;
 				arrayset_init(&cut, ptr_equals);
 				//Parameters
@@ -1708,7 +1708,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 					make_subset(callee_i_set->new, &cut);
 					arrayset_destroy(&cut);
 				} else {
-					iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
+					iteration_set *field_i_set = arraymap_find(env->live_classes_fields, field);
 					if (field_i_set) {
 						make_subset(callee_i_set->new, field_i_set->propagated);
 					}
@@ -1738,28 +1738,28 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
  * @param live_methods give pointer to empty uninitialized set for receiving results, This is where all live methods are put (as ir_entity*).
  * @param dyncall_targets give pointer to empty uninitialized map for receiving results, This is where call entities are mapped to their actually used potential call targets (ir_entity* -> {ir_entity*}). It's used to optimize dynamically bound calls if possible. (see also function xta_optimize_dyncalls)
  */
-static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, arrayset_t *live_methods, cpmap_t *dyncall_targets)
+static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, arrayset_t *live_methods, arraymap_t *dyncall_targets)
 {
 	assert(entry_points);
 	assert(dyncall_targets);
 
-	cpmap_t live_classes_fields;
-	cpmap_init(&live_classes_fields, hash_ptr, ptr_equals);
-	cpmap_init(dyncall_targets, hash_ptr, ptr_equals);
+	arraymap_t live_classes_fields;
+	arraymap_init(&live_classes_fields, ptr_equals);
+	arraymap_init(dyncall_targets, ptr_equals);
 
-	cpmap_t unused_targets;
-	cpmap_init(&unused_targets, hash_ptr, ptr_equals);
+	arraymap_t unused_targets;
+	arraymap_init(&unused_targets, ptr_equals);
 
 	pdeq *workqueue = new_pdeq();
 	pdeq *initializer_queue = new_pdeq();
 
-	cpmap_t done_map;
-	cpmap_init(&done_map, hash_ptr, ptr_equals);
+	arraymap_t done_map;
+	arraymap_init(&done_map, ptr_equals);
 
-	cpmap_t call_mths_live_param_types;
-	cpmap_init(&call_mths_live_param_types, hash_ptr, ptr_equals);
+	arraymap_t call_mths_live_param_types;
+	arraymap_init(&call_mths_live_param_types, ptr_equals);
 
-	cpmap_init(&known_types, hash_ptr, ptr_equals);
+	arraymap_init(&known_types, ptr_equals);
 
 	arrayset_t ext_live_classes;
 	arrayset_init(&ext_live_classes, ptr_equals);
@@ -1838,54 +1838,54 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, ar
 
 	{
 		// delete the maps and sets in map unused_targets
-		cpmap_iterator_t iterator;
-		cpmap_iterator_init(&iterator, &unused_targets);
-		cpmap_entry_t entry;
-		while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
-			cpmap_t *map = entry.data;
+		arraymap_iterator_t iterator;
+		arraymap_iterator_init(&iterator, &unused_targets);
+		arraymap_entry_t entry;
+		while ((entry = arraymap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
+			arraymap_t *map = entry.data;
 			assert(map);
 
-			cpmap_iterator_t inner_iterator;
-			cpmap_iterator_init(&inner_iterator, map);
-			cpmap_entry_t inner_entry;
-			while ((inner_entry = cpmap_iterator_next(&inner_iterator)).key != NULL || inner_entry.data != NULL) {
-				cpmap_t *inner_data = inner_entry.data;
+			arraymap_iterator_t inner_iterator;
+			arraymap_iterator_init(&inner_iterator, map);
+			arraymap_entry_t inner_entry;
+			while ((inner_entry = arraymap_iterator_next(&inner_iterator)).key != NULL || inner_entry.data != NULL) {
+				arraymap_t *inner_data = inner_entry.data;
 				assert(inner_data);
 
-				cpmap_remove_iterator(map, &inner_iterator);
+				arraymap_remove_iterator(map, &inner_iterator);
 				free_map_set(inner_data);
 			}
-			cpmap_remove_iterator(&unused_targets, &iterator);
-			cpmap_destroy(map);
+			arraymap_remove_iterator(&unused_targets, &iterator);
+			arraymap_destroy(map);
 			free(map);
 		}
 	}
-	cpmap_destroy(&unused_targets);
+	arraymap_destroy(&unused_targets);
 	{
 		// delete the map and sets in map call_mths_live_param_types
-		cpmap_iterator_t iterator;
-		cpmap_iterator_init(&iterator, &call_mths_live_param_types);
-		cpmap_entry_t entry;
-		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+		arraymap_iterator_t iterator;
+		arraymap_iterator_init(&iterator, &call_mths_live_param_types);
+		arraymap_entry_t entry;
+		while ((entry = arraymap_iterator_next(&iterator)).data != NULL) {
 			arrayset_t *set = entry.data;
 			arrayset_destroy(set);
 			free(set);
 		}
-		cpmap_destroy(&call_mths_live_param_types);
+		arraymap_destroy(&call_mths_live_param_types);
 	}
 	// note: live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
 
 	{
 		// delete the map and sets in map known_types
-		cpmap_iterator_t iterator;
-		cpmap_iterator_init(&iterator, &known_types);
-		cpmap_entry_t entry;
-		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
+		arraymap_iterator_t iterator;
+		arraymap_iterator_init(&iterator, &known_types);
+		arraymap_entry_t entry;
+		while ((entry = arraymap_iterator_next(&iterator)).data != NULL) {
 			arrayset_t *set = entry.data;
 			arrayset_destroy(set);
 			free(set);
 		}
-		cpmap_destroy(&known_types);
+		arraymap_destroy(&known_types);
 	}
 }
 
@@ -1896,27 +1896,27 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, ar
  * @param live_methods as returned by xta_run
  * @param dyncall_targets as returned by xta_run
  */
-static void xta_dispose_results(cpmap_t *dyncall_targets)
+static void xta_dispose_results(arraymap_t *dyncall_targets)
 {
 	assert(dyncall_targets);
 
-	cpmap_iterator_t it;
-	cpmap_entry_t entry;
+	arraymap_iterator_t it;
+	arraymap_entry_t entry;
 	// delete the sets in map dyncall_targets
-	cpmap_iterator_init(&it, dyncall_targets);
-	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
-		cpmap_t *map = entry.data;
-		cpmap_remove_iterator(dyncall_targets, &it);
+	arraymap_iterator_init(&it, dyncall_targets);
+	while ((entry = arraymap_iterator_next(&it)).key != NULL || entry.data != NULL) {
+		arraymap_t *map = entry.data;
+		arraymap_remove_iterator(dyncall_targets, &it);
 		free_map_set(map);
 	}
-	cpmap_destroy(dyncall_targets);
+	arraymap_destroy(dyncall_targets);
 }
 
 
 typedef struct optimizer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
 	arrayset_t *done_set; // set to mark graphs that were already analyzed
-	cpmap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
+	arraymap_t *dyncall_targets; // map that stores the set of potential call targets for every method entity appearing in a dynamically bound call (Map: call entity -> Set: method entities)
 #ifdef XTA_STATS
 	unsigned long long n_staticcalls; // number of static calls
 	unsigned long long n_dyncalls; // number of dynamic calls (without interface calls)
@@ -2006,9 +2006,9 @@ static void optimizer_handle_dynamic_call(ir_node *call, ir_entity *entity, ir_n
 #endif
 
 
-	cpmap_t *call_sites = cpmap_find(env->dyncall_targets, entity);
+	arraymap_t *call_sites = arraymap_find(env->dyncall_targets, entity);
 	assert(call_sites);
-	arrayset_t *targets = cpmap_find(call_sites, get_irg_entity(get_irn_irg(call)));
+	arrayset_t *targets = arraymap_find(call_sites, get_irg_entity(get_irn_irg(call)));
 	assert(targets);
 	// note: cannot check for nonempty target set here because there can be legal programs that have calls with empty target sets although they will probably run into an exception when executed! (e.g. interface call without implementing class and program initializes reference to null, actually same with abstract class or nonlive class)
 
@@ -2104,7 +2104,7 @@ static void walk_callgraph_and_devirtualize(ir_node *node, void *environment)
  * @param entry_points same as used with xta_run
  * @param dyncall_targets the result map returned from xta_run
  */
-static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_targets)
+static void xta_devirtualize_calls(ir_entity **entry_points, arraymap_t *dyncall_targets)
 {
 	assert(dyncall_targets);
 
@@ -2321,12 +2321,12 @@ static void delete_non_walked_methods(arrayset_t *walked_methods, arrayset_t *me
 void leak_all_live_ret_subtypes(ir_entity *method)
 {
 	if (leaking_live_types_map == NULL) {
-		leaking_live_types_map = new_cpmap();
+		leaking_live_types_map = new_arraymap();
 	}
-	arrayset_t *leaking_types = cpmap_find(leaking_live_types_map, method);
+	arrayset_t *leaking_types = arraymap_find(leaking_live_types_map, method);
 	if (leaking_types == NULL) {
 		leaking_types = new_arrayset();
-		cpmap_set(leaking_live_types_map, method, leaking_types);
+		arraymap_set(leaking_live_types_map, method, leaking_types);
 	}
 	size_t res_n = get_method_n_ress(get_entity_type(method));
 	for (size_t i = 0; i < res_n; i++) {
@@ -2340,7 +2340,7 @@ void leak_all_live_ret_subtypes(ir_entity *method)
 void add_leaking_type_to_method(ir_entity *method, ir_type *leaking_type)
 {
 	if (leaking_types_map == NULL) {
-		leaking_types_map = new_cpmap();
+		leaking_types_map = new_arraymap();
 	}
 	add_to_map_set(leaking_types_map, method, leaking_type);
 }
@@ -2348,11 +2348,11 @@ void add_leaking_type_to_method(ir_entity *method, ir_type *leaking_type)
 void call_methods_on_param_type(ir_entity *method, int param_n)
 {
 	if (add_live_types_in_method == NULL) {
-		add_live_types_in_method = new_cpmap();
+		add_live_types_in_method = new_arraymap();
 	}
 	int *p_n = malloc(sizeof(int));
 	*p_n = param_n;
-	cpmap_set(add_live_types_in_method, method, p_n);
+	arraymap_set(add_live_types_in_method, method, p_n);
 }
 
 static void clear_add_calls_map(void)
@@ -2360,22 +2360,22 @@ static void clear_add_calls_map(void)
 	if (add_live_types_in_method == NULL)
 		return;
 
-	cpmap_iterator_t it;
-	cpmap_iterator_init(&it, add_live_types_in_method);
-	cpmap_entry_t entry;
-	while ((entry = cpmap_iterator_next(&it)).key != NULL || entry.data != NULL) {
+	arraymap_iterator_t it;
+	arraymap_iterator_init(&it, add_live_types_in_method);
+	arraymap_entry_t entry;
+	while ((entry = arraymap_iterator_next(&it)).key != NULL || entry.data != NULL) {
 
-		cpmap_remove_iterator(add_live_types_in_method, &it);
+		arraymap_remove_iterator(add_live_types_in_method, &it);
 		free(entry.data);
 	}
-	cpmap_destroy(add_live_types_in_method);
+	arraymap_destroy(add_live_types_in_method);
 	free(add_live_types_in_method);
 }
 
 void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 {
 	assert(entry_points);
-	cpmap_t dyncall_targets;
+	arraymap_t dyncall_targets;
 	arrayset_t live_methods;
 
 	int devirtualized_calls_local;
