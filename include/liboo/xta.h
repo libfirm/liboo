@@ -20,7 +20,7 @@
 #include <stdbool.h>
 #include <libfirm/firm.h>
 #include "../../src-cpp/adt/cpmap.h"
-#include "../../src-cpp/adt/cpset.h"
+#include "../../src-cpp/adt/arrayset.h"
 
 /*
  * sets important callback function for detecting constructors.
@@ -33,7 +33,7 @@ void xta_set_is_constructor_callback(bool (*is_constr)(ir_entity *method));
  * This method gives frontends the ability to pass a set of ir_entities (methods) to XTA which are library methgds and don't leak arguments to other library methods.
  * @param methods the set of non-leaking methods
  */
-void xta_set_non_leaking_ext_methods(cpset_t *methods);
+void xta_set_non_leaking_ext_methods(arrayset_t *methods);
 
 /**
  * Calls all methods on passed subtypes of the method's specified parameter.
