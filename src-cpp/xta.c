@@ -27,9 +27,12 @@
 
 #include <libfirm/timing.h>
 // debug setting
-#define DEBUG_XTA 999
+// #define DEBUG_XTA 999
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
+
+int DEBUG_XTA = 0;
+
 // stats
 #define XTA_STATS 1
 #undef XTA_STATS // comment to activate stats
@@ -1247,6 +1250,8 @@ static void handle_new_classes_in_current_set(iteration_set *i_set, method_env *
 
 static bool update_iteration_sets(analyzer_env *env)
 {
+	printf("Update iteration sets...\n");
+	
 	arraymap_iterator_t iterator;
 	arraymap_iterator_init(&iterator, env->live_classes_fields);
 	arraymap_entry_t entry;
@@ -1355,34 +1360,34 @@ static bool propagate_live_classes(analyzer_env *env)
 				change = change || res;
 
 
-#if (DEBUG_XTA > 3)
-				if (res) {
-					if (!field_as_external(field)) {
-						printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
-						iteration_set *i_set = arraymap_find(env->live_classes_fields, field);
-						arrayset_iterator_t iterator;
-						arrayset_iterator_init(&iterator, i_set->propagated);
-						printf("p: ");
-						ir_type *type;
-						while ((type = arrayset_iterator_next(&iterator)) != NULL) {
-							printf("%s, ", get_compound_name(type));
+				if (DEBUG_XTA > 3) {
+					if (res) {
+						if (!field_as_external(field)) {
+							printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
+							iteration_set *i_set = arraymap_find(env->live_classes_fields, field);
+							arrayset_iterator_t iterator;
+							arrayset_iterator_init(&iterator, i_set->propagated);
+							printf("p: ");
+							ir_type *type;
+							while ((type = arrayset_iterator_next(&iterator)) != NULL) {
+								printf("%s, ", get_compound_name(type));
+							}
+							arrayset_iterator_init(&iterator, i_set->current);
+							printf("c: ");
+							while ((type = arrayset_iterator_next(&iterator)) != NULL) {
+								printf("%s, ", get_compound_name(type));
+							}
+							arrayset_iterator_init(&iterator, i_set->new);
+							printf("n: ");
+							while ((type = arrayset_iterator_next(&iterator)) != NULL) {
+								printf("%s, ", get_compound_name(type));
+							}
+							printf("\n");
+						} else {
+							printf("(External Field)\n");
 						}
-						arrayset_iterator_init(&iterator, i_set->current);
-						printf("c: ");
-						while ((type = arrayset_iterator_next(&iterator)) != NULL) {
-							printf("%s, ", get_compound_name(type));
-						}
-						arrayset_iterator_init(&iterator, i_set->new);
-						printf("n: ");
-						while ((type = arrayset_iterator_next(&iterator)) != NULL) {
-							printf("%s, ", get_compound_name(type));
-						}
-						printf("\n");
-					} else {
-						printf("(External Field)\n");
 					}
 				}
-#endif
 			}
 			arrayset_destroy(&cut);
 		}
@@ -1546,18 +1551,26 @@ static size_t n_ext_fields = 0;
 
 static void print_xta_run_res_calc_stats(analyzer_env *env)
 {
-	if (DEBUG_XTA) {
+	if (true) {
 		DEBUGOUT(2, "\n\n==== Results ==============================================\n");
 		{
 			arraymap_iterator_t iterator;
 			arraymap_iterator_init(&iterator, env->done_map);
 			arraymap_entry_t entry;
-			DEBUGOUT(2, "FINAL INFO\n");
+			DEBUGOUT(0, "FINAL INFO\n");
 			while ((entry = arraymap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *entity = entry.key;
 				method_info *info = entry.data;
+
+				int old_debug_xta = DEBUG_XTA;
+				if (strstr(get_entity_name(entity), "allZeros")) {
+					DEBUG_XTA = 999;
+				}
+				
 				DEBUGOUT(2, "\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 				DEBUGCALL(2) debug_print_info(info);
+
+				DEBUG_XTA = old_debug_xta;
 			}
 
 		}
@@ -1655,6 +1668,10 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 				}
 			}
 
+			int old_debug_xta = DEBUG_XTA;
+			if (strstr(get_entity_ld_name(entity), "allZeros")) {
+				DEBUG_XTA = 999;
+			}
 			DEBUGOUT(2, "== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
 			arraymap_set(env->done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
 			DEBUGOUT(3, "COLLECTING ARGS AND RES TYPES\n");
@@ -1684,6 +1701,8 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 			DEBUGOUT(4, "CURRENT INFO\n");
 			DEBUGCALL(4) debug_print_info(m_env->info);
 
+			DEBUG_XTA = old_debug_xta;
+			
 			DEBUGOUT(3, "ANALYZING GRAPH\n");
 
 			arrayset_insert(env->live_methods, entity);
