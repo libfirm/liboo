@@ -415,15 +415,15 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 		entity_menv->entity = entity;
 		method_info *info = new_method_info();
 		iteration_set *i_set = info->live_classes;
+		entity_menv->info = info;
+		entity_menv->analyzer_env = a_env;
 		if (is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity))) {
 			//Handle external library methods
 			info->is_library_method = true;
 			DEBUGOUT(4, "%s.%s is marked as library method\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
 		}
 		if (klass != NULL && is_Class_type(klass))
-			cpset_insert(i_set->current, klass);
-		entity_menv->info = info;
-		entity_menv->analyzer_env = a_env;
+			add_new_live_class(klass, entity_menv);
 		cpset_insert(info->callers, env->entity);
 		pdeq_putr(a_env->workqueue, entity_menv);
 	} else {
@@ -450,10 +450,19 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 			} else {
 				make_subset(callee_i_set->new, &cut);
 			}
+			//Unsure whether really necessary
+			cut_sets(&cut, caller_i_set->current, done_entity_info->parameter_subtypes);
+			if (method_as_lib_meth(entity, done_entity_info)) {
+				make_subset(a_env->ext_live_classes, &cut);
+			} else {
+				make_subset(callee_i_set->new, &cut);
+			}
 			cpset_destroy(&cut);
 			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Return
 			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->propagated);
+			make_subset(caller_i_set->new, &cut);
+			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->current);
 			make_subset(caller_i_set->new, &cut);
 
 			cpset_destroy(&cut);
@@ -1651,7 +1660,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 				for (size_t i = 0; (klass = initial_live_classes[i]) != NULL; i++) {
 					assert(is_Class_type(klass));
 					DEBUGOUT(3, "\t%s\n", get_compound_name(klass));
-					cpset_insert(callee_i_set->current, klass);
+					add_new_live_class(klass, m_env);
 				}
 			}
 
