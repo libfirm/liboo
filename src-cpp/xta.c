@@ -204,7 +204,7 @@ static void add_to_map_set(cpmap_t *map, void *key, void *value) {
 	cpset_insert(set, value);
 }
 
-static void free_map_set(cpmap_t *map) {
+static void destroy_map_set(cpmap_t *map) {
 	if (map == NULL)
 		return;
 
@@ -219,6 +219,11 @@ static void free_map_set(cpmap_t *map) {
 		free(set);
 	}
 	cpmap_destroy(map);
+}
+static void free_map_set(cpmap_t *map) {
+	if(map == NULL)
+		return;
+	destroy_map_set(map);
 	free(map);
 }
 
@@ -688,7 +693,7 @@ static void handle_added_live_param_types(ir_node *call, ir_entity *entity, meth
 			}
 			if (ret_call_entity) {
 				ir_type *ret_type = get_class_from_type(get_method_res_type(get_entity_type(ret_call_entity), proj_n));
-				add_to_map_set(a_env->call_mths_live_param_types, env->entity, ret_type);//TODO: make map point to set, so more than one call per method is possible
+				add_to_map_set(a_env->call_mths_live_param_types, env->entity, ret_type);
 				DEBUGOUT(4, "Add mths_live_params %s (Rettype: %s)", get_entity_name(env->entity), get_compound_name(ret_type));
 			}
 
@@ -1523,6 +1528,7 @@ static void retrieve_methods_overwriting_external_recursive(analyzer_env *env, i
 	}
 }
 
+//Library methods and fields are handled more conservatively, as their code and accesses/calls are unknown
 static void retrieve_library_info(analyzer_env *env)
 {
 	for (size_t i = 0, n = get_irp_n_types(); i < n; ++i) {
@@ -1831,7 +1837,7 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	}
 
 	xta_run_loop(&env, initial_live_classes);
-	print_xta_run_res_calc_stats(&env);
+	print_xta_run_res_calc_stats(&env); //print results, calculate stats
 	//Walk initializers of fields in glob_type, set methods live.
 	//they may be unused, if we delete init method, we would have to delete field as well
 	for (int k = get_compound_n_members(get_glob_type()) - 1; k >= 0; k--) {
@@ -1848,16 +1854,10 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 	del_pdeq(initializer_queue);
 	del_done_map(&done_map);
 	del_live_classes_fields(&live_classes_fields);
-
-	{
-		cpset_destroy(env.ext_live_classes);
-		cpset_destroy(env.glob_live_classes);
-
-		cpset_destroy(env.methods_ext_called);
-		free(env.methods_ext_called);
-
-	}
-
+	cpset_destroy(env.ext_live_classes);
+	cpset_destroy(env.glob_live_classes);
+	cpset_destroy(env.methods_ext_called);
+	free(env.methods_ext_called);
 	{
 		// delete the maps and sets in map unused_targets
 		cpmap_iterator_t iterator;
@@ -1883,39 +1883,13 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 		}
 	}
 	cpmap_destroy(&unused_targets);
-	{
-		// delete the map and sets in map call_mths_live_param_types
-		cpmap_iterator_t iterator;
-		cpmap_iterator_init(&iterator, &call_mths_live_param_types);
-		cpmap_entry_t entry;
-		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
-			cpset_t *set = entry.data;
-			cpset_destroy(set);
-			free(set);
-		}
-		cpmap_destroy(&call_mths_live_param_types);
-	}
-	// note: live_classes, live_methods and dyncall_targets are given from outside and return the results, but the sets in map dyncall_targets are allocated in the process and have to be deleted later
-
-	{
-		// delete the map and sets in map known_types
-		cpmap_iterator_t iterator;
-		cpmap_iterator_init(&iterator, &known_types);
-		cpmap_entry_t entry;
-		while ((entry = cpmap_iterator_next(&iterator)).data != NULL) {
-			cpset_t *set = entry.data;
-			cpset_destroy(set);
-			free(set);
-		}
-		cpmap_destroy(&known_types);
-	}
+	destroy_map_set(&call_mths_live_param_types);
+	destroy_map_set(&known_types);
 }
 
 
 /** frees memory allocated for the results returned by function run_xta
  * @note does not free the memory of the sets and maps themselves, just their content allocated during XTA
- * @param live_classes as returned by xta_run
- * @param live_methods as returned by xta_run
  * @param dyncall_targets as returned by xta_run
  */
 static void xta_dispose_results(cpmap_t *dyncall_targets)
@@ -2401,6 +2375,7 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 	cpset_t live_methods;
 
 	int devirtualized_calls_local;
+	//devirtualize calls on objects which are created in the same method the call happens
 	devirt_local(&devirtualized_calls_local);
 
 
@@ -2451,6 +2426,7 @@ void xta_optimization(ir_entity **entry_points, ir_type **initial_live_classes)
 #endif
 	cpset_t methodsel_entities;
 	cpset_init(&methodsel_entities, hash_ptr, ptr_equals);
+	//Methods methodsel nodes depend on cannot be deleted
 	fill_methodsel_entities(&live_methods, &methodsel_entities);
 	delete_non_walked_methods(&live_methods, &methodsel_entities);
 	cpset_destroy(&live_methods);
