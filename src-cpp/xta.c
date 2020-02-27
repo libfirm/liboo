@@ -27,7 +27,7 @@
 
 #include <libfirm/timing.h>
 // debug setting
-#define DEBUG_XTA 0
+#define DEBUG_XTA 5
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 // stats
@@ -414,7 +414,6 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 		method_env *entity_menv = (method_env *) malloc(sizeof(method_env));
 		entity_menv->entity = entity;
 		method_info *info = new_method_info();
-		iteration_set *i_set = info->live_classes;
 		entity_menv->info = info;
 		entity_menv->analyzer_env = a_env;
 		if (is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity))) {
@@ -883,6 +882,7 @@ static void visit_entity(ir_entity *entity, analyzer_env *env)
 {
 	if (entity == NULL || entity_visited(entity))
 		return;
+	DEBUGOUT(4, "Visiting entity from init: %s\n", get_entity_ld_name(entity));
 	mark_entity_visited(entity);
 	if (is_method_entity(entity)) {
 		cpset_insert(env->live_methods, entity);
@@ -997,6 +997,7 @@ static void analyze_iro_Address(ir_node *address, method_env *m_env)
 		add_to_workqueue(entity, get_entity_owner(entity), m_env);
 	} else if (!is_alias_entity(entity) && entity_has_definition(entity)) {
 		ir_initializer_t *const init = get_entity_initializer(entity);
+		DEBUGOUT(3, "Init entity: %s\n", get_entity_ld_name(entity));
 		if (init)
 			pdeq_putr(m_env->analyzer_env->initializer_queue, init);
 	}
@@ -1660,7 +1661,9 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 				for (size_t i = 0; (klass = initial_live_classes[i]) != NULL; i++) {
 					assert(is_Class_type(klass));
 					DEBUGOUT(3, "\t%s\n", get_compound_name(klass));
-					add_new_live_class(klass, m_env);
+					//add_new_live_class(klass, m_env);
+					cpset_insert(callee_i_set->current, klass);
+					cpset_insert(env->glob_live_classes, klass);
 				}
 			}
 
@@ -1829,6 +1832,16 @@ static void xta_run(ir_entity **entry_points, ir_type **initial_live_classes, cp
 
 	xta_run_loop(&env, initial_live_classes);
 	print_xta_run_res_calc_stats(&env);
+	//Walk initializers of fields in glob_type, set methods live.
+	//they may be unused, if we delete init method, we would have to delete field as well
+	for (int k = get_compound_n_members(get_glob_type()) - 1; k >= 0; k--) {
+		ir_entity *entity = get_compound_member(get_glob_type(), k);
+		if (!is_method_entity(entity) && !is_alias_entity(entity) && entity_has_definition(entity)) {
+			ir_initializer_t *const init = get_entity_initializer(entity);
+			if (init)
+				visit_initializer(init, &env);
+		}
+	}
 
 	// free data structures
 	del_pdeq(workqueue);
