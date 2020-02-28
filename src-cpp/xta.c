@@ -30,6 +30,7 @@
 #define DEBUG_XTA 5
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
+#define COMP_ENT_NAME(entity) get_compound_name(get_entity_owner(entity)), get_entity_name(entity)
 // stats
 #define XTA_STATS 1
 #undef XTA_STATS // comment to activate stats
@@ -246,7 +247,7 @@ static void add_to_dyncalls(ir_entity *method, cpset_t *call_entities, method_en
 		cpset_t *targets = cpmap_find(call_sites, env->entity);
 		assert(targets != NULL);
 
-		DEBUGOUT(3, "\t\t\t\t\tupdating method %s.%s for call %s.%s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
+		DEBUGOUT(3, "\t\t\t\t\tupdating method %s.%s for call %s.%s in %s.%s\n", COMP_ENT_NAME(method), COMP_ENT_NAME(call_entity), COMP_ENT_NAME(env->entity));
 		// add to targets set
 		cpset_insert(targets, method);
 	}
@@ -305,7 +306,7 @@ static void add_new_live_class(ir_type *klass, method_env *env)
 	        && !oo_get_class_is_abstract(klass)) { // if not abstract
 		// add to live classes
 		cpset_insert(i_set->current, klass);
-		DEBUGOUT(3, "\t\t\t\t\tadded new live class %s to method %s.%s \n", get_compound_name(klass), get_compound_name(get_entity_owner(env->entity)), get_entity_name(env->entity));
+		DEBUGOUT(3, "\t\t\t\t\tadded new live class %s to method %s.%s \n", get_compound_name(klass), COMP_ENT_NAME(env->entity));
 
 		// update existing results
 		update_unused_targets(env, klass);
@@ -378,16 +379,16 @@ static void analyzer_handle_no_graph(ir_entity *entity, method_env *env)
 	assert(get_entity_irg(entity) == NULL);
 	assert(env);
 
-	DEBUGOUT(4, "\t\t\thandling method without graph %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+	DEBUGOUT(4, "\t\t\thandling method without graph %s.%s ( %s )\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 
 	// check for redirection to different function via the linker name
 	ir_entity *target = get_ldname_redirect(entity);
 	if (target != NULL) { // if redirection target exists
-		DEBUGOUT(4, "\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		DEBUGOUT(4, "\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 		add_to_workqueue(target, get_entity_owner(entity), env);//Entity owner might not be correct, but it doesn't matter, as live classes are ignored
 	} else {
 		// assume external
-		DEBUGOUT(4, "\t\t\tprobably external %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		DEBUGOUT(4, "\t\t\tprobably external %s.%s ( %s )\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 
 		//Handle external methode (e.g. native)
 		//Add all known subclasses of return type live. Hopefully we don't lose much precision.
@@ -415,7 +416,7 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 	analyzer_env *a_env = env->analyzer_env;
 	method_info *done_entity_info = cpmap_find(a_env->done_map, entity);
 	if (done_entity_info == NULL) { // only enqueue if not already done
-		DEBUGOUT(3, "\t\t\tadding %s.%s ( %s ) [%s] to workqueue\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), ((get_entity_irg(entity)) ? "graph" : "nograph"));
+		DEBUGOUT(3, "\t\t\tadding %s.%s ( %s ) [%s] to workqueue\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity), ((get_entity_irg(entity)) ? "graph" : "nograph"));
 		method_env *entity_menv = (method_env *) malloc(sizeof(method_env));
 		entity_menv->entity = entity;
 		method_info *info = new_method_info();
@@ -424,7 +425,7 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 		if (is_Class_type(get_entity_owner(entity)) && oo_get_class_is_extern(get_entity_owner(entity))) {
 			//Handle external library methods
 			info->is_library_method = true;
-			DEBUGOUT(4, "%s.%s is marked as library method\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
+			DEBUGOUT(4, "%s.%s is marked as library method\n", COMP_ENT_NAME(entity));
 		}
 		if (klass != NULL && is_Class_type(klass))
 			add_new_live_class(klass, entity_menv);
@@ -481,7 +482,7 @@ static void take_entity(ir_entity *entity, ir_type *klass, cpset_t *result_set, 
 	assert(env);
 
 	if (cpset_find(result_set, entity) == NULL) { // take each entity only once (the sets won't mind but the workqueue)
-		DEBUGOUT(4, "\t\t\ttaking entity %s.%s ( %s ) of %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity), get_compound_name(klass));
+		DEBUGOUT(4, "\t\t\ttaking entity %s.%s ( %s ) of %s\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity), get_compound_name(klass));
 
 		// add to result set
 		cpset_insert(result_set, entity);
@@ -510,7 +511,7 @@ static ir_entity *find_implementation_recursive(ir_type *klass, ir_entity *call_
 		if (oo_get_method_is_abstract(result)) {
 			result = NULL;
 		} else {
-			DEBUGOUT(3, "\t\t\t\t\tfound candidate %s.%s ( %s ) [%s]\n", get_compound_name(get_entity_owner(result)), get_entity_name(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
+			DEBUGOUT(3, "\t\t\t\t\tfound candidate %s.%s ( %s ) [%s]\n", COMP_ENT_NAME(result), get_entity_ld_name(result), ((get_entity_irg(result)) ? "graph" : "nograph"));
 		}
 	} else {
 		result = fir_ascend_into_superclasses_and_merge(klass, call_entity, result);
@@ -601,7 +602,7 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 
 	ir_entity *overwriting_entity = get_class_member_by_name(klass, get_entity_ident(current_entity));
 	if (overwriting_entity != NULL && overwriting_entity != current_entity) { // if has overwriting entity
-		DEBUGOUT(3, "\t\t\t%s.%s overwrites %s.%s\n", get_compound_name(get_entity_owner(overwriting_entity)), get_entity_name(overwriting_entity), get_compound_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
+		DEBUGOUT(3, "\t\t\t%s.%s overwrites %s.%s\n", COMP_ENT_NAME(overwriting_entity), COMP_ENT_NAME(current_entity));
 
 		current_entity = overwriting_entity;
 	}
@@ -611,10 +612,10 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 	// support for FIRM usage without any entity copies at all (not even for case interface method implemention inherited from a superclass) -> have to assume some usual semantics
 	// for interface calls (or more general abstract calls) there has to be a non-abstract implementation in each non-abstract subclass, if there is no entity copy we have to find the implementation by ourselves (in cases an inherited method implements the abstract method)
 	if (oo_get_method_is_abstract(call_entity) && !oo_get_class_is_abstract(klass) && !oo_get_class_is_interface(klass) && oo_get_method_is_abstract(current_entity)) { // careful: interfaces seem not always to be marked as abstract
-		DEBUGOUT(3, "\t\t\tlooking for inherited implementation of abstract method %s.%s\n", get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity));
+		DEBUGOUT(3, "\t\t\tlooking for inherited implementation of abstract method %s.%s\n", COMP_ENT_NAME(call_entity));
 		ir_entity *inherited_impl = find_inherited_implementation(klass, call_entity);
 		if (inherited_impl != NULL) {
-			DEBUGOUT(3, "\t\t\t\tfound %s.%s as inherited implementation\n", get_compound_name(get_entity_owner(inherited_impl)), get_entity_name(inherited_impl));
+			DEBUGOUT(3, "\t\t\t\tfound %s.%s as inherited implementation\n", COMP_ENT_NAME(inherited_impl));
 			current_entity = inherited_impl;
 		} else {
 			DEBUGOUT(3, "\t\t\t\tfound no inherited implementation to abstract call entity\n");
@@ -627,14 +628,14 @@ static void collect_methods_recursive(ir_entity *call_entity, ir_type *klass, ir
 			if (is_in_iteration_set(m_info->live_classes, klass)) { // if class is considered in use
 				take_entity(current_entity, klass, result_set, env);
 			} else {
-				DEBUGOUT(3, "\t\t\tclass not in use, memorizing %s.%s %s\n", get_compound_name(get_entity_owner(current_entity)), get_entity_name(current_entity), ((get_entity_irg(current_entity)) ? "G" : "N"));
+				DEBUGOUT(3, "\t\t\tclass not in use, memorizing %s.%s %s\n", COMP_ENT_NAME(current_entity), ((get_entity_irg(current_entity)) ? "G" : "N"));
 				memorize_unused_target(klass, current_entity, call_entity, env); // remember entity with this class for patching if this class will become used
 			}
 		} else {
 			cpset_insert(result_set, current_entity);
 		}
 	} else {
-		DEBUGOUT(3, "\t\t\t%s.%s is abstract\n", get_compound_name(get_entity_owner(current_entity)), get_entity_name(current_entity));
+		DEBUGOUT(3, "\t\t\t%s.%s is abstract\n", COMP_ENT_NAME(current_entity));
 	}
 
 	size_t n_subtypes = get_class_n_subtypes(klass);
@@ -737,7 +738,7 @@ static void analyzer_handle_static_call(ir_node *call, ir_entity *entity, method
 		ir_entity *called_method = detect_call(call); //TODO support for more than one
 		if (called_method) {
 			assert(is_method_entity(called_method));
-			DEBUGOUT(4, "\t\texternal method calls %s.%s ( %s )\n", get_compound_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+			DEBUGOUT(4, "\t\texternal method calls %s.%s ( %s )\n", COMP_ENT_NAME(called_method), get_entity_ld_name(called_method));
 			add_to_workqueue(called_method, get_entity_owner(called_method), env);//Don't know whether owner is always correct
 		}
 	}
@@ -751,7 +752,7 @@ static void analyzer_handle_dynamic_call(ir_node *call, ir_entity *entity, metho
 	assert(is_method_entity(entity));
 	assert(env);
 
-	DEBUGOUT(4, "\tdynamic call: %s.%s %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+	DEBUGOUT(4, "\tdynamic call: %s.%s %s\n", COMP_ENT_NAME(entity), gdb_node_helper(entity));
 
 	analyzer_env *a_env = env->analyzer_env;
 	cpmap_t *call_sites = cpmap_find(a_env->dyncall_targets, entity);
@@ -975,7 +976,7 @@ static void analyze_iro_Address(ir_node *address, method_env *m_env)
 	ir_entity *entity = get_Address_entity(address);
 	if (is_method_entity(entity)) {
 		// could be a function whose address is taken (although usually the Address node of a normal call, these cases cannot be distinguished)
-		DEBUGOUT(4, "\tAddress with method entity: %s.%s %s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), gdb_node_helper(entity));
+		DEBUGOUT(4, "\tAddress with method entity: %s.%s %s\n", COMP_ENT_NAME(entity), gdb_node_helper(entity));
 		DEBUGOUT(4, "\t\tcould be address taken, so it could be called\n");
 
 		//look whether methods calls constructors that aren't in a graph
@@ -1069,7 +1070,7 @@ static void debug_print_info(method_info *info)
 	ir_entity *entity;
 	printf("======FIELD WRITES=====\n");
 	while ((entity = cpset_iterator_next(&iterator)) != NULL) {
-		printf("%s.%s, ", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
+		printf("%s.%s, ", COMP_ENT_NAME(entity));
 	}
 	printf("\n");
 
@@ -1077,7 +1078,7 @@ static void debug_print_info(method_info *info)
 	cpset_iterator_init(&iterator, set);
 	printf("======FIELD READS=====\n");
 	while ((entity = cpset_iterator_next(&iterator)) != NULL) {
-		printf("%s.%s, ", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
+		printf("%s.%s, ", COMP_ENT_NAME(entity));
 	}
 	printf("\n");
 
@@ -1104,7 +1105,7 @@ static void debug_print_info(method_info *info)
 	cpset_iterator_init(&iterator, set);
 	printf("======CALLERS=====\n");
 	while ((entity = cpset_iterator_next(&iterator)) != NULL) {
-		printf("%s.%s, ", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
+		printf("%s.%s, ", COMP_ENT_NAME(entity));
 	}
 	printf("\n");
 	printf("===END INFO BLOCK=========\n");
@@ -1154,7 +1155,7 @@ static void collect_arg_and_res_types(method_env *env)
 	//library methods, constructors, static and private methods don't have the special handling of the this pointer, so arg0 has to be handled like normal parameters
 	if (method_as_lib_meth(env->entity, info) || is_constr(env->entity) || get_entity_owner(env->entity) == get_glob_type() || oo_get_entity_binding(env->entity) == bind_static) {
 		if (is_constr(env->entity))
-			DEBUGOUT(3, "Constructor found: %s.%s\n", get_compound_name(get_entity_owner(env->entity)), get_entity_name(env->entity));
+			DEBUGOUT(3, "Constructor found: %s.%s\n", COMP_ENT_NAME(env->entity));
 		i = 0;
 	}
 	for (; i < arg_n; i++) {
@@ -1373,7 +1374,7 @@ static bool propagate_live_classes(analyzer_env *env)
 #if (DEBUG_XTA > 3)
 				if (res) {
 					if (!field_as_external(field)) {
-						printf("Field %s.%s updated to:\n", get_compound_name(get_entity_owner(field)), get_entity_name(field));
+						printf("Field %s.%s updated to:\n", COMP_ENT_NAME(field));
 						iteration_set *i_set = cpmap_find(env->live_classes_fields, field);
 						cpset_iterator_t iterator;
 						cpset_iterator_init(&iterator, i_set->propagated);
@@ -1572,7 +1573,7 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *entity = entry.key;
 				method_info *info = entry.data;
-				DEBUGOUT(2, "\n== %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+				DEBUGOUT(2, "\n== %s.%s ( %s )\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 				DEBUGCALL(2) debug_print_info(info);
 			}
 
@@ -1585,7 +1586,7 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 			while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 				const ir_entity *call_entity = entry.key;
 				assert(call_entity);
-				DEBUGOUT(2, "\t%s.%s %s\n", get_compound_name(get_entity_owner(call_entity)), get_entity_name(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
+				DEBUGOUT(2, "\t%s.%s %s\n", COMP_ENT_NAME(call_entity), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 
 				cpmap_t *call_sites = entry.data;
 				assert(call_sites);
@@ -1596,7 +1597,7 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 				while ((e = cpmap_iterator_next(&iter)).key != NULL || e.data != NULL) {
 					const ir_entity *call_site = e.key;
 					assert(call_site);
-					DEBUGOUT(2, "\t\t%s.%s\n", get_compound_name(get_entity_owner(call_site)), get_entity_name(call_site));
+					DEBUGOUT(2, "\t\t%s.%s\n", COMP_ENT_NAME(call_site));
 
 					cpset_t *targets = e.data;
 					assert(targets);
@@ -1604,7 +1605,7 @@ static void print_xta_run_res_calc_stats(analyzer_env *env)
 					cpset_iterator_init(&it, targets);
 					ir_entity *method;
 					while ((method = cpset_iterator_next(&it)) != NULL) {
-						DEBUGOUT(2, "\t\t\t%s.%s %s\n", get_compound_name(get_entity_owner(method)), get_entity_name(method), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
+						DEBUGOUT(2, "\t\t\t%s.%s %s\n", COMP_ENT_NAME(method), (oo_get_class_is_extern(get_entity_owner(call_entity))) ? "external" : "");
 					}
 				}
 			}
@@ -1673,7 +1674,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 				}
 			}
 
-			DEBUGOUT(2, "== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+			DEBUGOUT(2, "== %s.%s (%s)\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 			cpmap_set(env->done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
 			DEBUGOUT(3, "COLLECTING ARGS AND RES TYPES\n");
 			collect_arg_and_res_types(m_env);
@@ -1930,7 +1931,7 @@ static void optimizer_add_to_workqueue(ir_entity *method, optimizer_env *env)
 	assert(env);
 
 	if (cpset_find(env->done_set, method) == NULL) { // only enqueue if not already done
-		DEBUGOUT(4, "\t\tadding %s.%s to workqueue\n", get_compound_name(get_entity_owner(method)), get_entity_name(method));
+		DEBUGOUT(4, "\t\tadding %s.%s to workqueue\n", COMP_ENT_NAME(method));
 		pdeq_putr(env->workqueue, method);
 	}
 }
@@ -1942,12 +1943,12 @@ static void optimizer_handle_no_graph(ir_entity *entity, optimizer_env *env)
 	assert(get_entity_irg(entity) == NULL);
 	assert(env);
 
-	DEBUGOUT(4, "\t\t\thandling method without graph %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+	DEBUGOUT(4, "\t\t\thandling method without graph %s.%s ( %s )\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 
 	// check for redirection to different function via the linker name
 	ir_entity *target = get_ldname_redirect(entity);
 	if (target != NULL) { // if redirection target exists
-		DEBUGOUT(4, "\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		DEBUGOUT(4, "\t\t\t\tentity seems to redirect to different function via the linker name: %s.%s ( %s )\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 		optimizer_add_to_workqueue(target, env);
 	}
 }
@@ -1975,7 +1976,7 @@ static void optimizer_handle_static_call(ir_node *call, ir_entity *entity, optim
 		ir_entity *called_method = detect_call(call);
 		if (called_method) {
 			assert(is_method_entity(called_method));
-			DEBUGOUT(4, "\t\texternal method calls %s.%s (%s)\n", get_compound_name(get_entity_owner(called_method)), get_entity_name(called_method), get_entity_ld_name(called_method));
+			DEBUGOUT(4, "\t\texternal method calls %s.%s (%s)\n", COMP_ENT_NAME(called_method), get_entity_ld_name(called_method));
 			optimizer_add_to_workqueue(called_method, env);
 		}
 	}
@@ -2023,8 +2024,8 @@ static void optimizer_handle_dynamic_call(ir_node *call, ir_entity *entity, ir_n
 #endif
 
 		// set an Address node as callee to make the call statically bound
-		DEBUGOUT(2, "\t\tdevirtualizing call %s.%s -> %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_compound_name(get_entity_owner(target)), get_entity_name(target));
-		DEBUGOUT(2, "\t\tin method %s.%s\n", get_compound_name(get_entity_owner(get_irg_entity(get_irn_irg(call)))), get_entity_name(get_irg_entity(get_irn_irg(call))));
+		DEBUGOUT(2, "\t\tdevirtualizing call %s.%s -> %s.%s\n", COMP_ENT_NAME(entity), COMP_ENT_NAME(target));
+		DEBUGOUT(2, "\t\tin method %s.%s\n", COMP_ENT_NAME(get_irg_entity(get_irn_irg(call))));
 		ir_graph *graph = get_irn_irg(methodsel);
 		ir_node *address = new_r_Address(graph, target);
 		ir_node *mem = get_irn_n(methodsel, 0);
@@ -2141,7 +2142,7 @@ static void xta_devirtualize_calls(ir_entity **entry_points, cpmap_t *dyncall_ta
 
 		if (cpset_find(env.done_set, entity) != NULL) continue;
 
-		DEBUGOUT(4, "\n== %s.%s (%s)\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_entity_ld_name(entity));
+		DEBUGOUT(4, "\n== %s.%s (%s)\n", COMP_ENT_NAME(entity), get_entity_ld_name(entity));
 #ifdef XTA_STATS
 		env.n_reachmeth++;
 #endif
@@ -2221,7 +2222,7 @@ static void fetch_methodsel_entities(ir_node *node, void *env)
 	if (!cpset_find(methodsel_entities, entity)) {
 		cpset_insert(methodsel_entities, entity);
 		if (!cpset_find(helper->walked_methods, entity) && get_entity_irg(entity) != NULL) {
-			DEBUGOUT(3, "\t Setting abstract %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity));
+			DEBUGOUT(3, "\t Setting abstract %s.%s\n", COMP_ENT_NAME(entity));
 			free_ir_graph(get_entity_irg(entity));
 			oo_set_method_is_abstract(entity, true);
 		}
@@ -2250,7 +2251,7 @@ static void adjust_overwrites_at_deletion(ir_entity *entity)
 	for (size_t i = 0; i < n_overwrites; ++i) {
 		ir_entity *overwrites = get_entity_overwrites(entity, i);
 		remove_entity_overwrittenby(overwrites, entity);
-		DEBUGOUT(3, "\t Removing overwrittenby %s.%s from entity %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_compound_name(get_entity_owner(overwrites)), get_entity_name(overwrites));
+		DEBUGOUT(3, "\t Removing overwrittenby %s.%s from entity %s.%s\n", COMP_ENT_NAME(entity), COMP_ENT_NAME(overwrites));
 	}
 }
 
@@ -2262,16 +2263,16 @@ static void adjust_overwrittenby_at_deletion(ir_entity *entity)
 		ir_entity *overwrittenby = get_entity_overwrittenby(entity, i);
 		remove_entity_overwrites(overwrittenby, entity);
 
-		DEBUGOUT(3, "\t Removing overwrites %s.%s from entity %s.%s\n", get_compound_name(get_entity_owner(entity)), get_entity_name(entity), get_compound_name(get_entity_owner(overwrittenby)), get_entity_name(overwrittenby));
+		DEBUGOUT(3, "\t Removing overwrites %s.%s from entity %s.%s\n", COMP_ENT_NAME(entity), COMP_ENT_NAME(overwrittenby));
 		for (size_t j = 0; j < get_entity_n_overwrites(entity); ++j) {
 			ir_entity *overwrites = get_entity_overwrites(entity, j);
 			add_entity_overwrites(overwrittenby, overwrites);
-			DEBUGOUT(3, "\t Adding inheritance from %s.%s to %s.%s\n", get_compound_name(get_entity_owner(overwrittenby)), get_entity_name(overwrittenby), get_compound_name(get_entity_owner(overwrites)), get_entity_name(overwrites));
+			DEBUGOUT(3, "\t Adding inheritance from %s.%s to %s.%s\n", COMP_ENT_NAME(overwrittenby), COMP_ENT_NAME(overwrites));
 		}
 
 		if (get_entity_n_overwrites(overwrittenby) == 0) {
 			oo_set_method_is_inherited(overwrittenby, false);
-			DEBUGOUT(3, "\t Unsetting entity is inherited from entity %s.%s\n", get_compound_name(get_entity_owner(overwrittenby)), get_entity_name(overwrittenby));
+			DEBUGOUT(3, "\t Unsetting entity is inherited from entity %s.%s\n", COMP_ENT_NAME(overwrittenby));
 		}
 	}
 }
