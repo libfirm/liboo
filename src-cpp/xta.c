@@ -27,7 +27,7 @@
 
 #include <libfirm/timing.h>
 // debug setting
-#define DEBUG_XTA 5
+#define DEBUG_XTA 0
 #define DEBUGOUT(lvl, ...) if (DEBUG_XTA >= lvl) printf(__VA_ARGS__);
 #define DEBUGCALL(lvl) if (DEBUG_XTA >= lvl)
 #define COMP_ENT_NAME(entity) get_compound_name(get_entity_owner(entity)), get_entity_name(entity)
@@ -110,6 +110,8 @@ typedef struct iteration_set {
 	cpset_t *current;
 	cpset_t *new;
 } iteration_set;
+
+enum set_type { propagated_type, current_type };
 
 typedef struct analyzer_env {
 	pdeq *workqueue; // workqueue for the run over the (reduced) callgraph
@@ -407,6 +409,9 @@ static inline bool method_as_lib_meth(ir_entity *entity, method_info *info)
 	return info->is_library_method && !ext_method_is_non_leaking(entity);
 }
 
+static void propagate_parameters(method_env *env, cpset_t *caller_set);
+static void propagate_return_type(cpset_t *caller_set, method_info *callee_info, enum set_type type);
+
 static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 {
 	assert(entity);
@@ -433,44 +438,24 @@ static void add_to_workqueue(ir_entity *entity, ir_type *klass, method_env *env)
 		pdeq_putr(a_env->workqueue, entity_menv);
 	} else {
 		cpset_insert(done_entity_info->callers, env->entity);
+		method_env entity_menv;
+		entity_menv.entity = entity;
+		entity_menv.analyzer_env = a_env;
+		entity_menv.info = done_entity_info;
 		if (klass != NULL && is_Class_type(klass)) {
-			method_env entity_menv;
-			entity_menv.entity = entity;
-			entity_menv.analyzer_env = a_env;
-			entity_menv.info = done_entity_info;
 			add_new_live_class(klass, &entity_menv);
 		}
 		//This is later done for entities added to the workqueue.
 		//for already analyzed methods, we update already propagated info here.
 		if (entity != env->entity) { //Only if call is non-recursive
 			method_info *caller_info = env->info;
-			cpset_t cut;
-			cpset_init(&cut, hash_ptr, ptr_equals);
 			//Parameters
 			iteration_set *caller_i_set = caller_info->live_classes;
-			iteration_set *callee_i_set = done_entity_info->live_classes;
-			cut_sets(&cut, caller_i_set->propagated, done_entity_info->parameter_subtypes);
-			if (method_as_lib_meth(entity, done_entity_info)) {
-				make_subset(a_env->ext_live_classes, &cut);
-			} else {
-				make_subset(callee_i_set->new, &cut);
-			}
-			//Unsure whether really necessary
-			cut_sets(&cut, caller_i_set->current, done_entity_info->parameter_subtypes);
-			if (method_as_lib_meth(entity, done_entity_info)) {
-				make_subset(a_env->ext_live_classes, &cut);
-			} else {
-				make_subset(callee_i_set->new, &cut);
-			}
-			cpset_destroy(&cut);
-			cpset_init(&cut, hash_ptr, ptr_equals);
+			propagate_parameters(&entity_menv, caller_i_set->propagated);
+			propagate_parameters(&entity_menv, caller_i_set->current);
 			//Return
-			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->propagated);
-			make_subset(caller_i_set->new, &cut);
-			cut_sets(&cut, done_entity_info->return_subtypes, callee_i_set->current);
-			make_subset(caller_i_set->new, &cut);
-
-			cpset_destroy(&cut);
+			propagate_return_type(caller_i_set->new, done_entity_info, propagated_type);
+			propagate_return_type(caller_i_set->new, done_entity_info, current_type);
 		}
 	}
 }
@@ -1134,12 +1119,13 @@ static void make_subset(cpset_t *a, cpset_t *b)
 {
 	assert(a);
 	assert(b);
-
-	cpset_iterator_t iterator;
-	cpset_iterator_init(&iterator, b);
-	void  *element;
-	while ((element = cpset_iterator_next(&iterator)) != NULL) {
-		cpset_insert(a, element);
+	if(cpset_size(b) != 0) {
+		cpset_iterator_t iterator;
+		cpset_iterator_init(&iterator, b);
+		void  *element;
+		while ((element = cpset_iterator_next(&iterator)) != NULL) {
+			cpset_insert(a, element);
+		}
 	}
 }
 
@@ -1301,6 +1287,80 @@ static bool update_iteration_sets(analyzer_env *env)
 	}
 	return change;
 }
+
+static void propagate_parameters(method_env *env, cpset_t *caller_set) {
+	cpset_t cut;
+	cpset_init(&cut, hash_ptr, ptr_equals);
+	iteration_set *callee_i_set = env->info->live_classes;
+	if (cpset_size(caller_set) != 0) {
+		cut_sets(&cut, caller_set, env->info->parameter_subtypes);
+		if (method_as_lib_meth(env->entity, env->info)) {
+			make_subset(env->analyzer_env->ext_live_classes, &cut);
+		} else {
+			make_subset(callee_i_set->new, &cut);
+		}
+	}
+	cpset_destroy(&cut);
+}
+
+static void propagate_parameters_of_callers(method_env *env, enum set_type type) {
+	cpset_iterator_t set_iterator;
+	cpset_iterator_init(&set_iterator, env->info->callers);
+	ir_entity *caller;
+	while ((caller = cpset_iterator_next(&set_iterator)) != NULL) {
+		method_info *caller_info = cpmap_find(env->analyzer_env->done_map, caller);
+		iteration_set *caller_i_set = caller_info->live_classes;
+		cpset_t *caller_set;
+		if(type == current_type)
+			caller_set = caller_i_set->current;
+		else
+			caller_set = caller_i_set->propagated;
+		propagate_parameters(env, caller_set);
+	}
+}
+
+static void propagate_return_type(cpset_t *caller_set, method_info *callee_info, enum set_type type) {
+	iteration_set *callee_i_set = callee_info->live_classes;
+	cpset_t *callee_set;
+	if(type == current_type)
+		callee_set = callee_i_set->current;
+	else
+		callee_set = callee_i_set->propagated;
+	cpset_t cut;
+	if (cpset_size(callee_set) != 0) {
+		cpset_init(&cut, hash_ptr, ptr_equals);
+		cut_sets(&cut, callee_info->return_subtypes, callee_set);
+		make_subset(caller_set, &cut);
+		cpset_destroy(&cut);
+	}
+}
+
+static void propagate_field_reads(method_env *env, enum set_type type) {
+	cpset_iterator_t set_iterator;
+	cpset_iterator_init(&set_iterator, env->info->field_reads);
+	ir_entity *field;
+	iteration_set *callee_i_set = env->info->live_classes;
+	while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
+		if (field_as_external(field)) {
+			cpset_t cut;
+			cpset_init(&cut, hash_ptr, ptr_equals);
+			cut_sets(&cut, env->analyzer_env->ext_live_classes, get_subclasses_from_type(get_entity_type(field)));
+			make_subset(callee_i_set->new, &cut);
+			cpset_destroy(&cut);
+		} else {
+			iteration_set *field_i_set = cpmap_find(env->analyzer_env->live_classes_fields, field);
+			if (field_i_set) {
+				cpset_t *field_set;
+				if(type == current_type)
+					field_set = field_i_set->current;
+				else
+					field_set = field_i_set->propagated;
+				make_subset(callee_i_set->new, field_set);
+			}
+		}
+	}
+}
+
 static bool propagate_live_classes(analyzer_env *env)
 {
 	assert(env);
@@ -1309,57 +1369,29 @@ static bool propagate_live_classes(analyzer_env *env)
 	cpmap_iterator_init(&iterator, done_map);
 	cpmap_entry_t entry;
 	bool change = false;
+	method_env menv;
+	menv.analyzer_env = env;
 	while ((entry = cpmap_iterator_next(&iterator)).key != NULL || entry.data != NULL) {
 		method_info *info = (method_info *) entry.data;
 		ir_entity *callee = (ir_entity *) entry.key;
 		iteration_set *callee_i_set = info->live_classes;
 		cpset_iterator_t set_iterator;
 		//Method calls
+		menv.entity = callee;
+		menv.info = info;
 		cpset_iterator_init(&set_iterator, info->callers);
 		ir_entity *caller;
 		while ((caller = cpset_iterator_next(&set_iterator)) != NULL) {
 			method_info *caller_info = cpmap_find(done_map, caller);
-			cpset_t cut;
-			cpset_init(&cut, hash_ptr, ptr_equals);
-			//Parameters
 			iteration_set *caller_i_set = caller_info->live_classes;
-			if (cpset_size(caller_i_set->current) != 0) {
-				cut_sets(&cut, caller_i_set->current, info->parameter_subtypes);
-				if (method_as_lib_meth(callee, info)) {
-					make_subset(env->ext_live_classes, &cut);
-				} else {
-					make_subset(callee_i_set->new, &cut);
-				}
-			}
-			cpset_destroy(&cut);
-			cpset_init(&cut, hash_ptr, ptr_equals);
-			//Return
-			if (cpset_size(callee_i_set->current) != 0) {
-				cut_sets(&cut, info->return_subtypes, callee_i_set->current);
-				make_subset(caller_i_set->new, &cut);
-			}
-
-			cpset_destroy(&cut);
+			propagate_parameters(&menv, caller_i_set->current);
+			propagate_return_type(caller_i_set->new, info, current_type);
 		}
 		//Field Reads
-		cpset_iterator_init(&set_iterator, info->field_reads);
-		ir_entity *field;
-		while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
-			if (field_as_external(field)) {
-				cpset_t cut;
-				cpset_init(&cut, hash_ptr, ptr_equals);
-				cut_sets(&cut, env->ext_live_classes, get_subclasses_from_type(get_entity_type(field)));
-				make_subset(callee_i_set->new, &cut);
-				cpset_destroy(&cut);
-			} else {
-				iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
-				if (field_i_set && cpset_size(field_i_set->current) != 0) {
-					make_subset(callee_i_set->new, field_i_set->current);
-				}
-			}
-		}
+		propagate_field_reads(&menv, current_type);
 		//Field Writes
 		cpset_iterator_init(&set_iterator, info->field_writes);
+		ir_entity *field;
 		while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
 			cpset_t *subtypes;
 			subtypes = get_subclasses_from_type(get_entity_type(field));
@@ -1678,27 +1710,8 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 			cpmap_set(env->done_map, entity, m_env->info); // mark as done _before_ walking to not add it again in case of recursive calls
 			DEBUGOUT(3, "COLLECTING ARGS AND RES TYPES\n");
 			collect_arg_and_res_types(m_env);
-			DEBUGOUT(3, "COLLECTING LIVE CLASSES FROM CALLLERS\n");
 			//This has to be done here, because already propagated classes will not be looked at during propagaton.
-			cpset_iterator_t set_iterator;
-			//Method calls
-			cpset_iterator_init(&set_iterator, info->callers);
-			ir_entity *caller;
-			while ((caller = cpset_iterator_next(&set_iterator)) != NULL) {
-				method_info *caller_info = cpmap_find(env->done_map, caller);
-				cpset_t cut;
-				cpset_init(&cut, hash_ptr, ptr_equals);
-				//Parameters
-				iteration_set *caller_i_set = caller_info->live_classes;
-				cut_sets(&cut, caller_i_set->propagated, info->parameter_subtypes);
-				if (method_as_lib_meth(entity, info)) {
-					make_subset(env->ext_live_classes, &cut);
-				} else {
-					make_subset(callee_i_set->new, &cut);
-				}
-
-				cpset_destroy(&cut);
-			}
+			propagate_parameters_of_callers(m_env, propagated_type);
 
 			DEBUGOUT(4, "CURRENT INFO\n");
 			DEBUGCALL(4) debug_print_info(m_env->info);
@@ -1717,23 +1730,7 @@ static void xta_run_loop(analyzer_env *env, ir_type **initial_live_classes)
 
 			//Handle already propagated live classes of fields, that are read from (Therefore doing it after analyzing graph)
 			//Field Reads
-			cpset_iterator_init(&set_iterator, info->field_reads);
-			ir_entity *field;
-			while ((field = cpset_iterator_next(&set_iterator)) != NULL) {
-				if (field_as_external(field)) {
-					cpset_t cut;
-					cpset_init(&cut, hash_ptr, ptr_equals);
-					cut_sets(&cut, env->ext_live_classes, get_subclasses_from_type(get_entity_type(field)));
-					make_subset(callee_i_set->new, &cut);
-					cpset_destroy(&cut);
-				} else {
-					iteration_set *field_i_set = cpmap_find(env->live_classes_fields, field);
-					if (field_i_set) {
-						make_subset(callee_i_set->new, field_i_set->propagated);
-					}
-				}
-			}
-
+			propagate_field_reads(m_env, propagated_type);
 			free(m_env);
 		}
 		//Initializer queue
