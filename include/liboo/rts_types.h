@@ -35,6 +35,7 @@ struct class_info_t {
 	uint32_t              mask1;
 	uint32_t              mask2;
 	uint32_t              mask3;
+	uint32_t              mask4;
 };
 typedef struct class_info_t class_info_t;
 

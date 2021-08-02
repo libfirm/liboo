@@ -14,6 +14,21 @@
 #include <libfirm/adt/pmap.h>
 #include <libfirm/typerep.h>
 
+#define MASK_COUNT 5
+static const unsigned BYTES_PER_WORD = 4;
+static const unsigned BITS_PER_TAG = 2;
+static const unsigned MASK_BITS = 32;
+/* TODO The X10 compiler should set this */
+static const unsigned HEADER_WORDS = 5;
+
+typedef enum {
+	TAG_INT = 0,
+	TAG_POINTER = 1,
+	TAG_TRANSIENT = 2,
+	TAG_ARRAY_START = 3,
+	TAG_INVALID = 4,
+} pointer_tag_t;
+
 static ir_type   *class_info;
 static ir_entity *class_info_name;
 static ir_entity *class_info_uid;
@@ -23,7 +38,7 @@ static ir_entity *class_info_n_methods;
 static ir_entity *class_info_methods;
 static ir_entity *class_info_n_interfaces;
 static ir_entity *class_info_interfaces;
-static ir_entity *class_info_masks[4];
+static ir_entity *class_info_masks[MASK_COUNT];
 
 static ir_type   *method_info;
 static ir_entity *method_info_name;
@@ -122,14 +137,13 @@ static void init_rtti_firm_types(void)
 	class_info_n_interfaces = new_entity(class_info, id, type_uint32_t);
 	id = new_id_from_str("interfaces");
 	class_info_interfaces = new_entity(class_info, id, type_reference);
-	id = new_id_from_str("mask0");
-	class_info_masks[0] = new_entity(class_info, id, type_uint32_t);
-	id = new_id_from_str("mask1");
-	class_info_masks[1] = new_entity(class_info, id, type_uint32_t);
-	id = new_id_from_str("mask2");
-	class_info_masks[2] = new_entity(class_info, id, type_uint32_t);
-	id = new_id_from_str("mask3");
-	class_info_masks[3] = new_entity(class_info, id, type_uint32_t);
+	for (int i = 0; i < MASK_COUNT; i++) {
+		char ident[6];
+		assert(MASK_COUNT <= 9);
+		sprintf(ident, "mask%d", i);
+		id = new_id_from_str(ident);
+		class_info_masks[i] = new_entity(class_info, id, type_uint32_t);
+	}
 	default_layout_compound_type(class_info);
 	/* I'd really like to use the following assert, unfortunately it is
 	 * useless when we are cross-compiling. And I see no easy way at the
@@ -299,21 +313,6 @@ static ir_entity *create_interface_table(ir_type *klass, size_t n_interfaces)
 
 	return entity;
 }
-
-#define MASK_COUNT 4
-static const unsigned BYTES_PER_WORD = 4;
-static const unsigned BITS_PER_TAG = 2;
-static const unsigned MASK_BITS = 32;
-/* TODO The X10 compiler should set this */
-static const unsigned HEADER_WORDS = 5;
-
-typedef enum {
-	TAG_INT = 0,
-	TAG_POINTER = 1,
-	TAG_TRANSIENT = 2,
-	TAG_ARRAY_START = 3,
-	TAG_INVALID = 4,
-} pointer_tag_t;
 
 void register_array_type(ir_type *type, array_kind_t kind)
 {
